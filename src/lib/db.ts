@@ -26,58 +26,31 @@ db.version(1).stores({
   monthSettings: 'yearMonth',
 })
 
-// v2: 스키마 변경 없음. 기존 DB에 반복 거래 시드를 한 번만 넣기 위한 업그레이드.
-db.version(2).stores({}).upgrade(async (tx) => {
-  const count = await tx.table('recurringRules').count()
-  if (count > 0) return
-  const categories = await tx.table('categories').toArray()
-  const subsId = categories.find((c) => c.name === '구독')?.id ?? null
-  await tx.table('recurringRules').bulkAdd(seedRecurringRules(subsId))
-})
+// v2: 스키마 변경 없음. 예전에는 여기서 반복 거래를 시드했으나 지금은 넣지 않는다.
+// 이미 v2로 올라간 DB가 열리려면 이 선언 자체는 남아 있어야 한다.
+db.version(2).stores({})
 
-// 앱 가이드 §8 초기 카테고리. DB가 처음 만들어질 때 한 번만 들어간다.
+// 기본 카테고리. 예산 금액은 사용자가 직접 정하도록 0(미설정)으로 둔다.
 const seedCategories: Omit<Category, 'id'>[] = [
-  { name: '식비', monthlyBudget: 258000, color: '#8ebeff', isFixed: true, sortOrder: 0 },
-  { name: '카페', monthlyBudget: 43000, color: '#b7a7f8', isFixed: true, sortOrder: 1 },
-  { name: '교통비', monthlyBudget: 19970, color: '#83dad8', isFixed: true, sortOrder: 2 },
-  { name: '구독', monthlyBudget: 58490, color: '#c4a8e7', isFixed: true, sortOrder: 3 },
-  { name: '미용', monthlyBudget: 35000, color: '#e6b8dc', isFixed: true, sortOrder: 4 },
-  { name: '투자', monthlyBudget: 20000, color: '#95b7e9', isFixed: true, sortOrder: 5 },
-  { name: '기타', monthlyBudget: 0, color: '#a8aebb', isFixed: false, sortOrder: 6 },
+  { name: '식비', monthlyBudget: 0, color: '#8ebeff', isFixed: false, sortOrder: 0 },
+  { name: '교통비', monthlyBudget: 0, color: '#83dad8', isFixed: false, sortOrder: 1 },
+  { name: '구독', monthlyBudget: 0, color: '#c4a8e7', isFixed: true, sortOrder: 2 },
+  { name: '카페', monthlyBudget: 0, color: '#b7a7f8', isFixed: false, sortOrder: 3 },
 ]
 
-// 앱 가이드 §8 반복 거래. 2026년 9월부터 시작한다.
-function seedRecurringRules(subscriptionCategoryId: string | null): RecurringRule[] {
-  const rule = (
-    name: string,
-    amount: number,
-    type: 'expense' | 'income',
-    categoryId: string | null,
-    dayOfMonth: number,
-  ): RecurringRule => ({
-    id: crypto.randomUUID(),
-    name,
-    amount,
-    type,
-    categoryId,
-    dayOfMonth,
-    startDate: '2026-09-01',
-    endDate: null,
-    lastGeneratedMonth: null,
-  })
-  return [
-    rule('용돈', 700000, 'income', null, 1),
-    rule('구독 A', 9900, 'expense', subscriptionCategoryId, 8),
-    rule('구독 B', 2500, 'expense', subscriptionCategoryId, 17),
-    rule('구독 C', 1100, 'expense', subscriptionCategoryId, 21),
-    rule('구독 D', 13990, 'expense', subscriptionCategoryId, 21),
-    rule('해외 구독', 31000, 'expense', subscriptionCategoryId, 30),
-  ]
-}
-
 db.on('populate', (tx) => {
-  const categories = seedCategories.map((c) => ({ ...c, id: crypto.randomUUID() }))
-  tx.table('categories').bulkAdd(categories)
-  const subsId = categories.find((c) => c.name === '구독')?.id ?? null
-  tx.table('recurringRules').bulkAdd(seedRecurringRules(subsId))
+  tx.table('categories').bulkAdd(seedCategories.map((c) => ({ ...c, id: crypto.randomUUID() })))
 })
+
+/**
+ * 브라우저가 저장소를 임의로 비우지 않도록 요청한다.
+ * 승인 여부는 브라우저가 결정하며(설치 여부, 사용 빈도 등), 거부돼도 앱 동작에는 영향이 없다.
+ */
+export async function requestPersistentStorage(): Promise<boolean> {
+  if (!navigator.storage?.persist) return false
+  try {
+    return (await navigator.storage.persisted()) || (await navigator.storage.persist())
+  } catch {
+    return false
+  }
+}

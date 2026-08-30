@@ -25,7 +25,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { addMonths, format, getDaysInMonth, parseISO } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { calcTodayBudget, remainingToday, spentByCategory, spentOnDate } from './lib/budget'
-import { db } from './lib/db'
+import { db, requestPersistentStorage } from './lib/db'
 import { money } from './lib/format'
 import { useCategories } from './lib/hooks'
 import type { Transaction } from './lib/types'
@@ -62,7 +62,6 @@ function Header({ dark, onTheme }: { dark: boolean; onTheme: () => void }) {
       <div className="header-actions">
         <button className="icon-button desktop-search" aria-label="검색"><Search size={19} /></button>
         <button className="icon-button" onClick={onTheme} aria-label="테마 전환">{dark ? <Sun size={19} /> : <Moon size={19} />}</button>
-        <button className="avatar" aria-label="프로필">SY</button>
       </div>
     </header>
   )
@@ -85,7 +84,7 @@ function Sidebar({ active, setActive }: { active: Tab; setActive: (tab: Tab) => 
   return <aside className="sidebar"><nav>{items.map(item => { const Icon = item.icon; return <button key={item.id} onClick={() => setActive(item.id)} className={active === item.id ? 'active' : ''}><Icon size={19}/><span>{item.label}</span></button> })}</nav><div className="month-chip"><Planet small/><div><span>{Number(month.slice(5))}월의 행성</span><strong>{usage ?? 0}% 사용 중</strong></div></div></aside>
 }
 
-function HomeView({ openExpense, goTransactions }: { openExpense: () => void; goTransactions: () => void }) {
+function HomeView({ openExpense, goTransactions, goSettings }: { openExpense: () => void; goTransactions: () => void; goSettings: () => void }) {
   const categories = useCategories() ?? []
   const today = format(new Date(), 'yyyy-MM-dd')
   const month = today.slice(0, 7)
@@ -120,6 +119,14 @@ function HomeView({ openExpense, goTransactions }: { openExpense: () => void; go
     </section>
 
     <div className="section-heading"><div><p className="eyebrow">MONTHLY PLAN</p><h2>이번 달 예산</h2></div><button className="text-button">전체 보기 <ChevronRight size={16}/></button></div>
+    {budgeted.length === 0 && loaded && <section className="transaction-card">
+      <div className="empty-state">
+        <span className="empty-planet" aria-hidden="true" />
+        <strong>아직 예산을 정하지 않았어요</strong>
+        <p>카테고리마다 월 예산을 정하면 여기에 진행률이 보여요.</p>
+        <button className="outline-button" onClick={goSettings}>카테고리 관리로 이동</button>
+      </div>
+    </section>}
     <section className="category-grid">
       {budgeted.map((category) => {
         const used = spent.get(category.id) ?? 0
@@ -339,7 +346,8 @@ function App() {
   useEffect(() => { document.documentElement.classList.toggle('dark', dark) }, [dark])
   useEffect(() => { document.body.style.overflow = sheet ? 'hidden' : '' }, [sheet])
   useEffect(() => { materializeRecurring(format(new Date(), 'yyyy-MM-dd')) }, [])
-  const content = useMemo(() => ({home:<HomeView openExpense={()=>setSheet(true)} goTransactions={()=>setActive('transactions')}/>,calendar:<CalendarView/>,transactions:<TransactionsView openExpense={()=>setSheet(true)}/>,settings:<SettingsView dark={dark} onTheme={()=>setDark(!dark)}/>})[active], [active,dark])
+  useEffect(() => { requestPersistentStorage() }, [])
+  const content = useMemo(() => ({home:<HomeView openExpense={()=>setSheet(true)} goTransactions={()=>setActive('transactions')} goSettings={()=>setActive('settings')}/>,calendar:<CalendarView/>,transactions:<TransactionsView openExpense={()=>setSheet(true)}/>,settings:<SettingsView dark={dark} onTheme={()=>setDark(!dark)}/>})[active], [active,dark])
   return <div className="app-shell"><Header dark={dark} onTheme={()=>setDark(!dark)}/><Sidebar active={active} setActive={setActive}/><main>{content}</main>{(active==='home'||active==='transactions')&&<button className="desktop-add" onClick={()=>setSheet(true)}><Plus size={20}/> 추가</button>}<nav className="bottom-nav">{([{id:'home',label:'홈',icon:Home},{id:'calendar',label:'달력',icon:CalendarDays},{id:'transactions',label:'거래',icon:ListFilter},{id:'settings',label:'설정',icon:Settings}] as const).map(item=>{const Icon=item.icon;return <button key={item.id} className={active===item.id?'active':''} onClick={()=>setActive(item.id)}><Icon size={20}/><span>{item.label}</span></button>})}</nav>{sheet&&<ExpenseSheet close={()=>setSheet(false)}/>}</div>
 }
 
