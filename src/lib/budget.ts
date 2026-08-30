@@ -1,5 +1,5 @@
 import { getDaysInMonth, parseISO } from 'date-fns'
-import type { Category, Transaction } from './types'
+import type { Category, RecurringRule, Transaction } from './types'
 
 // 앱의 핵심 계산 로직. 전부 순수 함수로 유지한다 (DB, UI 접근 금지).
 // 금액은 전부 정수(원)로 계산하고, 나눗셈은 Math.floor로 내림한다.
@@ -84,6 +84,24 @@ export function spentByCategory(transactions: Transaction[], month: string): Map
 export function categoryProgress(spent: number, monthlyBudget: number): number {
   if (monthlyBudget <= 0) return 0
   return Math.round((spent / monthlyBudget) * 100)
+}
+
+/**
+ * 반복 규칙이 해당 월에 발생하는 날짜.
+ * dayOfMonth가 그 달의 마지막 날보다 크면 마지막 날로 보정한다 (예: 31일 규칙 → 9월 30일).
+ * 시작일 이전이거나 종료일 이후면 null.
+ */
+export function occurrenceDate(
+  rule: Pick<RecurringRule, 'dayOfMonth' | 'startDate' | 'endDate'>,
+  month: string,
+): string | null {
+  const [year, monthNum] = month.split('-').map(Number)
+  const lastDay = getDaysInMonth(new Date(year, monthNum - 1, 1))
+  const day = Math.min(rule.dayOfMonth, lastDay)
+  const date = `${month}-${String(day).padStart(2, '0')}`
+  if (date < rule.startDate) return null
+  if (rule.endDate && date > rule.endDate) return null
+  return date
 }
 
 /**

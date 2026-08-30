@@ -29,9 +29,11 @@ import { db } from './lib/db'
 import { money } from './lib/format'
 import { useCategories } from './lib/hooks'
 import type { Transaction } from './lib/types'
+import { materializeRecurring } from './lib/recurring'
 import { CategoryPlanet } from './components/CategoryPlanet'
 import { CategorySettings } from './components/CategorySettings'
 import { ExpenseSheet } from './components/ExpenseSheet'
+import { RecurringSettings } from './components/RecurringSettings'
 
 type Tab = 'home' | 'calendar' | 'transactions' | 'settings'
 
@@ -220,11 +222,12 @@ function TransactionsView({ openExpense }: { openExpense: () => void }) {
 }
 
 function SettingsView({ dark, onTheme }: { dark: boolean; onTheme: () => void }) {
-  const [sub, setSub] = useState<'categories' | null>(null)
+  const [sub, setSub] = useState<'categories' | 'recurring' | null>(null)
   if (sub === 'categories') return <CategorySettings back={() => setSub(null)} />
+  if (sub === 'recurring') return <RecurringSettings back={() => setSub(null)} />
   const settings = [
     { icon: CircleDollarSign, title: '카테고리 관리', desc: '예산과 카테고리 색상 설정', onClick: () => setSub('categories') },
-    { icon: Repeat2, title: '반복 거래', desc: '정기 수입과 예정 지출 관리', onClick: undefined },
+    { icon: Repeat2, title: '반복 거래', desc: '정기 수입과 예정 지출 관리', onClick: () => setSub('recurring') },
     { icon: WalletCards, title: '예비비 설정', desc: '이번 달 예비비 50,000원', onClick: undefined },
   ]
   return <div className="view"><div className="page-heading"><div><p className="eyebrow">PREFERENCES</p><h1>설정</h1><p>나의 예산 행성을 관리하세요.</p></div></div><section className="settings-card">{settings.map(row=>{const Icon=row.icon;return <button className="setting-row" key={row.title} onClick={row.onClick}><span><Icon size={20}/></span><div><strong>{row.title}</strong><small>{row.desc}</small></div><ChevronRight size={18}/></button>})}</section><h2 className="settings-subhead">앱 설정</h2><section className="settings-card"><button className="setting-row" onClick={onTheme}><span>{dark?<Moon size={20}/>:<Sun size={20}/>}</span><div><strong>화면 테마</strong><small>{dark?'다크 모드':'라이트 모드'}</small></div><i className={`toggle ${dark?'on':''}`}><b/></i></button><button className="setting-row"><span><Download size={20}/></span><div><strong>데이터 내보내기</strong><small>CSV 파일로 안전하게 보관</small></div><ChevronRight size={18}/></button></section><p className="version">ORBIT BUDGET · UI PROTOTYPE 0.3</p></div>
@@ -236,6 +239,7 @@ function App() {
   const [sheet, setSheet] = useState(false)
   useEffect(() => { document.documentElement.classList.toggle('dark', dark) }, [dark])
   useEffect(() => { document.body.style.overflow = sheet ? 'hidden' : '' }, [sheet])
+  useEffect(() => { materializeRecurring(format(new Date(), 'yyyy-MM-dd')) }, [])
   const content = useMemo(() => ({home:<HomeView openExpense={()=>setSheet(true)} goTransactions={()=>setActive('transactions')}/>,calendar:<CalendarView/>,transactions:<TransactionsView openExpense={()=>setSheet(true)}/>,settings:<SettingsView dark={dark} onTheme={()=>setDark(!dark)}/>})[active], [active,dark])
   return <div className="app-shell"><Header dark={dark} onTheme={()=>setDark(!dark)}/><Sidebar active={active} setActive={setActive}/><main>{content}</main>{(active==='home'||active==='transactions')&&<button className="desktop-add" onClick={()=>setSheet(true)}><Plus size={20}/> 추가</button>}<nav className="bottom-nav">{([{id:'home',label:'홈',icon:Home},{id:'calendar',label:'달력',icon:CalendarDays},{id:'transactions',label:'거래',icon:ListFilter},{id:'settings',label:'설정',icon:Settings}] as const).map(item=>{const Icon=item.icon;return <button key={item.id} className={active===item.id?'active':''} onClick={()=>setActive(item.id)}><Icon size={20}/><span>{item.label}</span></button>})}</nav>{sheet&&<ExpenseSheet close={()=>setSheet(false)}/>}</div>
 }

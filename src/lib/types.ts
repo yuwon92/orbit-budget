@@ -16,6 +16,7 @@ export interface Transaction {
   memo: string
   isPlanned: boolean // 예정 거래인지 실제 발생인지
   createdAt: number // 입력 시각 (epoch ms). 같은 날짜 안에서의 정렬과 시간 표시용
+  recurringRuleId?: string // 반복 규칙이 자동 생성한 거래면 그 규칙의 id
 }
 
 export interface RecurringRule {
@@ -27,6 +28,7 @@ export interface RecurringRule {
   dayOfMonth: number // 매달 며칠
   startDate: string
   endDate: string | null // null이면 무기한
+  lastGeneratedMonth: string | null // 이 달("yyyy-MM")까지 예정 거래를 만들었음. 중복 생성 방지
 }
 
 export interface MonthSettings {

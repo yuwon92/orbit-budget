@@ -149,3 +149,7 @@
 
 /* Hero over-budget state */
 .hero-copy h1.negative span,.hero-copy h1.negative small{color:var(--danger)}
+
+/* Recurring rules */
+.field-pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.income-chip{font-style:normal;font-size:9px;font-weight:700;color:color-mix(in srgb,var(--cosmic-cyan) 45%,var(--text-primary));background:color-mix(in srgb,var(--cosmic-cyan) 16%,transparent);border-radius:20px;padding:2px 7px;margin-left:7px;vertical-align:1px}

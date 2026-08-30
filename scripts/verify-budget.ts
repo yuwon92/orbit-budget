@@ -7,6 +7,7 @@ import {
   categoryProgress,
   freeBudget,
   occurredExpense,
+  occurrenceDate,
   remainingDays,
   remainingToday,
   spentByCategory,
@@ -101,5 +102,14 @@ console.log(`구독 진행률   = ${subsProgress}% (월말 기준 100%)`)
 assert.equal(spent.get('subs'), 58_490)
 assert.equal(subsProgress, 100)
 assert.equal(categoryProgress(1234, 0), 0) // 예산 미설정이면 0%
+
+// --- 반복 거래 발생일 (월말 보정) ---
+const rule31 = { dayOfMonth: 31, startDate: '2026-01-01', endDate: null }
+assert.equal(occurrenceDate(rule31, '2026-09'), '2026-09-30') // 9월은 30일까지
+assert.equal(occurrenceDate(rule31, '2026-02'), '2026-02-28') // 2월 보정
+assert.equal(occurrenceDate(rule31, '2026-10'), '2026-10-31')
+assert.equal(occurrenceDate({ dayOfMonth: 8, startDate: '2026-09-10', endDate: null }, '2026-09'), null) // 시작 전
+assert.equal(occurrenceDate({ dayOfMonth: 21, startDate: '2026-01-01', endDate: '2026-09-15' }, '2026-09'), null) // 종료 후
+console.log('반복 거래 발생일 (31일 규칙 → 9/30, 2월 보정, 기간 검사) 통과')
 
 console.log('\n모든 검산 통과')
