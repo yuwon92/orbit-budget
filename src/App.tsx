@@ -22,7 +22,7 @@ import {
   X,
 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { format, parseISO } from 'date-fns'
+import { addMonths, format, getDaysInMonth, parseISO } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { calcTodayBudget, remainingToday, spentByCategory, spentOnDate } from './lib/budget'
 import { db } from './lib/db'
@@ -158,9 +158,91 @@ function HomeView({ openExpense, goTransactions }: { openExpense: () => void; go
 }
 
 function CalendarView() {
-  const days = Array.from({ length: 35 }, (_, i) => i - 1)
-  const expenses: Record<number, string> = { 1:'50,000', 3:'8,500', 5:'12,000', 8:'9,900', 10:'500,000', 12:'7,400', 13:'16,500', 17:'2,500', 21:'15,090', 25:'4,800', 30:'31,000' }
-  return <div className="view"><div className="page-heading"><div><p className="eyebrow">MONTHLY ORBIT</p><h1>달력</h1><p>날짜별 소비 흐름과 예정 거래를 확인하세요.</p></div><div className="month-switch"><button><ChevronLeft size={18}/></button><strong>2026년 9월</strong><button><ChevronRight size={18}/></button></div></div><section className="calendar-card"><div className="weekdays">{['일','월','화','수','목','금','토'].map(d=><span key={d}>{d}</span>)}</div><div className="calendar-grid">{days.map((day,i)=> { const indicator = day===10||day===25?'income':day===8||day===17||day===21||day===30?'planned':''; return day < 1 || day > 30 ? <div className="calendar-day muted" key={i}/> : <button className={`calendar-day ${day===13?'selected':''}`} key={i}><span>{day}</span>{expenses[day]&&<span className="calendar-amount">{indicator&&<i className={indicator}/>}<strong>{expenses[day]}</strong></span>}</button> })}</div><div className="calendar-legend"><span><i className="planned"/> 예정 거래</span><span><i className="income"/> 수입</span></div></section><section className="selected-day"><div><p className="eyebrow">SELECTED DAY</p><h2>9월 13일</h2></div><strong>-16,500원</strong></section></div>
+  const today = format(new Date(), 'yyyy-MM-dd')
+  const [month, setMonth] = useState(today.slice(0, 7))
+  const [selected, setSelected] = useState<string | null>(today)
+  const categories = useCategories() ?? []
+  const catMap = useMemo(() => new Map(categories.map(c => [c.id, c])), [categories])
+  const monthTx = useLiveQuery(() => db.transactions.where('date').startsWith(month).toArray(), [month])
+
+  const byDay = useMemo(() => {
+    const map = new Map<string, { expense: number; hasPlanned: boolean; hasIncome: boolean }>()
+    for (const t of monthTx ?? []) {
+      const info = map.get(t.date) ?? { expense: 0, hasPlanned: false, hasIncome: false }
+      if (t.type === 'expense') info.expense += t.amount
+      if (t.type === 'income') info.hasIncome = true
+      if (t.isPlanned) info.hasPlanned = true
+      map.set(t.date, info)
+    }
+    return map
+  }, [monthTx])
+
+  const monthDate = parseISO(`${month}-01`)
+  const daysInMonth = getDaysInMonth(monthDate)
+  const firstWeekday = monthDate.getDay()
+  const cellCount = Math.ceil((firstWeekday + daysInMonth) / 7) * 7
+  const moveMonth = (delta: number) => {
+    setMonth(format(addMonths(monthDate, delta), 'yyyy-MM'))
+    setSelected(null)
+  }
+
+  const dayTx = selected
+    ? (monthTx ?? []).filter(t => t.date === selected).sort((a, b) => a.createdAt - b.createdAt)
+    : []
+  const dayNet = dayTx.reduce((sum, t) => sum + (t.type === 'income' ? t.amount : -t.amount), 0)
+
+  return <div className="view">
+    <div className="page-heading">
+      <div><p className="eyebrow">MONTHLY ORBIT</p><h1>달력</h1><p>날짜별 소비 흐름과 예정 거래를 확인하세요.</p></div>
+      <div className="month-switch">
+        <button onClick={() => moveMonth(-1)} aria-label="이전 달"><ChevronLeft size={18}/></button>
+        <strong>{format(monthDate, 'yyyy년 M월')}</strong>
+        <button onClick={() => moveMonth(1)} aria-label="다음 달"><ChevronRight size={18}/></button>
+      </div>
+    </div>
+    <section className="calendar-card">
+      <div className="weekdays">{['일','월','화','수','목','금','토'].map(d=><span key={d}>{d}</span>)}</div>
+      <div className="calendar-grid">
+        {Array.from({ length: cellCount }, (_, i) => {
+          const day = i - firstWeekday + 1
+          if (day < 1 || day > daysInMonth) return <div className="calendar-day muted" key={i}/>
+          const date = `${month}-${String(day).padStart(2, '0')}`
+          const info = byDay.get(date)
+          return <button
+            className={`calendar-day ${selected === date ? 'selected' : ''} ${date === today ? 'today' : ''}`}
+            key={i}
+            onClick={() => setSelected(date)}
+          >
+            <span>{day}</span>
+            {info && (info.expense > 0 || info.hasPlanned || info.hasIncome) && <span className="calendar-amount">
+              {info.hasPlanned && <i className="planned"/>}
+              {info.hasIncome && <i className="income"/>}
+              {info.expense > 0 && <strong>{money(info.expense)}</strong>}
+            </span>}
+          </button>
+        })}
+      </div>
+      <div className="calendar-legend"><span><i className="planned"/> 예정 거래</span><span><i className="income"/> 수입</span></div>
+    </section>
+    {selected && <section className="selected-day">
+      <div className="selected-head">
+        <div><p className="eyebrow">SELECTED DAY</p><h2>{format(parseISO(selected), 'M월 d일, EEEE', { locale: ko })}</h2></div>
+        {dayTx.length > 0 && <strong className={dayNet > 0 ? 'income-text' : ''}>{dayNet > 0 ? '+' : dayNet < 0 ? '-' : ''}{money(Math.abs(dayNet))}원</strong>}
+      </div>
+      {dayTx.length === 0
+        ? <p className="empty-note">이날의 내역이 없어요.</p>
+        : dayTx.map(t => {
+            const cat = t.categoryId ? catMap.get(t.categoryId) : undefined
+            const income = t.type === 'income'
+            return <div className="transaction-row" key={t.id}>
+              <span className="transaction-time">{format(t.createdAt, 'HH:mm')}</span>
+              <CategoryPlanet color={income ? '#83dad8' : cat?.color ?? '#a8aebb'}/>
+              <div className="transaction-name"><strong>{t.memo || cat?.name || (income ? '수입' : '지출')}{t.isPlanned && <em className="planned-chip">예정</em>}</strong><span>{income ? '수입' : cat?.name ?? '미분류'}</span></div>
+              <strong className={`transaction-amount ${income ? 'income-text' : ''}`}>{income ? '+' : '-'}{money(t.amount)}원</strong>
+            </div>
+          })}
+    </section>}
+  </div>
 }
 
 function TransactionsView({ openExpense }: { openExpense: () => void }) {
