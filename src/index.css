@@ -16,7 +16,11 @@
 .calendar-amount{display:flex;align-items:center;gap:4px;color:var(--text-secondary);font-variant-numeric:tabular-nums}
 .calendar-amount i{width:5px;height:5px;border-radius:50%;flex:0 0 5px}
 .calendar-amount strong{font-size:10px;font-weight:500;line-height:1}
+.calendar-amount.income strong{color:color-mix(in srgb,var(--cosmic-cyan) 52%,var(--text-primary));font-weight:600}
+.calendar-amount.planned strong{color:var(--text-tertiary)}
 .calendar-more{font-size:9px;color:var(--text-tertiary);line-height:1}
+.calendar-legend b{font-weight:700}
+.calendar-legend .legend-income b{color:color-mix(in srgb,var(--cosmic-cyan) 52%,var(--text-primary))}
 
 @media(max-width:680px){
   .calendar-amount{gap:3px}
