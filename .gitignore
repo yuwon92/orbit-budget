@@ -1,5 +1,6 @@
 node_modules
 dist
+dev-dist
 
 # 개발 가이드 문서 (로컬 전용)
 budget-app-guide.md
