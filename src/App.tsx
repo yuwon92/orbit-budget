@@ -100,7 +100,7 @@ function HomeView({ openExpense, goTransactions }: { openExpense: () => void; go
   const heroBarColor = usedPercent >= 100 ? 'var(--danger)' : usedPercent >= 80 ? '#e7b96a' : undefined
   const spent = spentByCategory(txs, month)
   const todayTx = loaded
-    ? txs.filter(t => t.date === today && t.type === 'expense').sort((a, b) => a.createdAt - b.createdAt)
+    ? txs.filter(t => t.date === today).sort((a, b) => a.createdAt - b.createdAt)
     : undefined
   const budgeted = categories.filter(c => c.monthlyBudget > 0)
   return <div className="view home-view">
@@ -131,26 +131,27 @@ function HomeView({ openExpense, goTransactions }: { openExpense: () => void; go
       })}
     </section>
 
-    <div className="section-heading transaction-heading"><div><p className="eyebrow">TODAY</p><h2>오늘 지출</h2></div><button className="text-button" onClick={goTransactions}>거래 내역 <ChevronRight size={16}/></button></div>
+    <div className="section-heading transaction-heading"><div><p className="eyebrow">TODAY</p><h2>오늘 내역</h2></div><button className="text-button" onClick={goTransactions}>거래 내역 <ChevronRight size={16}/></button></div>
     <section className="transaction-card">
       {todayTx && todayTx.length === 0
         ? <div className="empty-state">
             <span className="empty-planet" aria-hidden="true" />
-            <strong>아직 지출이 없어요</strong>
+            <strong>아직 내역이 없어요</strong>
             <p>오늘의 첫 기록을 남겨보세요.</p>
-            <button className="outline-button" onClick={openExpense}><Plus size={16}/> 지출 추가</button>
+            <button className="outline-button" onClick={openExpense}><Plus size={16}/> 추가</button>
           </div>
         : (todayTx ?? []).map(t => {
             const cat = t.categoryId ? catMap.get(t.categoryId) : undefined
+            const income = t.type === 'income'
             return <div className="transaction-row" key={t.id}>
               <span className="transaction-time">{format(t.createdAt, 'HH:mm')}</span>
               <CategoryPlanet color={cat?.color ?? '#a8aebb'}/>
-              <div className="transaction-name"><strong>{t.memo || cat?.name || '지출'}</strong><span>{cat?.name ?? '미분류'}</span></div>
-              <strong className="transaction-amount">-{money(t.amount)}원</strong>
+              <div className="transaction-name"><strong>{t.memo || cat?.name || (income ? '수입' : '지출')}</strong><span>{income ? '수입' : cat?.name ?? '미분류'}</span></div>
+              <strong className={`transaction-amount ${income ? 'income-text' : ''}`}>{income ? '+' : '-'}{money(t.amount)}원</strong>
             </div>
           })}
     </section>
-    <button className="mobile-add" onClick={openExpense}><Plus size={19}/> 지출 추가</button>
+    <button className="mobile-add" onClick={openExpense}><Plus size={19}/> 추가</button>
   </div>
 }
 
@@ -214,6 +215,7 @@ function TransactionsView({ openExpense }: { openExpense: () => void }) {
         })}
       </div>)}
     </section>
+    <button className="mobile-add" onClick={openExpense}><Plus size={19}/> 추가</button>
   </div>
 }
 
@@ -235,7 +237,7 @@ function App() {
   useEffect(() => { document.documentElement.classList.toggle('dark', dark) }, [dark])
   useEffect(() => { document.body.style.overflow = sheet ? 'hidden' : '' }, [sheet])
   const content = useMemo(() => ({home:<HomeView openExpense={()=>setSheet(true)} goTransactions={()=>setActive('transactions')}/>,calendar:<CalendarView/>,transactions:<TransactionsView openExpense={()=>setSheet(true)}/>,settings:<SettingsView dark={dark} onTheme={()=>setDark(!dark)}/>})[active], [active,dark])
-  return <div className="app-shell"><Header dark={dark} onTheme={()=>setDark(!dark)}/><Sidebar active={active} setActive={setActive}/><main>{content}</main>{(active==='home'||active==='transactions')&&<button className="desktop-add" onClick={()=>setSheet(true)}><Plus size={20}/> 지출 추가</button>}<nav className="bottom-nav">{([{id:'home',label:'홈',icon:Home},{id:'calendar',label:'달력',icon:CalendarDays},{id:'transactions',label:'거래',icon:ListFilter},{id:'settings',label:'설정',icon:Settings}] as const).map(item=>{const Icon=item.icon;return <button key={item.id} className={active===item.id?'active':''} onClick={()=>setActive(item.id)}><Icon size={20}/><span>{item.label}</span></button>})}</nav>{sheet&&<ExpenseSheet close={()=>setSheet(false)}/>}</div>
+  return <div className="app-shell"><Header dark={dark} onTheme={()=>setDark(!dark)}/><Sidebar active={active} setActive={setActive}/><main>{content}</main>{(active==='home'||active==='transactions')&&<button className="desktop-add" onClick={()=>setSheet(true)}><Plus size={20}/> 추가</button>}<nav className="bottom-nav">{([{id:'home',label:'홈',icon:Home},{id:'calendar',label:'달력',icon:CalendarDays},{id:'transactions',label:'거래',icon:ListFilter},{id:'settings',label:'설정',icon:Settings}] as const).map(item=>{const Icon=item.icon;return <button key={item.id} className={active===item.id?'active':''} onClick={()=>setActive(item.id)}><Icon size={20}/><span>{item.label}</span></button>})}</nav>{sheet&&<ExpenseSheet close={()=>setSheet(false)}/>}</div>
 }
 
 export default App
