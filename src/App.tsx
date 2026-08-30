@@ -210,11 +210,11 @@ function CalendarView() {
           if (day < 1 || day > daysInMonth) return <div className="calendar-day muted" key={i}/>
           const date = `${month}-${String(day).padStart(2, '0')}`
           const info = byDay.get(date)
-          const lines: { cls: 'expense' | 'income' | 'planned'; text: string }[] = info
+          const lines: { dot: 'spent' | 'income' | 'planned'; text: string }[] = info
             ? [
-                ...(info.expense > 0 ? [{ cls: 'expense' as const, text: `-${money(info.expense)}` }] : []),
-                ...(info.income > 0 ? [{ cls: 'income' as const, text: `+${money(info.income)}` }] : []),
-                ...info.planned.map(p => ({ cls: 'planned' as const, text: `${p.sign}${money(p.amount)}` })),
+                ...(info.expense > 0 ? [{ dot: 'spent' as const, text: `-${money(info.expense)}` }] : []),
+                ...(info.income > 0 ? [{ dot: 'income' as const, text: `+${money(info.income)}` }] : []),
+                ...info.planned.map(p => ({ dot: 'planned' as const, text: `${p.sign}${money(p.amount)}` })),
               ]
             : []
           const shown = lines.slice(0, 2)
@@ -225,15 +225,15 @@ function CalendarView() {
             onClick={() => setSelected(date)}
           >
             <span className="day-num">{day}</span>
-            {shown.map((line, idx) => <span className={`calendar-amount ${line.cls}`} key={idx}>
-              {line.cls === 'planned' && <i className="planned"/>}
+            {shown.map((line, idx) => <span className="calendar-amount" key={idx}>
+              <i className={line.dot}/>
               <strong>{line.text}</strong>
             </span>)}
             {moreCount > 0 && <span className="calendar-more">+{moreCount}개 더보기</span>}
           </button>
         })}
       </div>
-      <div className="calendar-legend"><span><b>−</b> 지출</span><span className="legend-income"><b>+</b> 수입</span><span><i className="planned"/> 예정 거래</span></div>
+      <div className="calendar-legend"><span><i className="spent"/> 지출</span><span><i className="income"/> 수입</span><span><i className="planned"/> 예정 거래</span></div>
     </section>
     {selected && <section className="selected-day">
       <div className="selected-head">
