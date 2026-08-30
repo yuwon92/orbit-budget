@@ -15,6 +15,7 @@ export interface Transaction {
   categoryId: string | null // 수입이거나 미분류면 null
   memo: string
   isPlanned: boolean // 예정 거래인지 실제 발생인지
+  createdAt: number // 입력 시각 (epoch ms). 같은 날짜 안에서의 정렬과 시간 표시용
 }
 
 export interface RecurringRule {
