@@ -29,6 +29,7 @@ import { db } from './lib/db'
 import { money } from './lib/format'
 import { useCategories } from './lib/hooks'
 import type { Transaction } from './lib/types'
+import { buildCsv, downloadCsv } from './lib/csv'
 import { materializeRecurring } from './lib/recurring'
 import { CategoryPlanet } from './components/CategoryPlanet'
 import { CategorySettings } from './components/CategorySettings'
@@ -318,12 +319,17 @@ function SettingsView({ dark, onTheme }: { dark: boolean; onTheme: () => void })
   const [sub, setSub] = useState<'categories' | 'recurring' | null>(null)
   if (sub === 'categories') return <CategorySettings back={() => setSub(null)} />
   if (sub === 'recurring') return <RecurringSettings back={() => setSub(null)} />
+  const exportCsv = async () => {
+    const [transactions, categories] = await Promise.all([db.transactions.toArray(), db.categories.toArray()])
+    if (transactions.length === 0) { window.alert('내보낼 거래가 아직 없어요.'); return }
+    downloadCsv(buildCsv(transactions, categories), `orbit-budget-${format(new Date(), 'yyyy-MM-dd')}.csv`)
+  }
   const settings = [
     { icon: CircleDollarSign, title: '카테고리 관리', desc: '예산과 카테고리 색상 설정', onClick: () => setSub('categories') },
     { icon: Repeat2, title: '반복 거래', desc: '정기 수입과 예정 지출 관리', onClick: () => setSub('recurring') },
     { icon: WalletCards, title: '예비비 설정', desc: '이번 달 예비비 50,000원', onClick: undefined },
   ]
-  return <div className="view"><div className="page-heading"><div><p className="eyebrow">PREFERENCES</p><h1>설정</h1><p>나의 예산 행성을 관리하세요.</p></div></div><section className="settings-card">{settings.map(row=>{const Icon=row.icon;return <button className="setting-row" key={row.title} onClick={row.onClick}><span><Icon size={20}/></span><div><strong>{row.title}</strong><small>{row.desc}</small></div><ChevronRight size={18}/></button>})}</section><h2 className="settings-subhead">앱 설정</h2><section className="settings-card"><button className="setting-row" onClick={onTheme}><span>{dark?<Moon size={20}/>:<Sun size={20}/>}</span><div><strong>화면 테마</strong><small>{dark?'다크 모드':'라이트 모드'}</small></div><i className={`toggle ${dark?'on':''}`}><b/></i></button><button className="setting-row"><span><Download size={20}/></span><div><strong>데이터 내보내기</strong><small>CSV 파일로 안전하게 보관</small></div><ChevronRight size={18}/></button></section><p className="version">ORBIT BUDGET · UI PROTOTYPE 0.3</p></div>
+  return <div className="view"><div className="page-heading"><div><p className="eyebrow">PREFERENCES</p><h1>설정</h1><p>나의 예산 행성을 관리하세요.</p></div></div><section className="settings-card">{settings.map(row=>{const Icon=row.icon;return <button className="setting-row" key={row.title} onClick={row.onClick}><span><Icon size={20}/></span><div><strong>{row.title}</strong><small>{row.desc}</small></div><ChevronRight size={18}/></button>})}</section><h2 className="settings-subhead">앱 설정</h2><section className="settings-card"><button className="setting-row" onClick={onTheme}><span>{dark?<Moon size={20}/>:<Sun size={20}/>}</span><div><strong>화면 테마</strong><small>{dark?'다크 모드':'라이트 모드'}</small></div><i className={`toggle ${dark?'on':''}`}><b/></i></button><button className="setting-row" onClick={exportCsv}><span><Download size={20}/></span><div><strong>데이터 내보내기</strong><small>CSV 파일로 안전하게 보관</small></div><ChevronRight size={18}/></button></section><p className="version">ORBIT BUDGET · UI PROTOTYPE 0.3</p></div>
 }
 
 function App() {

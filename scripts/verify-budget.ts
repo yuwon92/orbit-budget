@@ -15,6 +15,7 @@ import {
   totalIncome,
   upcomingExpense,
 } from '../src/lib/budget.ts'
+import { buildCsv } from '../src/lib/csv.ts'
 import type { Category, Transaction } from '../src/lib/types.ts'
 
 const cat = (id: string, name: string, monthlyBudget: number, isFixed: boolean): Category => ({
@@ -111,5 +112,19 @@ assert.equal(occurrenceDate(rule31, '2026-10'), '2026-10-31')
 assert.equal(occurrenceDate({ dayOfMonth: 8, startDate: '2026-09-10', endDate: null }, '2026-09'), null) // 시작 전
 assert.equal(occurrenceDate({ dayOfMonth: 21, startDate: '2026-01-01', endDate: '2026-09-15' }, '2026-09'), null) // 종료 후
 console.log('반복 거래 발생일 (31일 규칙 → 9/30, 2월 보정, 기간 검사) 통과')
+
+// --- CSV 생성 ---
+const csv = buildCsv(
+  [
+    { ...tx('2026-09-13', 12000, 'expense', 'food', '점심'), isPlanned: false },
+    { ...tx('2026-09-01', 5000, 'expense', null, '콤마,와 "따옴표"') },
+  ],
+  categories,
+)
+const csvLines = csv.split('\n')
+assert.equal(csvLines[0], 'date,type,category,amount,memo,is_planned')
+assert.equal(csvLines[1], '2026-09-01,expense,,5000,"콤마,와 ""따옴표""",false') // 날짜순 정렬 + 이스케이프
+assert.equal(csvLines[2], '2026-09-13,expense,식비,12000,점심,false')
+console.log('CSV 생성 (컬럼 순서, 정렬, 이스케이프) 통과')
 
 console.log('\n모든 검산 통과')
