@@ -1,5 +1,10 @@
 node_modules
 dist
+
+# 개발 가이드 문서 (로컬 전용)
+budget-app-guide.md
+budget-app-ui-guide.md
+CURRENT-UI-GUIDE.md
 *.tsbuildinfo
 vite.config.d.ts
 vite.config.js
