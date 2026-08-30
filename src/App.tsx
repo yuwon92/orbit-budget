@@ -23,6 +23,8 @@ import {
 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { format, parseISO } from 'date-fns'
+import { ko } from 'date-fns/locale'
+import { calcTodayBudget, remainingToday, spentByCategory, spentOnDate } from './lib/budget'
 import { db } from './lib/db'
 import { money } from './lib/format'
 import { useCategories } from './lib/hooks'
@@ -32,17 +34,6 @@ import { CategorySettings } from './components/CategorySettings'
 import { ExpenseSheet } from './components/ExpenseSheet'
 
 type Tab = 'home' | 'calendar' | 'transactions' | 'settings'
-
-function useMonthSpent(month: string) {
-  return useLiveQuery(async () => {
-    const list = await db.transactions.where('date').startsWith(month).toArray()
-    const map: Record<string, number> = {}
-    for (const t of list) {
-      if (t.type === 'expense' && t.categoryId) map[t.categoryId] = (map[t.categoryId] ?? 0) + t.amount
-    }
-    return map
-  }, [month])
-}
 
 function Planet({ small = false }: { small?: boolean }) {
   return (
@@ -81,29 +72,45 @@ function Sidebar({ active, setActive }: { active: Tab; setActive: (tab: Tab) => 
     { id: 'transactions', label: '거래 내역', icon: ListFilter },
     { id: 'settings', label: '설정', icon: Settings },
   ]
-  return <aside className="sidebar"><nav>{items.map(item => { const Icon = item.icon; return <button key={item.id} onClick={() => setActive(item.id)} className={active === item.id ? 'active' : ''}><Icon size={19}/><span>{item.label}</span></button> })}</nav><div className="month-chip"><Planet small/><div><span>9월의 행성</span><strong>34% 사용 중</strong></div></div></aside>
+  const month = format(new Date(), 'yyyy-MM')
+  const usage = useLiveQuery(async () => {
+    const txs = await db.transactions.where('date').startsWith(month).toArray()
+    const income = txs.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0)
+    const expense = txs.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0)
+    return income > 0 ? Math.round(expense / income * 100) : 0
+  }, [month])
+  return <aside className="sidebar"><nav>{items.map(item => { const Icon = item.icon; return <button key={item.id} onClick={() => setActive(item.id)} className={active === item.id ? 'active' : ''}><Icon size={19}/><span>{item.label}</span></button> })}</nav><div className="month-chip"><Planet small/><div><span>{Number(month.slice(5))}월의 행성</span><strong>{usage ?? 0}% 사용 중</strong></div></div></aside>
 }
 
 function HomeView({ openExpense, goTransactions }: { openExpense: () => void; goTransactions: () => void }) {
   const categories = useCategories() ?? []
-  const month = format(new Date(), 'yyyy-MM')
   const today = format(new Date(), 'yyyy-MM-dd')
-  const spent = useMonthSpent(month) ?? {}
+  const month = today.slice(0, 7)
   const catMap = useMemo(() => new Map(categories.map(c => [c.id, c])), [categories])
-  const todayTx = useLiveQuery(async () => {
-    const list = await db.transactions.where('date').equals(today).toArray()
-    return list.filter(t => t.type === 'expense').sort((a, b) => a.createdAt - b.createdAt)
-  }, [today])
-  const todaySpent = (todayTx ?? []).reduce((sum, t) => sum + t.amount, 0)
+  const monthTx = useLiveQuery(() => db.transactions.where('date').startsWith(month).toArray(), [month])
+  const settings = useLiveQuery(() => db.monthSettings.get(month), [month])
+  const loaded = monthTx !== undefined
+  const txs = monthTx ?? []
+
+  const todayBudget = calcTodayBudget(txs, today, settings?.reserveAmount ?? 0)
+  const todaySpent = spentOnDate(txs, today)
+  const remaining = remainingToday(todayBudget, todaySpent)
+  const over = remaining < 0
+  const usedPercent = todayBudget > 0 ? Math.round(todaySpent / todayBudget * 100) : todaySpent > 0 ? 100 : 0
+  const heroBarColor = usedPercent >= 100 ? 'var(--danger)' : usedPercent >= 80 ? '#e7b96a' : undefined
+  const spent = spentByCategory(txs, month)
+  const todayTx = loaded
+    ? txs.filter(t => t.date === today && t.type === 'expense').sort((a, b) => a.createdAt - b.createdAt)
+    : undefined
   const budgeted = categories.filter(c => c.monthlyBudget > 0)
   return <div className="view home-view">
     <section className="hero-card">
       <div className="hero-copy">
-        <p className="eyebrow">9월 13일, 일요일</p>
+        <p className="eyebrow">{format(new Date(), 'M월 d일, EEEE', { locale: ko })}</p>
         <p className="hero-label">오늘 사용할 수 있는 금액</p>
-        <h1><span>32,400</span><small>원</small></h1>
-        <div className="daily-budget"><span>오늘 예산</span><strong>41,200원</strong><i>40%</i></div>
-        <div className="hero-progress"><span style={{ width: '40%' }} /></div>
+        <h1 className={over ? 'negative' : ''}><span>{loaded ? money(remaining) : '—'}</span><small>원</small></h1>
+        <div className="daily-budget"><span>오늘 예산</span><strong>{loaded ? money(todayBudget) : '—'}원</strong><i>{usedPercent}%</i></div>
+        <div className="hero-progress"><span style={{ width: `${Math.min(usedPercent, 100)}%`, ...(heroBarColor ? { background: heroBarColor } : {}) }} /></div>
         <p className="hero-note">오늘 {money(todaySpent)}원을 사용했어요</p>
       </div>
       <Planet />
@@ -112,7 +119,7 @@ function HomeView({ openExpense, goTransactions }: { openExpense: () => void; go
     <div className="section-heading"><div><p className="eyebrow">MONTHLY PLAN</p><h2>이번 달 예산</h2></div><button className="text-button">전체 보기 <ChevronRight size={16}/></button></div>
     <section className="category-grid">
       {budgeted.map((category) => {
-        const used = spent[category.id] ?? 0
+        const used = spent.get(category.id) ?? 0
         const progress = Math.round(used / category.monthlyBudget * 100)
         const barColor = progress >= 100 ? '#ef7777' : progress >= 80 ? '#e7b96a' : category.color
         return <article className="category-card" key={category.id}>

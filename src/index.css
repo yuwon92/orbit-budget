@@ -146,3 +146,6 @@
 .planned-chip{font-style:normal;font-size:9px;font-weight:700;color:color-mix(in srgb,var(--planet-blue) 62%,var(--text-primary));background:color-mix(in srgb,var(--planet-blue) 15%,transparent);border-radius:20px;padding:2px 6px;margin-left:6px;vertical-align:1px}
 .row-delete{border:0;background:none;color:var(--text-tertiary);cursor:pointer;padding:6px;border-radius:8px;display:grid;place-items:center}
 .row-delete:hover{color:var(--danger);background:color-mix(in srgb,var(--danger) 10%,transparent)}
+
+/* Hero over-budget state */
+.hero-copy h1.negative span,.hero-copy h1.negative small{color:var(--danger)}
