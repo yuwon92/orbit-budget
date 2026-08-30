@@ -178,7 +178,7 @@ function TransactionsView({ openExpense }: { openExpense: () => void }) {
   }
 
   return <div className="view">
-    <div className="page-heading"><div><p className="eyebrow">HISTORY</p><h1>거래 내역</h1><p>모든 수입과 지출을 날짜별로 확인하세요.</p></div><button className="outline-button"><Download size={17}/> CSV 내보내기</button></div>
+    <div className="page-heading"><div><p className="eyebrow">HISTORY</p><h1>거래 내역</h1><p>모든 수입과 지출을 날짜별로 확인하세요.</p></div></div>
     <div className="filterbar"><div><Search size={18}/><input placeholder="메모 또는 카테고리 검색"/></div><button><SlidersHorizontal size={17}/> 필터</button></div>
     <section className="history-card">
       {all && all.length === 0 && <div className="empty-state">
