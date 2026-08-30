@@ -166,12 +166,14 @@ function CalendarView() {
   const monthTx = useLiveQuery(() => db.transactions.where('date').startsWith(month).toArray(), [month])
 
   const byDay = useMemo(() => {
-    const map = new Map<string, { expense: number; hasPlanned: boolean; hasIncome: boolean }>()
-    for (const t of monthTx ?? []) {
-      const info = map.get(t.date) ?? { expense: 0, hasPlanned: false, hasIncome: false }
-      if (t.type === 'expense') info.expense += t.amount
-      if (t.type === 'income') info.hasIncome = true
-      if (t.isPlanned) info.hasPlanned = true
+    // 실제 지출은 하루 총액으로 합치고, 예정 지출과 수입은 개별 항목으로 보여준다.
+    const map = new Map<string, { actualExpense: number; items: { dot: 'planned' | 'income'; amount: number }[] }>()
+    const sorted = [...(monthTx ?? [])].sort((a, b) => a.createdAt - b.createdAt)
+    for (const t of sorted) {
+      const info = map.get(t.date) ?? { actualExpense: 0, items: [] }
+      if (t.type === 'expense' && !t.isPlanned) info.actualExpense += t.amount
+      else if (t.type === 'expense') info.items.push({ dot: 'planned', amount: t.amount })
+      else info.items.push({ dot: 'income', amount: t.amount })
       map.set(t.date, info)
     }
     return map
@@ -208,17 +210,22 @@ function CalendarView() {
           if (day < 1 || day > daysInMonth) return <div className="calendar-day muted" key={i}/>
           const date = `${month}-${String(day).padStart(2, '0')}`
           const info = byDay.get(date)
+          const lines: { dot?: 'planned' | 'income'; amount: number }[] = info
+            ? [...(info.actualExpense > 0 ? [{ amount: info.actualExpense }] : []), ...info.items]
+            : []
+          const shown = lines.slice(0, 2)
+          const moreCount = lines.length - shown.length
           return <button
             className={`calendar-day ${selected === date ? 'selected' : ''} ${date === today ? 'today' : ''}`}
             key={i}
             onClick={() => setSelected(date)}
           >
-            <span>{day}</span>
-            {info && (info.expense > 0 || info.hasPlanned || info.hasIncome) && <span className="calendar-amount">
-              {info.hasPlanned && <i className="planned"/>}
-              {info.hasIncome && <i className="income"/>}
-              {info.expense > 0 && <strong>{money(info.expense)}</strong>}
-            </span>}
+            <span className="day-num">{day}</span>
+            {shown.map((line, idx) => <span className="calendar-amount" key={idx}>
+              {line.dot && <i className={line.dot}/>}
+              <strong>{money(line.amount)}</strong>
+            </span>)}
+            {moreCount > 0 && <span className="calendar-more">+{moreCount}개 더보기</span>}
           </button>
         })}
       </div>
