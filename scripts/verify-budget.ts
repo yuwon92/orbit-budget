@@ -11,9 +11,11 @@ import {
   categoryProgress,
   countExpenses,
   dailyAllowance,
+  dailyFreeAmount,
   freeBudget,
   inQuickSlot,
   monthlyOccurrences,
+  monthlyFreeAmount,
   occurredExpense,
   occurrenceDate,
   periodAllowance,
@@ -79,6 +81,39 @@ assert.equal(income, 1_640_950)
 const free = freeBudget(transactions, categories, month)
 console.log(`자유 예산     = ${free.toLocaleString()} (기대: 556,490)`)
 assert.equal(free, 556_490)
+
+// 월 자유 금액: 카테고리 예산은 전액 확보하고, 그 예산으로 덮이지 않는 거래만 추가 차감한다.
+// 9/13 당일 지출 100,000원은 홈 잔액에서 빠지므로 월 자유 금액의 아침 기준선에는 넣지 않는다.
+const monthlyFree = monthlyFreeAmount(transactions, categories, today, 0)
+console.log(`월 자유 금액   = ${monthlyFree.toLocaleString()} (카테고리 예산 + 예산 밖 거래 차감)`)
+assert.equal(monthlyFree, 656_490)
+assert.equal(dailyFreeAmount(transactions, categories, today, 0), 21_883)
+assert.equal(dailyFreeAmount(transactions, categories, today, 50_000), 20_216)
+
+// 실제 설정 화면과 같은 9/1 사례. 이름이 아니라 모든 카테고리의 저장된 월 예산을 합산한다.
+const screenCategories = [
+  cat('food2', '식비', 360_000, true),
+  cat('transport2', '교통비', 42_900, true),
+  cat('subs2', '구독', 58_490, true),
+  cat('cafe2', '카페', 45_000, true),
+  cat('beauty2', '미용', 100_000, true),
+  cat('stationery2', '문구', 0, false),
+  cat('stocks2', '주식', 20_000, true),
+  cat('other2', '기타', 0, false),
+]
+const screenTransactions = [
+  tx('2026-09-01', 700_000, 'income', null, ''),
+  tx('2026-09-10', 821_950, 'income', null, ''),
+  tx('2026-09-08', 9_900, 'expense', 'subs2', ''),
+  tx('2026-09-17', 2_500, 'expense', 'subs2', ''),
+  tx('2026-09-21', 1_100, 'expense', 'subs2', ''),
+  tx('2026-09-21', 13_990, 'expense', 'subs2', ''),
+  tx('2026-09-30', 31_000, 'expense', 'subs2', ''),
+  tx('2026-09-10', 500_000, 'expense', null, ''),
+  tx('2026-09-13', 100_000, 'expense', null, ''),
+]
+assert.equal(monthlyFreeAmount(screenTransactions, screenCategories, '2026-09-01', 100_000), 195_560)
+assert.equal(dailyFreeAmount(screenTransactions, screenCategories, '2026-09-01', 100_000), 6_518)
 
 // --- 오늘 예산 흐름 (9/13 아침 기준) ---
 const occurred = occurredExpense(transactions, today)
@@ -277,8 +312,8 @@ const weekSpend = [
   tx(MON, 30_000, 'expense', 'etc', ''), // 목록에 없는 카테고리 -> 자유에서 빠진다
 ]
 const todaySpend = weekSpend.filter((t) => t.date === MON)
-const dayBudget = 57_358
-const rows = buildBreakdown(homeCats, todaySpend, weekSpend, dayBudget, MON, WEEK_FROM, WEEK_TO)
+const dayFree = 20_000
+const rows = buildBreakdown(homeCats, todaySpend, weekSpend, dayFree, MON, WEEK_FROM)
 
 assert.deepEqual(rows.map((r) => r.categoryId), ['food', 'cafe', 'bus', null])
 // 식비: 주 단위라 이번 주 65,000에서 이번 주 지출 13,000을 뺀다 (오늘치만 빼지 않는다)
@@ -288,20 +323,18 @@ assert.deepEqual(
 )
 // 카페: 요일 지정이라 오늘 몫 5,000에서 오늘 지출 5,000
 assert.deepEqual({ allowance: rows[1].allowance, remaining: rows[1].remaining, used: rows[1].used }, { allowance: 5_000, remaining: 0, used: 1 })
-// 자유: 오늘 예산에서 하루 환산 몫(9,285 + 5,000 + 3,100)을 뺀 뒤 목록 밖 지출 30,000을 뺀다
+// 자유: 월 자유 금액에서 계산한 하루 자유 비용에서 목록 밖 오늘 지출을 뺀다.
 const freeRow = rows[3]
-assert.equal(freeRow.allowance, dayBudget - (9_285 + 5_000 + 3_100))
+assert.equal(freeRow.allowance, dayFree)
 assert.equal(freeRow.spent, 30_000)
 assert.equal(breakdownTotal(rows), rows.reduce((s, r) => s + r.remaining, 0))
 
-// 숨기면 그 줄이 빠지고, 떼어두지 않은 몫만큼 자유가 늘어난다
+// 홈에서 숨기기는 표시 설정일 뿐 계산 결과와 큰 숫자를 바꾸지 않는다.
 const hidden = buildBreakdown(
   [homeCat('food', foodRule), homeCat('cafe', cafeRule, true), homeCat('bus', busRule), homeCat('etc', { kind: 'manual' })],
-  todaySpend, weekSpend, dayBudget, MON, WEEK_FROM, WEEK_TO,
+  todaySpend, weekSpend, dayFree, MON, WEEK_FROM,
 )
-assert.deepEqual(hidden.map((r) => r.categoryId), ['food', 'bus', null])
-assert.equal(hidden[2].allowance, freeRow.allowance + 5_000) // 카페 하루 몫이 자유로
-assert.equal(hidden[2].spent, 35_000) // 카페 지출도 자유에서 빠진다
+assert.deepEqual(hidden, rows)
 console.log('하루 몫 분해 (기간별 예산, 주/일 한도, 건수, 자유 흡수) 통과')
 
 // --- CSV 생성 ---

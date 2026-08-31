@@ -8,12 +8,13 @@ import type { Category } from '../lib/types'
  * 줄마다 기간이 다를 수 있어서(주 단위 / 오늘) 오른쪽에 기간을 같이 적는다.
  */
 export function DailyBreakdown({ rows, categories }: { rows: BreakdownRow[]; categories: Category[] }) {
-  if (rows.length <= 1) return null // 자유 한 줄뿐이면 굳이 쪼개 보여주지 않는다
   const catMap = new Map(categories.map((c) => [c.id, c]))
+  const visibleRows = rows.filter((row) => !row.categoryId || !catMap.get(row.categoryId)?.hiddenOnHome)
+  if (visibleRows.length <= 1) return null // 자유 한 줄뿐이면 굳이 쪼개 보여주지 않는다
 
   return (
     <ul className="hero-breakdown">
-      {rows.map((row) => {
+      {visibleRows.map((row) => {
         const category = row.categoryId ? catMap.get(row.categoryId) : undefined
         const period = row.scope === 'week' ? '이번 주' : '오늘'
         const note =

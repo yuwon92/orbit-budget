@@ -24,7 +24,7 @@ import {
 import { useLiveQuery } from 'dexie-react-hooks'
 import { addMonths, endOfWeek, format, getDaysInMonth, parseISO, startOfWeek } from 'date-fns'
 import { ko } from 'date-fns/locale'
-import { breakdownTotal, buildBreakdown, calcTodayBudget, inQuickSlot, spentByCategory, spentOnDate } from './lib/budget'
+import { breakdownTotal, buildBreakdown, dailyFreeAmount, inQuickSlot, spentByCategory, spentOnDate } from './lib/budget'
 import { db, requestPersistentStorage } from './lib/db'
 import { money } from './lib/format'
 import { useCategories } from './lib/hooks'
@@ -112,15 +112,18 @@ function HomeView({ openExpense, openEdit, openPreset, goTransactions, goCategor
     return () => window.removeEventListener('keydown', onKey)
   }, [menuFor])
 
-  const todayBudget = calcTodayBudget(txs, today, settings?.reserveAmount ?? 0)
   const todaySpent = spentOnDate(txs, today)
   const spent = spentByCategory(txs, month)
   const todayTx = loaded
     ? txs.filter(t => t.date === today).sort((a, b) => a.createdAt - b.createdAt)
     : undefined
-  // 큰 숫자는 화면에 뜬 줄들의 합이다. 주 단위 카테고리는 이번 주 잔액이 그대로 들어간다.
-  const rows = buildBreakdown(categories, todayTx ?? [], weekTx ?? [], todayBudget, today, weekStart, weekEnd)
+  const freeAllowance = dailyFreeAmount(txs, categories, today, settings?.reserveAmount ?? 0)
+  // 카테고리 이름이 아니라 각 카테고리에 저장된 주기 설정을 순회한다.
+  // 주 단위 항목은 이번 주 잔액, 요일 지정 항목은 오늘 잔액, 자유는 하루 자유 비용이다.
+  const rows = buildBreakdown(categories, todayTx ?? [], weekTx ?? [], freeAllowance, today, weekStart)
   const remaining = breakdownTotal(rows)
+  // 현재 잔액에는 오늘 지출이 이미 각 줄에서 빠져 있으므로 다시 빼지 않는다.
+  const todayBudget = remaining + todaySpent
   const over = remaining < 0
   const budgeted = categories.filter(c => c.monthlyBudget > 0)
   const toggleHidden = async (category: typeof categories[number]) => {

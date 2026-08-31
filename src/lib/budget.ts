@@ -57,6 +57,50 @@ export function calcTodayBudget(
   return Math.floor(base / remainingDays(today))
 }
 
+/**
+ * 월 자유 금액.
+ *
+ * 모든 카테고리의 월 예산은 먼저 전액 확보한다. 오늘 이전의 실제 지출과 오늘 이후의
+ * 예정 지출은 같은 카테고리의 월 예산으로 덮이는 범위까지 다시 빼지 않고, 예산 밖 금액과
+ * 예산 초과분만 추가로 차감한다. 오늘 지출은 홈의 현재 잔액에서 별도로 차감한다.
+ */
+export function monthlyFreeAmount(
+  transactions: Transaction[],
+  categories: Category[],
+  today: string,
+  reserveAmount: number,
+): number {
+  const month = today.slice(0, 7)
+  const budgets = new Map(categories.map((category) => [category.id, Math.max(category.monthlyBudget, 0)]))
+  const totalBudget = categories.reduce((sum, category) => sum + Math.max(category.monthlyBudget, 0), 0)
+  const committed = new Map<string, number>()
+
+  for (const transaction of transactions) {
+    if (!inMonth(transaction, month) || transaction.type !== 'expense' || transaction.date === today) continue
+    const categoryId = transaction.categoryId && budgets.has(transaction.categoryId)
+      ? transaction.categoryId
+      : '__outside_budget__'
+    committed.set(categoryId, (committed.get(categoryId) ?? 0) + transaction.amount)
+  }
+
+  let outsideOrOverBudget = 0
+  for (const [categoryId, amount] of committed) {
+    outsideOrOverBudget += Math.max(amount - (budgets.get(categoryId) ?? 0), 0)
+  }
+
+  return totalIncome(transactions, month) - totalBudget - outsideOrOverBudget - reserveAmount
+}
+
+/** 월 자유 금액을 그 달의 30일/31일 전체로 균등하게 나눈 하루 자유 비용. */
+export function dailyFreeAmount(
+  transactions: Transaction[],
+  categories: Category[],
+  today: string,
+  reserveAmount: number,
+): number {
+  return Math.floor(monthlyFreeAmount(transactions, categories, today, reserveAmount) / getDaysInMonth(parseISO(today)))
+}
+
 /** 특정 날짜의 지출 합계 */
 export function spentOnDate(transactions: Transaction[], date: string): number {
   return transactions
@@ -300,32 +344,30 @@ export interface BreakdownRow {
  * 홈 히어로 목록을 만든다. 줄마다 자기 기간을 쓴다 —
  * 주 단위 한도면 이번 주 예산에서 이번 주 지출을, 요일 지정이면 오늘 몫에서 오늘 지출을 뺀다.
  *
- * 자유는 하루짜리다. 오늘 예산에서 보이는 카테고리들의 '하루 환산' 몫을 빼둔 값이라
- * 주 단위 카테고리가 있어도 매일 일정하다. 숨긴 카테고리는 몫을 떼지 않으므로
- * 그 지출이 자유에서 빠진다.
+ * 자유는 월 자유 금액을 30일/31일로 나눈 하루짜리 몫이다.
+ * hiddenOnHome은 표시만 숨길 뿐 예산과 큰 숫자의 계산에는 영향을 주지 않는다.
  */
 export function buildBreakdown(
   categories: Category[],
   todayTx: Transaction[],
   weekTx: Transaction[],
-  todayBudget: number,
+  freeAllowance: number,
   today: string,
   weekStart: string,
-  weekEnd: string,
 ): BreakdownRow[] {
   const rows: BreakdownRow[] = []
   const shown = new Set<string>()
-  let dailyReserved = 0
 
   for (const category of categories) {
-    if (category.hiddenOnHome || !category.budgetRule) continue
+    if (!category.budgetRule) continue
     const period = periodAllowance(category.budgetRule, today)
     const limit = usageLimit(category.budgetRule, today)
     if (!period || !limit) continue
     const weekly = period.scope === 'week'
     const source = weekly ? weekTx : todayTx
     const from = weekly ? weekStart : today
-    const to = weekly ? weekEnd : today
+    // 주간 몫에서도 오늘 이후의 예정 거래는 아직 사용한 금액으로 세지 않는다.
+    const to = today
     const spent = source
       .filter(
         (t) =>
@@ -345,11 +387,9 @@ export function buildBreakdown(
       used: countExpenses(source, category.id, from, to),
       active: limit.active,
     })
-    dailyReserved += dailyAllowance(category.budgetRule, today) ?? 0
     shown.add(category.id)
   }
 
-  const freeAllowance = todayBudget - dailyReserved
   const freeSpent = todayTx
     .filter((t) => t.type === 'expense' && (!t.categoryId || !shown.has(t.categoryId)))
     .reduce((sum, t) => sum + t.amount, 0)
