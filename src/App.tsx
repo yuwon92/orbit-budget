@@ -35,8 +35,10 @@ import { CategoryPlanet } from './components/CategoryPlanet'
 import { CategorySettings } from './components/CategorySettings'
 import { ExpenseSheet } from './components/ExpenseSheet'
 import { RecurringSettings } from './components/RecurringSettings'
+import { ReserveSheet } from './components/ReserveSheet'
 
 type Tab = 'home' | 'calendar' | 'transactions' | 'settings'
+type SettingsSub = 'categories' | 'recurring' | null
 
 function Planet({ small = false }: { small?: boolean }) {
   return (
@@ -84,7 +86,7 @@ function Sidebar({ active, setActive }: { active: Tab; setActive: (tab: Tab) => 
   return <aside className="sidebar"><nav>{items.map(item => { const Icon = item.icon; return <button key={item.id} onClick={() => setActive(item.id)} className={active === item.id ? 'active' : ''}><Icon size={19}/><span>{item.label}</span></button> })}</nav><div className="month-chip"><Planet small/><div><span>{Number(month.slice(5))}월의 행성</span><strong>{usage ?? 0}% 사용 중</strong></div></div></aside>
 }
 
-function HomeView({ openExpense, goTransactions, goSettings }: { openExpense: () => void; goTransactions: () => void; goSettings: () => void }) {
+function HomeView({ openExpense, openEdit, goTransactions, goCategories }: { openExpense: () => void; openEdit: (t: Transaction) => void; goTransactions: () => void; goCategories: () => void }) {
   const categories = useCategories() ?? []
   const today = format(new Date(), 'yyyy-MM-dd')
   const month = today.slice(0, 7)
@@ -118,13 +120,13 @@ function HomeView({ openExpense, goTransactions, goSettings }: { openExpense: ()
       <Planet />
     </section>
 
-    <div className="section-heading"><div><p className="eyebrow">MONTHLY PLAN</p><h2>이번 달 예산</h2></div><button className="text-button">전체 보기 <ChevronRight size={16}/></button></div>
+    <div className="section-heading"><div><p className="eyebrow">MONTHLY PLAN</p><h2>이번 달 예산</h2></div><button className="text-button" onClick={goCategories}>전체 보기 <ChevronRight size={16}/></button></div>
     {budgeted.length === 0 && loaded && <section className="transaction-card">
       <div className="empty-state">
         <span className="empty-planet" aria-hidden="true" />
         <strong>아직 예산을 정하지 않았어요</strong>
         <p>카테고리마다 월 예산을 정하면 여기에 진행률이 보여요.</p>
-        <button className="outline-button" onClick={goSettings}>카테고리 관리로 이동</button>
+        <button className="outline-button" onClick={goCategories}>카테고리 관리로 이동</button>
       </div>
     </section>}
     <section className="category-grid">
@@ -156,7 +158,7 @@ function HomeView({ openExpense, goTransactions, goSettings }: { openExpense: ()
             return <div className="transaction-row" key={t.id}>
               <span className="transaction-time">{format(t.createdAt, 'HH:mm')}</span>
               <CategoryPlanet color={cat?.color ?? '#a8aebb'}/>
-              <div className="transaction-name"><strong>{t.memo || cat?.name || (income ? '수입' : '지출')}</strong><span>{income ? '수입' : cat?.name ?? '미분류'}</span></div>
+              <button className="transaction-name" onClick={() => openEdit(t)}><strong>{t.memo || cat?.name || (income ? '수입' : '지출')}</strong><span>{income ? '수입' : cat?.name ?? '미분류'}</span></button>
               <strong className={`transaction-amount ${income ? 'income-text' : ''}`}>{income ? '+' : '-'}{money(t.amount)}원</strong>
             </div>
           })}
@@ -165,7 +167,7 @@ function HomeView({ openExpense, goTransactions, goSettings }: { openExpense: ()
   </div>
 }
 
-function CalendarView() {
+function CalendarView({ openEdit }: { openEdit: (t: Transaction) => void }) {
   const today = format(new Date(), 'yyyy-MM-dd')
   const [month, setMonth] = useState(today.slice(0, 7))
   const [selected, setSelected] = useState<string | null>(today)
@@ -256,7 +258,7 @@ function CalendarView() {
             return <div className="transaction-row" key={t.id}>
               <span className="transaction-time">{format(t.createdAt, 'HH:mm')}</span>
               <CategoryPlanet color={income ? '#83dad8' : cat?.color ?? '#a8aebb'}/>
-              <div className="transaction-name"><strong>{t.memo || cat?.name || (income ? '수입' : '지출')}{t.isPlanned && <em className="planned-chip">예정</em>}</strong><span>{income ? '수입' : cat?.name ?? '미분류'}</span></div>
+              <button className="transaction-name" onClick={() => openEdit(t)}><strong>{t.memo || cat?.name || (income ? '수입' : '지출')}{t.isPlanned && <em className="planned-chip">예정</em>}</strong><span>{income ? '수입' : cat?.name ?? '미분류'}</span></button>
               <strong className={`transaction-amount ${income ? 'income-text' : ''}`}>{income ? '+' : '-'}{money(t.amount)}원</strong>
             </div>
           })}
@@ -264,13 +266,35 @@ function CalendarView() {
   </div>
 }
 
-function TransactionsView({ openExpense }: { openExpense: () => void }) {
+function TransactionsView({ openExpense, openEdit }: { openExpense: () => void; openEdit: (t: Transaction) => void }) {
   const categories = useCategories() ?? []
   const catMap = useMemo(() => new Map(categories.map(c => [c.id, c])), [categories])
   const all = useLiveQuery(() => db.transactions.orderBy('date').reverse().toArray(), [])
+  const [query, setQuery] = useState('')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [typeFilter, setTypeFilter] = useState<'all' | 'expense' | 'income'>('all')
+  // 카테고리 id 목록. 'none'은 미분류. 비어 있으면 카테고리로 거르지 않는다.
+  const [catFilter, setCatFilter] = useState<string[]>([])
+  const activeCount = (typeFilter === 'all' ? 0 : 1) + (catFilter.length > 0 ? 1 : 0)
+  const filtering = activeCount > 0 || query.trim().length > 0
+  const reset = () => { setQuery(''); setTypeFilter('all'); setCatFilter([]) }
+  const toggleCat = (id: string) =>
+    setCatFilter((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return (all ?? []).filter(t => {
+      if (typeFilter !== 'all' && t.type !== typeFilter) return false
+      if (catFilter.length > 0 && !catFilter.includes(t.categoryId ?? 'none')) return false
+      if (!q) return true
+      const name = t.categoryId ? catMap.get(t.categoryId)?.name ?? '' : '미분류'
+      return t.memo.toLowerCase().includes(q) || name.toLowerCase().includes(q)
+    })
+  }, [all, query, typeFilter, catFilter, catMap])
+
   const groups = useMemo(() => {
     const map = new Map<string, Transaction[]>()
-    for (const t of all ?? []) {
+    for (const t of filtered) {
       if (!map.has(t.date)) map.set(t.date, [])
       map.get(t.date)!.push(t)
     }
@@ -279,7 +303,7 @@ function TransactionsView({ openExpense }: { openExpense: () => void }) {
       items: [...items].sort((a, b) => b.createdAt - a.createdAt),
       net: items.reduce((sum, t) => sum + (t.type === 'income' ? t.amount : -t.amount), 0),
     }))
-  }, [all])
+  }, [filtered])
 
   const remove = async (t: Transaction) => {
     const cat = t.categoryId ? catMap.get(t.categoryId) : undefined
@@ -290,13 +314,51 @@ function TransactionsView({ openExpense }: { openExpense: () => void }) {
 
   return <div className="view">
     <div className="page-heading"><div><p className="eyebrow">HISTORY</p><h1>거래 내역</h1><p>모든 수입과 지출을 날짜별로 확인하세요.</p></div></div>
-    <div className="filterbar"><div><Search size={18}/><input placeholder="메모 또는 카테고리 검색"/></div><button><SlidersHorizontal size={17}/> 필터</button></div>
+    <div className="filterbar">
+      <div>
+        <Search size={18}/>
+        <input placeholder="메모 또는 카테고리 검색" value={query} onChange={e => setQuery(e.target.value)}/>
+        {query && <button className="clear-query" onClick={() => setQuery('')} aria-label="검색어 지우기"><X size={15}/></button>}
+      </div>
+      <button className={filterOpen || activeCount > 0 ? 'active' : ''} onClick={() => setFilterOpen(!filterOpen)}>
+        <SlidersHorizontal size={17}/> 필터{activeCount > 0 ? ` · ${activeCount}` : ''}
+        {activeCount > 0 && <i className="filter-dot" aria-hidden="true"/>}
+      </button>
+    </div>
+    {filterOpen && <section className="filter-panel">
+      <div className="filter-group">
+        <span className="field-label">종류</span>
+        <div className="type-toggle">
+          {([['all','전체'],['expense','지출'],['income','수입']] as const).map(([id, label]) =>
+            <button key={id} className={typeFilter === id ? 'active' : ''} onClick={() => setTypeFilter(id)}>{label}</button>)}
+        </div>
+      </div>
+      <div className="filter-group">
+        <span className="field-label">카테고리</span>
+        <div className="filter-pills">
+          {categories.map(c =>
+            <button key={c.id} className={catFilter.includes(c.id) ? 'selected' : ''} onClick={() => toggleCat(c.id)}>
+              <CategoryPlanet color={c.color}/>{c.name}
+            </button>)}
+          <button className={catFilter.includes('none') ? 'selected' : ''} onClick={() => toggleCat('none')}>
+            <CategoryPlanet color="#a8aebb"/>미분류
+          </button>
+        </div>
+      </div>
+      {filtering && <button className="text-button filter-reset" onClick={reset}>필터 초기화</button>}
+    </section>}
     <section className="history-card">
       {all && all.length === 0 && <div className="empty-state">
         <span className="empty-planet" aria-hidden="true" />
         <strong>아직 거래가 없어요</strong>
         <p>첫 지출이나 수입을 기록해보세요.</p>
         <button className="outline-button" onClick={openExpense}><Plus size={16}/> 거래 추가</button>
+      </div>}
+      {all && all.length > 0 && groups.length === 0 && <div className="empty-state">
+        <span className="empty-planet" aria-hidden="true" />
+        <strong>조건에 맞는 거래가 없어요</strong>
+        <p>검색어나 필터를 바꿔보세요.</p>
+        <button className="outline-button" onClick={reset}>필터 초기화</button>
       </div>}
       {groups.map(group => <div key={group.date}>
         <div className="date-divider">
@@ -308,10 +370,10 @@ function TransactionsView({ openExpense }: { openExpense: () => void }) {
           const income = t.type === 'income'
           return <div className="history-row" key={t.id}>
             <span className={`money-direction ${income ? 'income' : 'expense'}`}>{income ? <ArrowDownLeft size={18}/> : <ArrowUpRight size={18}/>}</span>
-            <div>
+            <button className="row-open" onClick={() => openEdit(t)}>
               <strong>{t.memo || cat?.name || (income ? '수입' : '지출')}{t.isPlanned && <em className="planned-chip">예정</em>}</strong>
               <span>{format(t.createdAt, 'HH:mm')} · {income ? '수입' : cat?.name ?? '미분류'}</span>
-            </div>
+            </button>
             <strong className={income ? 'income-text' : ''}>{income ? '+' : '-'}{money(t.amount)}원</strong>
             <button className="row-delete" onClick={() => remove(t)} aria-label="삭제"><Trash2 size={16}/></button>
           </div>
@@ -322,8 +384,11 @@ function TransactionsView({ openExpense }: { openExpense: () => void }) {
   </div>
 }
 
-function SettingsView({ dark, onTheme }: { dark: boolean; onTheme: () => void }) {
-  const [sub, setSub] = useState<'categories' | 'recurring' | null>(null)
+function SettingsView({ dark, onTheme, sub, setSub }: { dark: boolean; onTheme: () => void; sub: SettingsSub; setSub: (sub: SettingsSub) => void }) {
+  const month = format(new Date(), 'yyyy-MM')
+  const monthSettings = useLiveQuery(() => db.monthSettings.get(month), [month])
+  const [reserveOpen, setReserveOpen] = useState(false)
+  const reserve = monthSettings?.reserveAmount ?? 0
   if (sub === 'categories') return <CategorySettings back={() => setSub(null)} />
   if (sub === 'recurring') return <RecurringSettings back={() => setSub(null)} />
   const exportCsv = async () => {
@@ -334,21 +399,30 @@ function SettingsView({ dark, onTheme }: { dark: boolean; onTheme: () => void })
   const settings = [
     { icon: CircleDollarSign, title: '카테고리 관리', desc: '예산과 카테고리 색상 설정', onClick: () => setSub('categories') },
     { icon: Repeat2, title: '반복 거래', desc: '정기 수입과 예정 지출 관리', onClick: () => setSub('recurring') },
-    { icon: WalletCards, title: '예비비 설정', desc: '이번 달 예비비 50,000원', onClick: undefined },
+    {
+      icon: WalletCards,
+      title: '예비비 설정',
+      desc: reserve > 0 ? `이번 달 예비비 ${money(reserve)}원` : '이번 달 예비비 없음',
+      onClick: () => setReserveOpen(true),
+    },
   ]
-  return <div className="view"><div className="page-heading"><div><p className="eyebrow">PREFERENCES</p><h1>설정</h1><p>나의 예산 행성을 관리하세요.</p></div></div><section className="settings-card">{settings.map(row=>{const Icon=row.icon;return <button className="setting-row" key={row.title} onClick={row.onClick}><span><Icon size={20}/></span><div><strong>{row.title}</strong><small>{row.desc}</small></div><ChevronRight size={18}/></button>})}</section><h2 className="settings-subhead">앱 설정</h2><section className="settings-card"><button className="setting-row" onClick={onTheme}><span>{dark?<Moon size={20}/>:<Sun size={20}/>}</span><div><strong>화면 테마</strong><small>{dark?'다크 모드':'라이트 모드'}</small></div><i className={`toggle ${dark?'on':''}`}><b/></i></button><button className="setting-row" onClick={exportCsv}><span><Download size={20}/></span><div><strong>데이터 내보내기</strong><small>CSV 파일로 안전하게 보관</small></div><ChevronRight size={18}/></button></section><p className="version">ORBIT BUDGET · UI PROTOTYPE 0.3</p></div>
+  return <div className="view"><div className="page-heading"><div><p className="eyebrow">PREFERENCES</p><h1>설정</h1><p>나의 예산 행성을 관리하세요.</p></div></div><section className="settings-card">{settings.map(row=>{const Icon=row.icon;return <button className="setting-row" key={row.title} onClick={row.onClick}><span><Icon size={20}/></span><div><strong>{row.title}</strong><small>{row.desc}</small></div><ChevronRight size={18}/></button>})}</section><h2 className="settings-subhead">앱 설정</h2><section className="settings-card"><button className="setting-row" onClick={onTheme}><span>{dark?<Moon size={20}/>:<Sun size={20}/>}</span><div><strong>화면 테마</strong><small>{dark?'다크 모드':'라이트 모드'}</small></div><i className={`toggle ${dark?'on':''}`}><b/></i></button><button className="setting-row" onClick={exportCsv}><span><Download size={20}/></span><div><strong>데이터 내보내기</strong><small>CSV 파일로 안전하게 보관</small></div><ChevronRight size={18}/></button></section><p className="version">ORBIT BUDGET · UI PROTOTYPE 0.3</p>{reserveOpen && <ReserveSheet month={month} current={reserve} close={() => setReserveOpen(false)} />}</div>
 }
 
 function App() {
   const [active, setActive] = useState<Tab>('home')
   const [dark, setDark] = useState(false)
-  const [sheet, setSheet] = useState(false)
+  const [sheet, setSheet] = useState<Transaction | 'new' | null>(null)
+  const [settingsSub, setSettingsSub] = useState<SettingsSub>(null)
+  const goSettings = (sub: SettingsSub) => { setSettingsSub(sub); setActive('settings') }
   useEffect(() => { document.documentElement.classList.toggle('dark', dark) }, [dark])
   useEffect(() => { document.body.style.overflow = sheet ? 'hidden' : '' }, [sheet])
+  const openExpense = () => setSheet('new')
+  const openEdit = (t: Transaction) => setSheet(t)
   useEffect(() => { materializeRecurring(format(new Date(), 'yyyy-MM-dd')) }, [])
   useEffect(() => { requestPersistentStorage() }, [])
-  const content = useMemo(() => ({home:<HomeView openExpense={()=>setSheet(true)} goTransactions={()=>setActive('transactions')} goSettings={()=>setActive('settings')}/>,calendar:<CalendarView/>,transactions:<TransactionsView openExpense={()=>setSheet(true)}/>,settings:<SettingsView dark={dark} onTheme={()=>setDark(!dark)}/>})[active], [active,dark])
-  return <div className="app-shell"><Header dark={dark} onTheme={()=>setDark(!dark)}/><Sidebar active={active} setActive={setActive}/><main>{content}</main>{(active==='home'||active==='transactions')&&<button className="desktop-add" onClick={()=>setSheet(true)}><Plus size={20}/> 추가</button>}<nav className="bottom-nav">{([{id:'home',label:'홈',icon:Home},{id:'calendar',label:'달력',icon:CalendarDays},{id:'transactions',label:'거래',icon:ListFilter},{id:'settings',label:'설정',icon:Settings}] as const).map(item=>{const Icon=item.icon;return <button key={item.id} className={active===item.id?'active':''} onClick={()=>setActive(item.id)}><Icon size={20}/><span>{item.label}</span></button>})}</nav>{sheet&&<ExpenseSheet close={()=>setSheet(false)}/>}</div>
+  const content = useMemo(() => ({home:<HomeView openExpense={openExpense} openEdit={openEdit} goTransactions={()=>setActive('transactions')} goCategories={()=>goSettings('categories')}/>,calendar:<CalendarView openEdit={openEdit}/>,transactions:<TransactionsView openExpense={openExpense} openEdit={openEdit}/>,settings:<SettingsView dark={dark} onTheme={()=>setDark(!dark)} sub={settingsSub} setSub={setSettingsSub}/>})[active], [active,dark,settingsSub])
+  return <div className="app-shell"><Header dark={dark} onTheme={()=>setDark(!dark)}/><Sidebar active={active} setActive={(tab)=>{if(tab==='settings')setSettingsSub(null);setActive(tab)}}/><main>{content}</main>{(active==='home'||active==='transactions')&&<button className="desktop-add" onClick={openExpense}><Plus size={20}/> 추가</button>}<nav className="bottom-nav">{([{id:'home',label:'홈',icon:Home},{id:'calendar',label:'달력',icon:CalendarDays},{id:'transactions',label:'거래',icon:ListFilter},{id:'settings',label:'설정',icon:Settings}] as const).map(item=>{const Icon=item.icon;return <button key={item.id} className={active===item.id?'active':''} onClick={()=>{if(item.id==='settings')setSettingsSub(null);setActive(item.id)}}><Icon size={20}/><span>{item.label}</span></button>})}</nav>{sheet&&<ExpenseSheet transaction={sheet==='new'?null:sheet} close={()=>setSheet(null)}/>}</div>
 }
 
 export default App

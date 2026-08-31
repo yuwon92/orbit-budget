@@ -4,15 +4,18 @@ import { format } from 'date-fns'
 import { db } from '../lib/db'
 import { money } from '../lib/format'
 import { useCategories } from '../lib/hooks'
+import type { Transaction } from '../lib/types'
 import { CategoryPlanet } from './CategoryPlanet'
 
-export function ExpenseSheet({ close }: { close: () => void }) {
+/** transaction이 있으면 수정, 없으면 새 거래 추가. */
+export function ExpenseSheet({ transaction, close }: { transaction?: Transaction | null; close: () => void }) {
   const categories = useCategories() ?? []
-  const [type, setType] = useState<'expense' | 'income'>('expense')
-  const [amount, setAmount] = useState('')
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
-  const [memo, setMemo] = useState('')
+  const editing = transaction ?? null
+  const [type, setType] = useState<'expense' | 'income'>(editing?.type ?? 'expense')
+  const [amount, setAmount] = useState(editing ? String(editing.amount) : '')
+  const [selectedId, setSelectedId] = useState<string | null>(editing?.categoryId ?? null)
+  const [date, setDate] = useState(() => editing?.date ?? format(new Date(), 'yyyy-MM-dd'))
+  const [memo, setMemo] = useState(editing?.memo ?? '')
   const [saving, setSaving] = useState(false)
 
   const selected = selectedId ?? categories[0]?.id ?? null
@@ -22,17 +25,28 @@ export function ExpenseSheet({ close }: { close: () => void }) {
   const save = async () => {
     if (!canSave || saving) return
     setSaving(true)
-    await db.transactions.add({
-      id: crypto.randomUUID(),
+    const data = {
       date,
       amount: Number(amount),
       type,
       categoryId: type === 'expense' ? selected : null,
       memo: memo.trim(),
-      // 미래 날짜로 입력하면 예정 거래로 저장한다.
+      // 미래 날짜면 예정 거래로 둔다.
       isPlanned: date > format(new Date(), 'yyyy-MM-dd'),
-      createdAt: Date.now(),
-    })
+    }
+    if (editing) {
+      // createdAt과 recurringRuleId는 그대로 둔다 (정렬 기준과 반복 규칙 연결 유지).
+      await db.transactions.update(editing.id, data)
+    } else {
+      await db.transactions.add({ id: crypto.randomUUID(), createdAt: Date.now(), ...data })
+    }
+    close()
+  }
+
+  const remove = async () => {
+    if (!editing) return
+    if (!window.confirm(`이 ${editing.type === 'income' ? '수입' : '지출'} 내역을 삭제할까요?`)) return
+    await db.transactions.delete(editing.id)
     close()
   }
 
@@ -42,8 +56,8 @@ export function ExpenseSheet({ close }: { close: () => void }) {
         <div className="sheet-handle" />
         <header>
           <div>
-            <p className="eyebrow">NEW TRANSACTION</p>
-            <h2>{type === 'expense' ? '지출 추가' : '수입 추가'}</h2>
+            <p className="eyebrow">{editing ? 'EDIT TRANSACTION' : 'NEW TRANSACTION'}</p>
+            <h2>{type === 'expense' ? '지출' : '수입'} {editing ? '수정' : '추가'}</h2>
           </div>
           <button className="icon-button" onClick={close} aria-label="닫기"><X size={20} /></button>
         </header>
@@ -77,9 +91,14 @@ export function ExpenseSheet({ close }: { close: () => void }) {
             <input placeholder="메모 추가 (선택)" value={memo} onChange={(e) => setMemo(e.target.value)} />
           </label>
         </div>
+        {editing?.recurringRuleId && <p className="field-note sheet-note">
+          반복 거래에서 자동으로 만들어진 내역이에요. 여기서 고친 값은 이 달에만 적용되고,
+          반복 규칙을 수정하면 아직 안 지난 예정 내역은 규칙대로 다시 만들어져요.
+        </p>}
         <button className="save-button" onClick={save} disabled={!canSave || saving}>
           {canSave ? `${formatted}원 저장` : '금액을 입력하세요'}
         </button>
+        {editing && <button className="delete-button" onClick={remove}>내역 삭제</button>}
       </section>
     </div>
   )
