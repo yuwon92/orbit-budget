@@ -188,7 +188,7 @@ export function budgetFromRule(rule: BudgetRule, month: string, recurringSum: nu
 }
 
 /**
- * 홈에서 이 카테고리 구슬을 한 번 눌렀을 때 기록할 금액. 빠른 기록 대상이 아니면 null.
+ * 홈에서 이 카테고리 구슬을 한 번 눌렀을 때 기록할 금액. 퀵 슬롯 대상이 아니면 null.
  * 교통은 왕복 설정과 무관하게 편도 요금이다. 한 번 탈 때마다 한 번 누르는 게 기준이라
  * 왕복이면 두 번 누른다 (예산 계산에서 하루치를 왕복으로 잡는 것과는 다른 이야기).
  */
@@ -200,7 +200,7 @@ export function quickAddAmount(rule: BudgetRule | undefined): number | null {
 }
 
 /**
- * 이 카테고리가 빠른 기록 구슬에 뜨는지.
+ * 이 카테고리가 퀵 슬롯 구슬에 뜨는지.
  * 설정을 한 번도 안 건드렸으면 단가가 있는 카테고리(횟수·교통)만 기본으로 뜬다.
  * 직접 넣은 카테고리는 단가가 없어서 구슬을 눌러도 금액은 직접 입력해야 한다.
  */
@@ -253,7 +253,7 @@ export function periodAllowance(
  * active가 false면 오늘은 쓰기로 한 요일이 아니다.
  *
  * 교통에서 왕복이면 한도를 두 배로 센다. 하루 몫은 왕복 한 번이지만 실제로 타는 건
- * 편도 두 번이고, 빠른 기록 구슬도 편도마다 한 번씩 누르기 때문이다 (왕복 = 오늘 2/2회).
+ * 편도 두 번이고, 퀵 슬롯 구슬도 편도마다 한 번씩 누르기 때문이다 (왕복 = 오늘 2/2회).
  */
 export function usageLimit(
   rule: BudgetRule,

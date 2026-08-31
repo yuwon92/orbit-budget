@@ -192,7 +192,7 @@ assert.deepEqual(
 assert.equal(recurringSumForCategory(recRules, 'subs', '2026-08'), 41_800) // spotify 제외, cancelled 포함
 console.log('예산 계산 도구 (요일 수 세기, 단가 배수 반올림, 구독 합계 기간 판정) 통과')
 
-// --- 홈 빠른 기록 구슬의 단가 ---
+// --- 홈 퀵 슬롯 구슬의 단가 ---
 assert.equal(quickAddAmount({ kind: 'perUse', unitAmount: 13_000, freq: perWeek10 }), 13_000)
 // 교통은 왕복이 켜져 있어도 한 번 누르면 편도. 왕복이면 두 번 누른다
 assert.equal(quickAddAmount({ ...commute, freq: weekdaysAll }), 1_550)
@@ -200,7 +200,7 @@ assert.equal(quickAddAmount({ kind: 'commute', fare: 1_550, roundTrip: false, fr
 assert.equal(quickAddAmount({ kind: 'manual' }), null)
 assert.equal(quickAddAmount({ kind: 'recurringSum' }), null)
 assert.equal(quickAddAmount(undefined), null) // 계산 방법이 없는 예전 카테고리
-console.log('빠른 기록 단가 (교통은 편도, 직접 입력·구독은 제외) 통과')
+console.log('퀵 슬롯 단가 (교통은 편도, 직접 입력·구독은 제외) 통과')
 
 // 퀵 슬롯: 안 건드렸으면 단가 있는 것만, 손대면 그 설정이 이긴다
 const slotCat = (budgetRule: object, quickSlot?: boolean): Category => ({

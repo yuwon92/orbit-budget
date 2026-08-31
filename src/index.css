@@ -194,7 +194,7 @@ button.transaction-name,.history-row .row-open{border:0;background:none;padding:
 .calc-result strong{font-size:16px;font-variant-numeric:tabular-nums}
 .calc-result small{font-size:11px;line-height:1.6;color:var(--text-secondary)}
 
-/* 홈 빠른 기록 구슬 (히어로 카드 바깥) */
+/* 홈 퀵 슬롯 구슬 (히어로 카드 바깥) */
 .quick-add{display:flex;flex-wrap:wrap;gap:14px;margin-top:18px}
 .quick-orb{border:0;background:none;padding:0;cursor:pointer;display:grid;justify-items:center;gap:7px}
 .quick-orb .orb{--category-color:#8ebeff;width:60px;height:60px;border-radius:50%;display:grid;place-items:center;text-align:center;padding:0 7px;font-size:11px;font-weight:700;line-height:1.2;letter-spacing:-.02em;color:#1b2030;overflow:hidden;background:linear-gradient(145deg,color-mix(in srgb,var(--category-color) 58%,white),var(--category-color));box-shadow:inset -3px -2px 5px color-mix(in srgb,var(--category-color) 65%,#7583aa);transition:transform .12s}
@@ -266,3 +266,42 @@ button.transaction-name,.history-row .row-open{border:0;background:none;padding:
 
 /* 달력 상세의 예정 거래는 생성 시각 대신 상태만 표시 */
 .selected-day .transaction-time.planned-label{color:var(--planet-blue);font-weight:700}
+
+/* 퀵 슬롯 즉시 기록 결과와 실행 취소 */
+.quick-undo-toast{position:fixed;z-index:90;left:50%;bottom:30px;transform:translateX(-50%);min-height:48px;max-width:calc(100% - 32px);padding:4px 8px 4px 16px;border:1px solid var(--border);border-radius:14px;background:var(--text-primary);color:var(--surface);box-shadow:var(--shadow);display:flex;align-items:center;gap:18px;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;animation:toast-up .2s ease-out}
+.quick-undo-toast button{height:40px;padding:0 10px;border:0;background:none;color:var(--planet-blue);font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap}
+@keyframes toast-up{from{opacity:0;transform:translate(-50%,8px)}}
+@media(max-width:680px){
+  .quick-undo-toast{bottom:92px;width:calc(100% - 32px);justify-content:space-between;white-space:normal}
+}
+
+/* 퀵 슬롯 제목·편집·빈 상태와 터치 접근성 */
+.quick-section{margin-top:22px}
+.quick-section-head{display:flex;align-items:center;justify-content:space-between;min-height:44px}
+.quick-section-head h2{margin:0;font-size:15px;letter-spacing:-.025em}
+.quick-edit-button{min-width:44px;height:44px;padding:0 8px;border:0;background:none;color:var(--text-secondary);font-size:12px;font-weight:700;cursor:pointer;border-radius:10px}
+.quick-section .quick-add{margin-top:8px}
+.quick-orb{min-width:60px;min-height:81px;border-radius:12px;touch-action:manipulation}
+.quick-orb:focus-visible,.quick-edit-button:focus-visible,.quick-slot-list button:focus-visible,.quick-empty button:focus-visible,.quick-undo-toast button:focus-visible{outline:2px solid var(--planet-blue);outline-offset:2px}
+.quick-slot-editor{margin-top:8px;padding:14px;background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:0 3px 14px rgba(30,40,70,.025)}
+.quick-slot-editor>p{margin:0 0 10px;font-size:11px;color:var(--text-secondary)}
+.quick-slot-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.quick-slot-list button{min-height:48px;padding:7px 10px;border:1px solid var(--border);border-radius:11px;background:var(--surface);color:var(--text-primary);display:flex;align-items:center;gap:9px;text-align:left;cursor:pointer;touch-action:manipulation}
+.quick-toggle-planet{width:24px;height:24px;display:grid;place-items:center;flex:0 0 24px}
+.quick-toggle-planet .orb{--category-color:#8ebeff;width:20px;height:20px;border-radius:50%;background:linear-gradient(145deg,color-mix(in srgb,var(--category-color) 58%,white),var(--category-color));box-shadow:inset -2px -1px 3px color-mix(in srgb,var(--category-color) 65%,#7583aa)}
+.quick-slot-list strong{min-width:0;flex:1;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.quick-toggle-state{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text-tertiary);white-space:nowrap}
+.quick-toggle-state i{width:6px;height:6px;border-radius:50%;background:var(--text-tertiary);flex:0 0 6px}
+.quick-toggle-state i.on{background:var(--planet-blue)}
+.quick-empty{min-height:112px;margin-top:8px;padding:18px;border:1px dashed var(--border);border-radius:16px;display:grid;justify-items:start;align-content:center;gap:6px;background:var(--surface)}
+.quick-empty strong{font-size:13px}
+.quick-empty p{margin:0;font-size:11px;color:var(--text-secondary)}
+.quick-empty button{min-height:44px;margin-top:3px;padding:0;border:0;background:none;color:var(--planet-blue);font-size:12px;font-weight:800;cursor:pointer;border-radius:8px}
+.quick-undo-toast button{min-height:44px}
+@media(max-width:680px){
+  .quick-section{margin-top:16px}
+  .quick-section .quick-add{flex-wrap:nowrap;overflow-x:auto;gap:11px;margin-inline:-16px;padding:2px 16px 8px;scroll-padding-inline:16px;scroll-snap-type:x proximity;scrollbar-width:none}
+  .quick-section .quick-add::-webkit-scrollbar{display:none}
+  .quick-orb{min-width:56px;min-height:77px;flex:0 0 56px;scroll-snap-align:start}
+  .quick-slot-list{grid-template-columns:1fr}
+}

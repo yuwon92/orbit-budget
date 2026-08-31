@@ -10,7 +10,7 @@ import { CategoryPlanet } from './CategoryPlanet'
 
 /**
  * transaction이 있으면 수정, 없으면 새 거래 추가.
- * preset은 홈 빠른 기록 구슬에서 넘어온 카테고리·단가로, 금액칸만 고쳐 저장하면 된다.
+ * preset은 홈 퀵 슬롯 구슬에서 넘어온 카테고리·단가로, 금액칸만 고쳐 저장하면 된다.
  */
 export function ExpenseSheet({
   transaction,

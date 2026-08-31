@@ -144,7 +144,7 @@ function HomeView({ openExpense, openEdit, openPreset, goTransactions, goCategor
       <Planet />
     </section>
 
-    <QuickAddOrbs openPreset={openPreset} />
+    <QuickAddOrbs openPreset={openPreset} goCategories={goCategories} />
 
     <div className="section-heading"><div><p className="eyebrow">MONTHLY PLAN</p><h2>이번 달 예산</h2></div><button className="text-button" onClick={goCategories}>전체 보기 <ChevronRight size={16}/></button></div>
     {budgeted.length === 0 && loaded && <section className="transaction-card">
@@ -484,7 +484,7 @@ function SettingsView({ dark, onTheme, sub, setSub }: { dark: boolean; onTheme: 
 function App() {
   const [active, setActive] = useState<Tab>('home')
   const [dark, setDark] = useState(false)
-  // 빈 객체면 새 거래, transaction이 있으면 수정, preset이 있으면 빠른 기록에서 넘어온 프리필.
+  // 빈 객체면 새 거래, transaction이 있으면 수정, preset이 있으면 퀵 슬롯에서 넘어온 프리필.
   const [sheet, setSheet] = useState<{ transaction?: Transaction; preset?: QuickPreset; initialDate?: string } | null>(null)
   const [settingsSub, setSettingsSub] = useState<SettingsSub>(null)
   const goSettings = (sub: SettingsSub) => { setSettingsSub(sub); setActive('settings') }

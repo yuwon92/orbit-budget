@@ -23,7 +23,7 @@ export interface Category {
   sortOrder: number // 목록 표시 순서
   budgetRule?: BudgetRule // 예산 계산 방법. 없으면 직접 입력으로 본다
   hiddenOnHome?: boolean // 홈 히어로의 하루 몫 목록에서 감춤. 몫은 '자유'로 합쳐진다
-  quickSlot?: boolean // 홈 빠른 기록 구슬에 띄울지. 안 건드렸으면 횟수·교통만 기본으로 뜬다
+  quickSlot?: boolean // 홈 퀵 슬롯 구슬에 띄울지. 안 건드렸으면 횟수·교통만 기본으로 뜬다
 }
 
 export interface Transaction {

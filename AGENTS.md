@@ -41,7 +41,7 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `CategorySettings.tsx` (375줄) | 카테고리 목록 + 폼(예산 계산 도구 UI 포함) |
 | `RecurringSettings.tsx` | 반복 거래 목록 + 폼 |
 | `ReserveSheet.tsx` | 월 예비비 입력 |
-| `QuickAddOrbs.tsx` | 홈 빠른 기록 구슬 줄 |
+| `QuickAddOrbs.tsx` | 홈 퀵 슬롯 구슬 줄 |
 | `DailyBreakdown.tsx` | 홈 히어로 몫 목록. **계산 안 함, 그리기만** |
 | `CategoryPlanet.tsx` | 카테고리 색 구슬 (9줄) |
 
