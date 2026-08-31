@@ -1,4 +1,4 @@
-import { occurrenceDate } from './budget'
+import { budgetFromRule, occurrenceDate, recurringSumForCategory } from './budget'
 import { db } from './db'
 
 /**
@@ -48,6 +48,28 @@ export async function resyncRuleForMonth(ruleId: string, today: string): Promise
     }
   })
   await materializeRecurring(today)
+}
+
+/**
+ * 계산 방법이 걸린 카테고리의 월 예산을 이번 달 기준으로 다시 계산해서 저장한다.
+ * 앱을 열 때(달이 바뀌면 요일 수가 달라진다)와 반복 거래를 고친 뒤에 부른다.
+ * 직접 입력(manual, 또는 방법이 없는 예전 카테고리)은 건드리지 않는다.
+ */
+export async function syncRuleBudgets(month: string): Promise<void> {
+  await db.transaction('rw', db.categories, db.recurringRules, async () => {
+    const [categories, rules] = await Promise.all([
+      db.categories.toArray(),
+      db.recurringRules.toArray(),
+    ])
+    for (const category of categories) {
+      const rule = category.budgetRule
+      if (!rule || rule.kind === 'manual') continue
+      const next = budgetFromRule(rule, month, recurringSumForCategory(rules, category.id, month))
+      if (next !== null && next !== category.monthlyBudget) {
+        await db.categories.update(category.id, { monthlyBudget: next })
+      }
+    }
+  })
 }
 
 /** 규칙 삭제. 이번 달의 아직 안 지난 예정 거래도 함께 지운다. */

@@ -5,7 +5,7 @@ import { format } from 'date-fns'
 import { db } from '../lib/db'
 import { money } from '../lib/format'
 import { useCategories } from '../lib/hooks'
-import { deleteRule, materializeRecurring, resyncRuleForMonth } from '../lib/recurring'
+import { deleteRule, materializeRecurring, resyncRuleForMonth, syncRuleBudgets } from '../lib/recurring'
 import type { RecurringRule } from '../lib/types'
 import { CategoryPlanet } from './CategoryPlanet'
 
@@ -45,6 +45,8 @@ function RuleForm({ rule, close }: { rule: RecurringRule | null; close: () => vo
       await db.recurringRules.add({ id: crypto.randomUUID(), lastGeneratedMonth: null, ...data })
       await materializeRecurring(todayStr())
     }
+    // 구독 합계로 예산을 잡아둔 카테고리가 있으면 바로 반영한다.
+    await syncRuleBudgets(todayStr().slice(0, 7))
     close()
   }
 
@@ -52,6 +54,7 @@ function RuleForm({ rule, close }: { rule: RecurringRule | null; close: () => vo
     if (!rule) return
     if (!window.confirm(`'${rule.name}' 반복 거래를 삭제할까요?\n이번 달의 아직 안 지난 예정 거래도 함께 지워져요.`)) return
     await deleteRule(rule.id, todayStr())
+    await syncRuleBudgets(todayStr().slice(0, 7))
     close()
   }
 

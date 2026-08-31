@@ -174,3 +174,22 @@
 button.transaction-name,.history-row .row-open{border:0;background:none;padding:0;text-align:left;font:inherit;color:inherit;cursor:pointer}
 .history-row .row-open{display:grid;gap:4px;flex:1}
 .sheet-note{margin-top:22px}
+
+/* 카테고리 예산 계산 도구 */
+.method-pills{margin-top:0}
+.method-pills button{height:36px;padding:0 12px}
+.freq-toggle{margin-top:0}
+.freq-body{margin-top:12px;display:grid;gap:12px}
+.weekday-row{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.weekday-row button{height:40px;border:1px solid var(--border);border-radius:11px;background:var(--surface);color:var(--text-secondary);font-size:12px;cursor:pointer;padding:0}
+.weekday-row button.selected{border-color:var(--planet-blue);color:var(--text-primary);font-weight:700}
+.inline-field{display:flex;align-items:center;gap:12px}
+.inline-field>span{font-size:11px;color:var(--text-secondary);font-weight:600;flex:0 0 auto}
+.inline-field .budget-input{flex:1}
+.rule-sum-list{border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.rule-sum-list>div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border);font-size:12px}
+.rule-sum-list>div:last-child{border:0}
+.rule-sum-list strong{font-variant-numeric:tabular-nums}
+.calc-result{display:grid;gap:5px}
+.calc-result strong{font-size:16px;font-variant-numeric:tabular-nums}
+.calc-result small{font-size:11px;line-height:1.6;color:var(--text-secondary)}

@@ -2,21 +2,27 @@
 // 실행: npm run verify
 import assert from 'node:assert/strict'
 import {
+  activeRecurringForCategory,
   availableAmount,
+  budgetFromRule,
   calcTodayBudget,
   categoryProgress,
   freeBudget,
+  monthlyOccurrences,
   occurredExpense,
   occurrenceDate,
+  recurringSumForCategory,
   remainingDays,
   remainingToday,
   spentByCategory,
   spentOnDate,
   totalIncome,
   upcomingExpense,
+  weekdayCountInMonth,
+  weeksInMonth,
 } from '../src/lib/budget.ts'
 import { buildCsv } from '../src/lib/csv.ts'
-import type { Category, Transaction } from '../src/lib/types.ts'
+import type { Category, RecurringRule, Transaction } from '../src/lib/types.ts'
 
 const cat = (id: string, name: string, monthlyBudget: number, isFixed: boolean): Category => ({
   id, name, monthlyBudget, color: '#8ebeff', isFixed, sortOrder: 0,
@@ -112,6 +118,71 @@ assert.equal(occurrenceDate(rule31, '2026-10'), '2026-10-31')
 assert.equal(occurrenceDate({ dayOfMonth: 8, startDate: '2026-09-10', endDate: null }, '2026-09'), null) // 시작 전
 assert.equal(occurrenceDate({ dayOfMonth: 21, startDate: '2026-01-01', endDate: '2026-09-15' }, '2026-09'), null) // 종료 후
 console.log('반복 거래 발생일 (31일 규칙 → 9/30, 2월 보정, 기간 검사) 통과')
+
+// --- 예산 계산 도구 ---
+// 2026년 9월은 1일이 화요일이라 화·수만 5번, 나머지 요일은 4번이다.
+assert.equal(weekdayCountInMonth([1, 3, 5], '2026-09'), 13) // 월4 + 수5 + 금4
+assert.equal(weekdayCountInMonth([1, 2, 3, 4, 5], '2026-09'), 22) // 월~금
+assert.equal(weekdayCountInMonth([], '2026-09'), 0)
+assert.equal(weeksInMonth('2026-09'), 30 / 7)
+
+const perWeek10 = { mode: 'perWeek', timesPerWeek: 10 } as const
+const monWedFri = { mode: 'weekdays', weekdays: [1, 3, 5], timesPerDay: 1 } as const
+const weekdaysAll = { mode: 'weekdays', weekdays: [1, 2, 3, 4, 5], timesPerDay: 1 } as const
+assert.equal(monthlyOccurrences(perWeek10, '2026-09'), 10 * (30 / 7))
+assert.equal(monthlyOccurrences(monWedFri, '2026-09'), 13) // 근사 12.85가 아니라 실제 13회
+
+// 횟수형: 한 번에 6,500원. 횟수를 먼저 반올림해서 금액이 6,500원 배수로 떨어진다.
+assert.equal(budgetFromRule({ kind: 'perUse', unitAmount: 6_500, freq: perWeek10 }, '2026-09', 0), 279_500) // 42.85회 → 43회
+assert.equal(budgetFromRule({ kind: 'perUse', unitAmount: 6_500, freq: monWedFri }, '2026-09', 0), 84_500) // 13회
+assert.equal(279_500 % 6_500, 0) // 어중간한 278,571원이 아니라 단가의 배수
+
+// 교통형: 편도 1,550원 왕복 → 하루 3,100원
+const commute = { kind: 'commute', fare: 1_550, roundTrip: true } as const
+assert.equal(budgetFromRule({ ...commute, freq: { mode: 'perWeek', timesPerWeek: 5 } }, '2026-09', 0), 65_100) // 21.42일 → 21일
+assert.equal(budgetFromRule({ ...commute, freq: weekdaysAll }, '2026-09', 0), 68_200) // 월~금 22일
+assert.equal(68_200 % 3_100, 0)
+// 달이 바뀌면 요일 수가 달라져서 같은 설정도 금액이 달라진다 (11월은 1일이 일요일 → 월~금 21일)
+assert.equal(weekdayCountInMonth([1, 2, 3, 4, 5], '2026-11'), 21)
+assert.equal(budgetFromRule({ ...commute, freq: weekdaysAll }, '2026-11', 0), 65_100)
+
+assert.equal(budgetFromRule({ kind: 'manual' }, '2026-09', 0), null) // 직접 입력은 계산 대상 아님
+assert.equal(budgetFromRule({ kind: 'recurringSum' }, '2026-09', 31_900), 31_900)
+
+// 구독 합계: 이 카테고리에 걸린, 이번 달에 살아있는 지출 규칙만 더한다
+const recRule = (
+  id: string,
+  amount: number,
+  type: 'expense' | 'income',
+  categoryId: string | null,
+  startDate = '2026-01-01',
+  endDate: string | null = null,
+): RecurringRule => ({
+  id, name: id, amount, type, categoryId, dayOfMonth: 10,
+  startDate, endDate, lastGeneratedMonth: null,
+})
+const recRules = [
+  recRule('netflix', 17_000, 'expense', 'subs'),
+  recRule('youtube', 14_900, 'expense', 'subs'),
+  recRule('spotify', 11_000, 'expense', 'subs', '2026-09-20'), // 이번 달 중간에 가입
+  recRule('gym', 50_000, 'expense', 'etc'), // 다른 카테고리
+  recRule('allowance', 300_000, 'income', 'subs'), // 수입
+  recRule('cancelled', 9_900, 'expense', 'subs', '2026-01-01', '2026-08-31'), // 지난달에 해지
+]
+// 9/20에 가입한 구독은 이번 달 발생일(10일)이 이미 지나서 예정 거래는 안 생기지만,
+// 다음 달부터 계속 나가는 돈이므로 예산에는 들어가야 한다.
+assert.equal(occurrenceDate({ dayOfMonth: 10, startDate: '2026-09-20', endDate: null }, '2026-09'), null)
+assert.equal(recurringSumForCategory(recRules, 'subs', '2026-09'), 42_900) // 17,000 + 14,900 + 11,000
+assert.equal(recurringSumForCategory(recRules, 'etc', '2026-09'), 50_000)
+assert.equal(recurringSumForCategory(recRules, 'food', '2026-09'), 0)
+// 목록과 합계가 같은 함수에서 나오는지
+assert.deepEqual(
+  activeRecurringForCategory(recRules, 'subs', '2026-09').map((r) => r.id),
+  ['netflix', 'youtube', 'spotify'],
+)
+// 아직 시작 전인 달에는 빠진다
+assert.equal(recurringSumForCategory(recRules, 'subs', '2026-08'), 41_800) // spotify 제외, cancelled 포함
+console.log('예산 계산 도구 (요일 수 세기, 단가 배수 반올림, 구독 합계 기간 판정) 통과')
 
 // --- CSV 생성 ---
 const csv = buildCsv(
