@@ -252,3 +252,17 @@ button.transaction-name,.history-row .row-open{border:0;background:none;padding:
   input,textarea,select{font-size:16px!important}
   .amount-input input{font-size:34px!important}
 }
+
+/* 달력 탐색·선택 상태·터치 접근성 */
+.month-switch-center{display:flex;align-items:center;gap:9px}
+.month-switch .today-button{width:auto;height:32px;padding:0 9px;font-size:11px;color:var(--text-secondary)}
+.calendar-day{touch-action:manipulation}
+.calendar-day:focus-visible{z-index:1;outline:2px solid var(--planet-blue);outline-offset:-2px}
+.calendar-day.selected.today .day-num{box-shadow:0 0 0 2px var(--surface),0 0 0 3.5px var(--planet-blue)}
+@media(max-width:680px){
+  .month-switch>button{width:44px;height:44px}
+  .month-switch .today-button{width:auto;height:36px;padding:0 10px}
+}
+
+/* 달력 상세의 예정 거래는 생성 시각 대신 상태만 표시 */
+.selected-day .transaction-time.planned-label{color:var(--planet-blue);font-weight:700}

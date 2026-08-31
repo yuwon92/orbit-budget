@@ -237,6 +237,18 @@ function CalendarView({ openEdit, openExpenseForDate }: { openEdit: (t: Transact
     setSelected(null)
     setDetailOpen(false)
   }
+  const goToday = () => {
+    setMonth(today.slice(0, 7))
+    setSelected(today)
+    setDetailOpen(true)
+  }
+
+  useEffect(() => {
+    if (!detailOpen) return
+    const closeDetail = (e: KeyboardEvent) => e.key === 'Escape' && setDetailOpen(false)
+    window.addEventListener('keydown', closeDetail)
+    return () => window.removeEventListener('keydown', closeDetail)
+  }, [detailOpen])
 
   const dayTx = selected
     ? (monthTx ?? []).filter(t => t.date === selected).sort((a, b) => a.createdAt - b.createdAt)
@@ -248,7 +260,10 @@ function CalendarView({ openEdit, openExpenseForDate }: { openEdit: (t: Transact
       <div><p className="eyebrow">MONTHLY ORBIT</p><h1>달력</h1><p>날짜별 소비 흐름과 예정 거래를 확인하세요.</p></div>
       <div className="month-switch">
         <button onClick={() => moveMonth(-1)} aria-label="이전 달"><ChevronLeft size={18}/></button>
-        <strong>{format(monthDate, 'yyyy년 M월')}</strong>
+        <div className="month-switch-center">
+          <strong aria-live="polite">{format(monthDate, 'yyyy년 M월')}</strong>
+          <button className="today-button" onClick={goToday}>오늘</button>
+        </div>
         <button onClick={() => moveMonth(1)} aria-label="다음 달"><ChevronRight size={18}/></button>
       </div>
     </div>
@@ -269,9 +284,17 @@ function CalendarView({ openEdit, openExpenseForDate }: { openEdit: (t: Transact
             : []
           const shown = lines.slice(0, 2)
           const moreCount = lines.length - shown.length
+          const dayLabel = [
+            format(parseISO(date), 'M월 d일 EEEE', { locale: ko }),
+            ...(info?.expense ? [`지출 ${money(info.expense)}원`] : []),
+            ...(info?.income ? [`수입 ${money(info.income)}원`] : []),
+            ...(info?.planned.length ? [`예정 거래 ${info.planned.length}건`] : []),
+          ].join(', ')
           return <button
             className={`calendar-day ${selected === date ? 'selected' : ''} ${date === today ? 'today' : ''}`}
             key={i}
+            aria-label={dayLabel}
+            aria-pressed={selected === date}
             onClick={() => { setSelected(date); setDetailOpen(true) }}
           >
             <span className="day-num">{day}</span>
@@ -285,7 +308,7 @@ function CalendarView({ openEdit, openExpenseForDate }: { openEdit: (t: Transact
       </div>
       <div className="calendar-legend"><span><i className="spent"/> 지출</span><span><i className="income"/> 수입</span><span><i className="planned"/> 예정 거래</span></div>
     </section>
-    {selected && <div className={`calendar-detail-layer ${detailOpen ? 'open' : ''}`} onMouseDown={(e) => e.target === e.currentTarget && setDetailOpen(false)}>
+    {selected && <div className={`calendar-detail-layer ${detailOpen ? 'open' : ''}`} onClick={(e) => e.target === e.currentTarget && setDetailOpen(false)}>
       <section className="selected-day" role="region" aria-labelledby="selected-day-title">
         <div className="sheet-handle calendar-sheet-handle" aria-hidden="true" />
         <div className="selected-head">
@@ -302,9 +325,9 @@ function CalendarView({ openEdit, openExpenseForDate }: { openEdit: (t: Transact
                 const cat = t.categoryId ? catMap.get(t.categoryId) : undefined
                 const income = t.type === 'income'
                 return <div className="transaction-row" key={t.id}>
-                  <span className="transaction-time">{format(t.createdAt, 'HH:mm')}</span>
+                  <span className={`transaction-time ${t.isPlanned ? 'planned-label' : ''}`}>{t.isPlanned ? '예정' : format(t.createdAt, 'HH:mm')}</span>
                   <CategoryPlanet color={income ? '#83dad8' : cat?.color ?? '#a8aebb'}/>
-                  <button className="transaction-name" onClick={() => openEdit(t)}><strong>{t.memo || cat?.name || (income ? '수입' : '지출')}{t.isPlanned && <em className="planned-chip">예정</em>}</strong>{t.memo && <span>{income ? '수입' : cat?.name ?? '미분류'}</span>}</button>
+                  <button className="transaction-name" onClick={() => openEdit(t)}><strong>{t.memo || cat?.name || (income ? '수입' : '지출')}</strong>{t.memo && <span>{income ? '수입' : cat?.name ?? '미분류'}</span>}</button>
                   <strong className={`transaction-amount ${income ? 'income-text' : ''}`}>{income ? '+' : '-'}{money(t.amount)}원</strong>
                 </div>
               })}
