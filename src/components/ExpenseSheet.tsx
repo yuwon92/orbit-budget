@@ -5,15 +5,31 @@ import { db } from '../lib/db'
 import { money } from '../lib/format'
 import { useCategories } from '../lib/hooks'
 import type { Transaction } from '../lib/types'
+import type { QuickPreset } from './QuickAddOrbs'
 import { CategoryPlanet } from './CategoryPlanet'
 
-/** transaction이 있으면 수정, 없으면 새 거래 추가. */
-export function ExpenseSheet({ transaction, close }: { transaction?: Transaction | null; close: () => void }) {
+/**
+ * transaction이 있으면 수정, 없으면 새 거래 추가.
+ * preset은 홈 빠른 기록 구슬에서 넘어온 카테고리·단가로, 금액칸만 고쳐 저장하면 된다.
+ */
+export function ExpenseSheet({
+  transaction,
+  preset,
+  close,
+}: {
+  transaction?: Transaction | null
+  preset?: QuickPreset
+  close: () => void
+}) {
   const categories = useCategories() ?? []
   const editing = transaction ?? null
   const [type, setType] = useState<'expense' | 'income'>(editing?.type ?? 'expense')
-  const [amount, setAmount] = useState(editing ? String(editing.amount) : '')
-  const [selectedId, setSelectedId] = useState<string | null>(editing?.categoryId ?? null)
+  const [amount, setAmount] = useState(
+    editing ? String(editing.amount) : preset?.amount ? String(preset.amount) : '',
+  )
+  const [selectedId, setSelectedId] = useState<string | null>(
+    editing?.categoryId ?? preset?.categoryId ?? null,
+  )
   const [date, setDate] = useState(() => editing?.date ?? format(new Date(), 'yyyy-MM-dd'))
   const [memo, setMemo] = useState(editing?.memo ?? '')
   const [saving, setSaving] = useState(false)
@@ -68,7 +84,13 @@ export function ExpenseSheet({ transaction, close }: { transaction?: Transaction
         <label className="amount-input">
           <span>금액</span>
           <div>
-            <input autoFocus inputMode="numeric" value={formatted} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))} />
+            <input
+              autoFocus
+              inputMode="numeric"
+              value={formatted}
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))}
+            />
             <strong>원</strong>
           </div>
         </label>

@@ -188,6 +188,190 @@ export function budgetFromRule(rule: BudgetRule, month: string, recurringSum: nu
 }
 
 /**
+ * 홈에서 이 카테고리 구슬을 한 번 눌렀을 때 기록할 금액. 빠른 기록 대상이 아니면 null.
+ * 교통은 왕복 설정과 무관하게 편도 요금이다. 한 번 탈 때마다 한 번 누르는 게 기준이라
+ * 왕복이면 두 번 누른다 (예산 계산에서 하루치를 왕복으로 잡는 것과는 다른 이야기).
+ */
+export function quickAddAmount(rule: BudgetRule | undefined): number | null {
+  if (!rule) return null
+  if (rule.kind === 'perUse') return rule.unitAmount
+  if (rule.kind === 'commute') return rule.fare
+  return null
+}
+
+/**
+ * 이 카테고리가 빠른 기록 구슬에 뜨는지.
+ * 설정을 한 번도 안 건드렸으면 단가가 있는 카테고리(횟수·교통)만 기본으로 뜬다.
+ * 직접 넣은 카테고리는 단가가 없어서 구슬을 눌러도 금액은 직접 입력해야 한다.
+ */
+export function inQuickSlot(category: Category): boolean {
+  return category.quickSlot ?? quickAddAmount(category.budgetRule) !== null
+}
+
+/** 그 날짜의 요일 (0=일 … 6=토) */
+const weekdayOf = (date: string) => {
+  const [year, month, day] = date.split('-').map(Number)
+  return new Date(year, month - 1, day).getDay()
+}
+
+/**
+ * 이 카테고리가 그 날 쓸 수 있는 몫. 횟수·교통이 아니면 null (자유에 섞인다).
+ *
+ * 요일을 지정했으면 그 날 실제로 나가는 돈이라 해당 요일이 아닌 날은 0이고,
+ * 주 단위 한도면 요일을 모르니 7로 나눈 평균을 쓴다.
+ * 교통의 하루치는 왕복을 반영한다 (구슬을 한 번 눌렀을 때의 편도와는 다르다).
+ */
+export function dailyAllowance(rule: BudgetRule, date: string): number | null {
+  if (rule.kind !== 'perUse' && rule.kind !== 'commute') return null
+  const unit = rule.kind === 'perUse' ? rule.unitAmount : rule.fare * (rule.roundTrip ? 2 : 1)
+  const freq = rule.freq
+  if (freq.mode === 'perWeek') return Math.floor((unit * freq.timesPerWeek) / 7)
+  return freq.weekdays.includes(weekdayOf(date)) ? unit * freq.timesPerDay : 0
+}
+
+/**
+ * 화면에 보여줄 예산과 그 기간. 한도가 주 단위면 예산도 주 단위다.
+ * 카페가 한 번에 5,000원 주 2회면 이번 주 10,000원이고, 주가 바뀌면 다시 채워진다.
+ * (자유 몫을 구할 때만 dailyAllowance로 하루치 환산을 쓴다)
+ */
+export function periodAllowance(
+  rule: BudgetRule,
+  date: string,
+): { scope: 'week' | 'day'; amount: number } | null {
+  if (rule.kind !== 'perUse' && rule.kind !== 'commute') return null
+  const unit = rule.kind === 'perUse' ? rule.unitAmount : rule.fare * (rule.roundTrip ? 2 : 1)
+  const freq = rule.freq
+  if (freq.mode === 'perWeek') return { scope: 'week', amount: unit * freq.timesPerWeek }
+  return {
+    scope: 'day',
+    amount: freq.weekdays.includes(weekdayOf(date)) ? unit * freq.timesPerDay : 0,
+  }
+}
+
+/**
+ * 그 날 기준 횟수 한도. 주 단위 한도면 주간 횟수를, 요일 지정이면 그 날 횟수를 센다.
+ * active가 false면 오늘은 쓰기로 한 요일이 아니다.
+ *
+ * 교통에서 왕복이면 한도를 두 배로 센다. 하루 몫은 왕복 한 번이지만 실제로 타는 건
+ * 편도 두 번이고, 빠른 기록 구슬도 편도마다 한 번씩 누르기 때문이다 (왕복 = 오늘 2/2회).
+ */
+export function usageLimit(
+  rule: BudgetRule,
+  date: string,
+): { scope: 'week' | 'day'; limit: number; active: boolean } | null {
+  if (rule.kind !== 'perUse' && rule.kind !== 'commute') return null
+  const perTime = rule.kind === 'commute' && rule.roundTrip ? 2 : 1
+  const freq = rule.freq
+  if (freq.mode === 'perWeek') {
+    return { scope: 'week', limit: freq.timesPerWeek * perTime, active: true }
+  }
+  return {
+    scope: 'day',
+    limit: freq.timesPerDay * perTime,
+    active: freq.weekdays.includes(weekdayOf(date)),
+  }
+}
+
+/** 기간(양끝 포함) 안에서 이 카테고리에 지출한 건수 */
+export function countExpenses(
+  transactions: Transaction[],
+  categoryId: string,
+  from: string,
+  to: string,
+): number {
+  return transactions.filter(
+    (t) => t.type === 'expense' && t.categoryId === categoryId && t.date >= from && t.date <= to,
+  ).length
+}
+
+/** 홈 히어로 목록의 한 줄. categoryId가 null이면 '자유' */
+export interface BreakdownRow {
+  categoryId: string | null
+  scope: 'week' | 'day'
+  allowance: number
+  spent: number
+  remaining: number
+  limit: number | null
+  used: number
+  active: boolean
+}
+
+/**
+ * 홈 히어로 목록을 만든다. 줄마다 자기 기간을 쓴다 —
+ * 주 단위 한도면 이번 주 예산에서 이번 주 지출을, 요일 지정이면 오늘 몫에서 오늘 지출을 뺀다.
+ *
+ * 자유는 하루짜리다. 오늘 예산에서 보이는 카테고리들의 '하루 환산' 몫을 빼둔 값이라
+ * 주 단위 카테고리가 있어도 매일 일정하다. 숨긴 카테고리는 몫을 떼지 않으므로
+ * 그 지출이 자유에서 빠진다.
+ */
+export function buildBreakdown(
+  categories: Category[],
+  todayTx: Transaction[],
+  weekTx: Transaction[],
+  todayBudget: number,
+  today: string,
+  weekStart: string,
+  weekEnd: string,
+): BreakdownRow[] {
+  const rows: BreakdownRow[] = []
+  const shown = new Set<string>()
+  let dailyReserved = 0
+
+  for (const category of categories) {
+    if (category.hiddenOnHome || !category.budgetRule) continue
+    const period = periodAllowance(category.budgetRule, today)
+    const limit = usageLimit(category.budgetRule, today)
+    if (!period || !limit) continue
+    const weekly = period.scope === 'week'
+    const source = weekly ? weekTx : todayTx
+    const from = weekly ? weekStart : today
+    const to = weekly ? weekEnd : today
+    const spent = source
+      .filter(
+        (t) =>
+          t.type === 'expense' &&
+          t.categoryId === category.id &&
+          t.date >= from &&
+          t.date <= to,
+      )
+      .reduce((sum, t) => sum + t.amount, 0)
+    rows.push({
+      categoryId: category.id,
+      scope: period.scope,
+      allowance: period.amount,
+      spent,
+      remaining: period.amount - spent,
+      limit: limit.limit,
+      used: countExpenses(source, category.id, from, to),
+      active: limit.active,
+    })
+    dailyReserved += dailyAllowance(category.budgetRule, today) ?? 0
+    shown.add(category.id)
+  }
+
+  const freeAllowance = todayBudget - dailyReserved
+  const freeSpent = todayTx
+    .filter((t) => t.type === 'expense' && (!t.categoryId || !shown.has(t.categoryId)))
+    .reduce((sum, t) => sum + t.amount, 0)
+  rows.push({
+    categoryId: null,
+    scope: 'day',
+    allowance: freeAllowance,
+    spent: freeSpent,
+    remaining: freeAllowance - freeSpent,
+    limit: null,
+    used: 0,
+    active: true,
+  })
+  return rows
+}
+
+/** 히어로 큰 숫자 = 화면에 뜬 줄들의 합 */
+export function breakdownTotal(rows: BreakdownRow[]): number {
+  return rows.reduce((sum, r) => sum + r.remaining, 0)
+}
+
+/**
  * 자유 예산 (앱 가이드 §8 검산 기준)
  * = 총수입 - 고정비 카테고리의 월 예산 합 - 고정비 카테고리 밖의 지출(미분류 포함)
  * 고정비 카테고리 안의 실제 지출은 예산으로 이미 떼어두었으므로 이중으로 빼지 않는다.

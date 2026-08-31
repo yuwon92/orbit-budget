@@ -22,9 +22,9 @@ import {
   X,
 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { addMonths, format, getDaysInMonth, parseISO } from 'date-fns'
+import { addMonths, endOfWeek, format, getDaysInMonth, parseISO, startOfWeek } from 'date-fns'
 import { ko } from 'date-fns/locale'
-import { calcTodayBudget, remainingToday, spentByCategory, spentOnDate } from './lib/budget'
+import { breakdownTotal, buildBreakdown, calcTodayBudget, inQuickSlot, spentByCategory, spentOnDate } from './lib/budget'
 import { db, requestPersistentStorage } from './lib/db'
 import { money } from './lib/format'
 import { useCategories } from './lib/hooks'
@@ -32,8 +32,10 @@ import type { Transaction } from './lib/types'
 import { buildCsv, downloadCsv } from './lib/csv'
 import { materializeRecurring, syncRuleBudgets } from './lib/recurring'
 import { CategoryPlanet } from './components/CategoryPlanet'
+import { DailyBreakdown } from './components/DailyBreakdown'
 import { CategorySettings } from './components/CategorySettings'
 import { ExpenseSheet } from './components/ExpenseSheet'
+import { QuickAddOrbs, type QuickPreset } from './components/QuickAddOrbs'
 import { RecurringSettings } from './components/RecurringSettings'
 import { ReserveSheet } from './components/ReserveSheet'
 
@@ -86,7 +88,7 @@ function Sidebar({ active, setActive }: { active: Tab; setActive: (tab: Tab) => 
   return <aside className="sidebar"><nav>{items.map(item => { const Icon = item.icon; return <button key={item.id} onClick={() => setActive(item.id)} className={active === item.id ? 'active' : ''}><Icon size={19}/><span>{item.label}</span></button> })}</nav><div className="month-chip"><Planet small/><div><span>{Number(month.slice(5))}월의 행성</span><strong>{usage ?? 0}% 사용 중</strong></div></div></aside>
 }
 
-function HomeView({ openExpense, openEdit, goTransactions, goCategories }: { openExpense: () => void; openEdit: (t: Transaction) => void; goTransactions: () => void; goCategories: () => void }) {
+function HomeView({ openExpense, openEdit, openPreset, goTransactions, goCategories }: { openExpense: () => void; openEdit: (t: Transaction) => void; openPreset: (preset: QuickPreset) => void; goTransactions: () => void; goCategories: () => void }) {
   const categories = useCategories() ?? []
   const today = format(new Date(), 'yyyy-MM-dd')
   const month = today.slice(0, 7)
@@ -95,30 +97,54 @@ function HomeView({ openExpense, openEdit, goTransactions, goCategories }: { ope
   const settings = useLiveQuery(() => db.monthSettings.get(month), [month])
   const loaded = monthTx !== undefined
   const txs = monthTx ?? []
+  // 주 단위 횟수 한도는 주가 달을 걸칠 수 있어서(8/30 일요일 ~ 9/5) 따로 읽는다.
+  const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 0 }), 'yyyy-MM-dd')
+  const weekEnd = format(endOfWeek(new Date(), { weekStartsOn: 0 }), 'yyyy-MM-dd')
+  const weekTx = useLiveQuery(
+    () => db.transactions.where('date').between(weekStart, weekEnd, true, true).toArray(),
+    [weekStart, weekEnd],
+  )
+  const [menuFor, setMenuFor] = useState<string | null>(null)
+  useEffect(() => {
+    if (!menuFor) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenuFor(null)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [menuFor])
 
   const todayBudget = calcTodayBudget(txs, today, settings?.reserveAmount ?? 0)
   const todaySpent = spentOnDate(txs, today)
-  const remaining = remainingToday(todayBudget, todaySpent)
-  const over = remaining < 0
-  const usedPercent = todayBudget > 0 ? Math.round(todaySpent / todayBudget * 100) : todaySpent > 0 ? 100 : 0
-  const heroBarColor = usedPercent >= 100 ? 'var(--danger)' : usedPercent >= 80 ? '#e7b96a' : undefined
   const spent = spentByCategory(txs, month)
   const todayTx = loaded
     ? txs.filter(t => t.date === today).sort((a, b) => a.createdAt - b.createdAt)
     : undefined
+  // 큰 숫자는 화면에 뜬 줄들의 합이다. 주 단위 카테고리는 이번 주 잔액이 그대로 들어간다.
+  const rows = buildBreakdown(categories, todayTx ?? [], weekTx ?? [], todayBudget, today, weekStart, weekEnd)
+  const remaining = breakdownTotal(rows)
+  const over = remaining < 0
   const budgeted = categories.filter(c => c.monthlyBudget > 0)
-  return <div className="view home-view">
+  const toggleHidden = async (category: typeof categories[number]) => {
+    setMenuFor(null)
+    await db.categories.update(category.id, { hiddenOnHome: !category.hiddenOnHome })
+  }
+  const toggleQuickSlot = async (category: typeof categories[number]) => {
+    setMenuFor(null)
+    await db.categories.update(category.id, { quickSlot: !inQuickSlot(category) })
+  }
+  return <div className="view home-view" onClick={() => menuFor && setMenuFor(null)}>
     <section className="hero-card">
       <div className="hero-copy">
         <p className="eyebrow">{format(new Date(), 'M월 d일, EEEE', { locale: ko })}</p>
         <p className="hero-label">오늘 사용할 수 있는 금액</p>
         <h1 className={over ? 'negative' : ''}><span>{loaded ? money(remaining) : '—'}</span><small>원</small></h1>
-        <div className="daily-budget"><span>오늘 예산</span><strong>{loaded ? money(todayBudget) : '—'}원</strong><i>{usedPercent}%</i></div>
-        <div className="hero-progress"><span style={{ width: `${Math.min(usedPercent, 100)}%`, ...(heroBarColor ? { background: heroBarColor } : {}) }} /></div>
+        <div className="daily-budget"><span>오늘 예산</span><strong>{loaded ? money(todayBudget) : '—'}원</strong></div>
+        {loaded && <DailyBreakdown rows={rows} categories={categories}/>}
         <p className="hero-note">오늘 {money(todaySpent)}원을 사용했어요</p>
       </div>
       <Planet />
     </section>
+
+    <QuickAddOrbs openPreset={openPreset} />
 
     <div className="section-heading"><div><p className="eyebrow">MONTHLY PLAN</p><h2>이번 달 예산</h2></div><button className="text-button" onClick={goCategories}>전체 보기 <ChevronRight size={16}/></button></div>
     {budgeted.length === 0 && loaded && <section className="transaction-card">
@@ -134,9 +160,20 @@ function HomeView({ openExpense, openEdit, goTransactions, goCategories }: { ope
         const used = spent.get(category.id) ?? 0
         const progress = Math.round(used / category.monthlyBudget * 100)
         const barColor = progress >= 100 ? '#ef7777' : progress >= 80 ? '#e7b96a' : category.color
+        // 홈 요약에 오르는 건 횟수·교통뿐이라 그 항목은 해당 카테고리에만 띄운다.
+        // 퀵 슬롯은 모든 카테고리가 넣고 뺄 수 있다.
+        const canToggleHome = category.budgetRule?.kind === 'perUse' || category.budgetRule?.kind === 'commute'
+        const open = menuFor === category.id
         return <article className="category-card" key={category.id}>
-          <div className="category-top"><CategoryPlanet color={category.color}/><button aria-label="더 보기"><MoreHorizontal size={18}/></button></div>
-          <div><h3>{category.name}</h3><p><strong>{money(used)}</strong> <span>/ {money(category.monthlyBudget)}원</span></p></div>
+          <div className="category-top">
+            <CategoryPlanet color={category.color}/>
+            <button aria-label="더 보기" aria-expanded={open} onClick={(e) => { e.stopPropagation(); setMenuFor(open ? null : category.id) }}><MoreHorizontal size={18}/></button>
+          </div>
+          {open && <div className="card-menu" onClick={(e) => e.stopPropagation()}>
+            {canToggleHome && <button onClick={() => toggleHidden(category)}>{category.hiddenOnHome ? '홈에 추가하기' : '홈에서 숨기기'}</button>}
+            <button onClick={() => toggleQuickSlot(category)}>{inQuickSlot(category) ? '퀵 슬롯에서 숨기기' : '퀵 슬롯에 추가하기'}</button>
+          </div>}
+          <div><h3>{category.name}{category.hiddenOnHome && <em className="hidden-note">홈에서 숨김</em>}</h3><p><strong>{money(used)}</strong> <span>/ {money(category.monthlyBudget)}원</span></p></div>
           <div className="progress-meta"><span>{progress}% 사용</span><span>{money(category.monthlyBudget - used)}원 남음</span></div>
           <div className="category-progress"><i style={{ width: `${Math.min(progress, 100)}%`, background: barColor }} /></div>
         </article>
@@ -158,7 +195,8 @@ function HomeView({ openExpense, openEdit, goTransactions, goCategories }: { ope
             return <div className="transaction-row" key={t.id}>
               <span className="transaction-time">{format(t.createdAt, 'HH:mm')}</span>
               <CategoryPlanet color={cat?.color ?? '#a8aebb'}/>
-              <button className="transaction-name" onClick={() => openEdit(t)}><strong>{t.memo || cat?.name || (income ? '수입' : '지출')}</strong><span>{income ? '수입' : cat?.name ?? '미분류'}</span></button>
+              {/* 메모가 없으면 제목이 곧 카테고리라 아래 줄을 또 쓰지 않는다 */}
+              <button className="transaction-name" onClick={() => openEdit(t)}><strong>{t.memo || cat?.name || (income ? '수입' : '지출')}</strong>{t.memo && <span>{income ? '수입' : cat?.name ?? '미분류'}</span>}</button>
               <strong className={`transaction-amount ${income ? 'income-text' : ''}`}>{income ? '+' : '-'}{money(t.amount)}원</strong>
             </div>
           })}
@@ -258,7 +296,7 @@ function CalendarView({ openEdit }: { openEdit: (t: Transaction) => void }) {
             return <div className="transaction-row" key={t.id}>
               <span className="transaction-time">{format(t.createdAt, 'HH:mm')}</span>
               <CategoryPlanet color={income ? '#83dad8' : cat?.color ?? '#a8aebb'}/>
-              <button className="transaction-name" onClick={() => openEdit(t)}><strong>{t.memo || cat?.name || (income ? '수입' : '지출')}{t.isPlanned && <em className="planned-chip">예정</em>}</strong><span>{income ? '수입' : cat?.name ?? '미분류'}</span></button>
+              <button className="transaction-name" onClick={() => openEdit(t)}><strong>{t.memo || cat?.name || (income ? '수입' : '지출')}{t.isPlanned && <em className="planned-chip">예정</em>}</strong>{t.memo && <span>{income ? '수입' : cat?.name ?? '미분류'}</span>}</button>
               <strong className={`transaction-amount ${income ? 'income-text' : ''}`}>{income ? '+' : '-'}{money(t.amount)}원</strong>
             </div>
           })}
@@ -412,21 +450,23 @@ function SettingsView({ dark, onTheme, sub, setSub }: { dark: boolean; onTheme: 
 function App() {
   const [active, setActive] = useState<Tab>('home')
   const [dark, setDark] = useState(false)
-  const [sheet, setSheet] = useState<Transaction | 'new' | null>(null)
+  // 빈 객체면 새 거래, transaction이 있으면 수정, preset이 있으면 빠른 기록에서 넘어온 프리필.
+  const [sheet, setSheet] = useState<{ transaction?: Transaction; preset?: QuickPreset } | null>(null)
   const [settingsSub, setSettingsSub] = useState<SettingsSub>(null)
   const goSettings = (sub: SettingsSub) => { setSettingsSub(sub); setActive('settings') }
   useEffect(() => { document.documentElement.classList.toggle('dark', dark) }, [dark])
   useEffect(() => { document.body.style.overflow = sheet ? 'hidden' : '' }, [sheet])
-  const openExpense = () => setSheet('new')
-  const openEdit = (t: Transaction) => setSheet(t)
+  const openExpense = () => setSheet({})
+  const openEdit = (t: Transaction) => setSheet({ transaction: t })
+  const openPreset = (preset: QuickPreset) => setSheet({ preset })
   // 달이 바뀌면 요일 수도 달라지므로 앱을 열 때 계산식 예산을 이번 달 기준으로 맞춘다.
   useEffect(() => {
     const today = format(new Date(), 'yyyy-MM-dd')
     materializeRecurring(today).then(() => syncRuleBudgets(today.slice(0, 7)))
   }, [])
   useEffect(() => { requestPersistentStorage() }, [])
-  const content = useMemo(() => ({home:<HomeView openExpense={openExpense} openEdit={openEdit} goTransactions={()=>setActive('transactions')} goCategories={()=>goSettings('categories')}/>,calendar:<CalendarView openEdit={openEdit}/>,transactions:<TransactionsView openExpense={openExpense} openEdit={openEdit}/>,settings:<SettingsView dark={dark} onTheme={()=>setDark(!dark)} sub={settingsSub} setSub={setSettingsSub}/>})[active], [active,dark,settingsSub])
-  return <div className="app-shell"><Header dark={dark} onTheme={()=>setDark(!dark)}/><Sidebar active={active} setActive={(tab)=>{if(tab==='settings')setSettingsSub(null);setActive(tab)}}/><main>{content}</main>{(active==='home'||active==='transactions')&&<button className="desktop-add" onClick={openExpense}><Plus size={20}/> 추가</button>}<nav className="bottom-nav">{([{id:'home',label:'홈',icon:Home},{id:'calendar',label:'달력',icon:CalendarDays},{id:'transactions',label:'거래',icon:ListFilter},{id:'settings',label:'설정',icon:Settings}] as const).map(item=>{const Icon=item.icon;return <button key={item.id} className={active===item.id?'active':''} onClick={()=>{if(item.id==='settings')setSettingsSub(null);setActive(item.id)}}><Icon size={20}/><span>{item.label}</span></button>})}</nav>{sheet&&<ExpenseSheet transaction={sheet==='new'?null:sheet} close={()=>setSheet(null)}/>}</div>
+  const content = useMemo(() => ({home:<HomeView openExpense={openExpense} openEdit={openEdit} openPreset={openPreset} goTransactions={()=>setActive('transactions')} goCategories={()=>goSettings('categories')}/>,calendar:<CalendarView openEdit={openEdit}/>,transactions:<TransactionsView openExpense={openExpense} openEdit={openEdit}/>,settings:<SettingsView dark={dark} onTheme={()=>setDark(!dark)} sub={settingsSub} setSub={setSettingsSub}/>})[active], [active,dark,settingsSub])
+  return <div className="app-shell"><Header dark={dark} onTheme={()=>setDark(!dark)}/><Sidebar active={active} setActive={(tab)=>{if(tab==='settings')setSettingsSub(null);setActive(tab)}}/><main>{content}</main>{(active==='home'||active==='transactions')&&<button className="desktop-add" onClick={openExpense}><Plus size={20}/> 추가</button>}<nav className="bottom-nav">{([{id:'home',label:'홈',icon:Home},{id:'calendar',label:'달력',icon:CalendarDays},{id:'transactions',label:'거래',icon:ListFilter},{id:'settings',label:'설정',icon:Settings}] as const).map(item=>{const Icon=item.icon;return <button key={item.id} className={active===item.id?'active':''} onClick={()=>{if(item.id==='settings')setSettingsSub(null);setActive(item.id)}}><Icon size={20}/><span>{item.label}</span></button>})}</nav>{sheet&&<ExpenseSheet transaction={sheet.transaction} preset={sheet.preset} close={()=>setSheet(null)}/>}</div>
 }
 
 export default App

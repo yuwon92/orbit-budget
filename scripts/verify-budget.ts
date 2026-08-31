@@ -4,13 +4,20 @@ import assert from 'node:assert/strict'
 import {
   activeRecurringForCategory,
   availableAmount,
+  breakdownTotal,
   budgetFromRule,
+  buildBreakdown,
   calcTodayBudget,
   categoryProgress,
+  countExpenses,
+  dailyAllowance,
   freeBudget,
+  inQuickSlot,
   monthlyOccurrences,
   occurredExpense,
   occurrenceDate,
+  periodAllowance,
+  quickAddAmount,
   recurringSumForCategory,
   remainingDays,
   remainingToday,
@@ -18,6 +25,7 @@ import {
   spentOnDate,
   totalIncome,
   upcomingExpense,
+  usageLimit,
   weekdayCountInMonth,
   weeksInMonth,
 } from '../src/lib/budget.ts'
@@ -183,6 +191,118 @@ assert.deepEqual(
 // 아직 시작 전인 달에는 빠진다
 assert.equal(recurringSumForCategory(recRules, 'subs', '2026-08'), 41_800) // spotify 제외, cancelled 포함
 console.log('예산 계산 도구 (요일 수 세기, 단가 배수 반올림, 구독 합계 기간 판정) 통과')
+
+// --- 홈 빠른 기록 구슬의 단가 ---
+assert.equal(quickAddAmount({ kind: 'perUse', unitAmount: 13_000, freq: perWeek10 }), 13_000)
+// 교통은 왕복이 켜져 있어도 한 번 누르면 편도. 왕복이면 두 번 누른다
+assert.equal(quickAddAmount({ ...commute, freq: weekdaysAll }), 1_550)
+assert.equal(quickAddAmount({ kind: 'commute', fare: 1_550, roundTrip: false, freq: weekdaysAll }), 1_550)
+assert.equal(quickAddAmount({ kind: 'manual' }), null)
+assert.equal(quickAddAmount({ kind: 'recurringSum' }), null)
+assert.equal(quickAddAmount(undefined), null) // 계산 방법이 없는 예전 카테고리
+console.log('빠른 기록 단가 (교통은 편도, 직접 입력·구독은 제외) 통과')
+
+// 퀵 슬롯: 안 건드렸으면 단가 있는 것만, 손대면 그 설정이 이긴다
+const slotCat = (budgetRule: object, quickSlot?: boolean): Category => ({
+  id: 'x', name: 'x', monthlyBudget: 0, color: '#8ebeff', isFixed: false, sortOrder: 0,
+  budgetRule: budgetRule as Category['budgetRule'], quickSlot,
+})
+assert.equal(inQuickSlot(slotCat({ kind: 'perUse', unitAmount: 6_500, freq: perWeek10 })), true)
+assert.equal(inQuickSlot(slotCat({ ...commute, freq: weekdaysAll })), true)
+assert.equal(inQuickSlot(slotCat({ kind: 'manual' })), false) // 기본값은 안 뜸
+assert.equal(inQuickSlot(slotCat({ kind: 'manual' }, true)), true) // 직접 넣으면 뜬다
+assert.equal(inQuickSlot(slotCat({ kind: 'recurringSum' }, true)), true)
+assert.equal(inQuickSlot(slotCat({ kind: 'perUse', unitAmount: 6_500, freq: perWeek10 }, false)), false) // 빼면 안 뜬다
+console.log('퀵 슬롯 표시 여부 (기본값 + 직접 설정) 통과')
+
+// --- 홈 하루 몫 분해 ---
+// 2026-09-07은 월요일, 09-08은 화요일
+const MON = '2026-09-07'
+const TUE = '2026-09-08'
+const foodRule = { kind: 'perUse', unitAmount: 6_500, freq: perWeek10 } as const
+const cafeRule = { kind: 'perUse', unitAmount: 5_000, freq: monWedFri } as const
+const busRule = { ...commute, freq: weekdaysAll } as const
+
+assert.equal(dailyAllowance(foodRule, MON), 9_285) // 6,500 x 10 / 7 = 9,285.7 -> 내림
+assert.equal(dailyAllowance(cafeRule, MON), 5_000) // 월요일이라 그날 몫이 있다
+assert.equal(dailyAllowance(cafeRule, TUE), 0) // 화요일은 쓰기로 한 요일이 아니다
+assert.equal(dailyAllowance(busRule, MON), 3_100) // 편도 1,550 왕복 = 하루 3,100
+assert.equal(dailyAllowance(busRule, '2026-09-05'), 0) // 토요일
+assert.equal(dailyAllowance({ ...commute, freq: { mode: 'perWeek', timesPerWeek: 5 } }, MON), 2_214) // 3,100 x 5 / 7
+assert.equal(dailyAllowance({ kind: 'manual' }, MON), null)
+assert.equal(dailyAllowance({ kind: 'recurringSum' }, MON), null)
+
+assert.deepEqual(usageLimit(foodRule, MON), { scope: 'week', limit: 10, active: true })
+assert.deepEqual(usageLimit(cafeRule, MON), { scope: 'day', limit: 1, active: true })
+assert.deepEqual(usageLimit(cafeRule, TUE), { scope: 'day', limit: 1, active: false })
+// 왕복은 편도 두 번이라 한도도 두 번. 구슬을 두 번 눌러야 하루치가 채워진다
+assert.deepEqual(usageLimit(busRule, MON), { scope: 'day', limit: 2, active: true })
+assert.deepEqual(usageLimit({ ...commute, freq: { mode: 'perWeek', timesPerWeek: 5 } }, MON), { scope: 'week', limit: 10, active: true })
+assert.deepEqual(usageLimit({ kind: 'commute', fare: 1_550, roundTrip: false, freq: weekdaysAll }, MON), { scope: 'day', limit: 1, active: true })
+assert.equal(usageLimit({ kind: 'manual' }, MON), null)
+
+// 건수 세기: 기간 양끝 포함, 수입·다른 카테고리 제외
+const countTx: Transaction[] = [
+  tx('2026-09-06', 6_000, 'expense', 'food', ''),
+  tx('2026-09-07', 6_500, 'expense', 'food', ''),
+  tx('2026-09-12', 7_000, 'expense', 'food', ''),
+  tx('2026-09-13', 8_000, 'expense', 'food', ''), // 주 범위 밖
+  tx('2026-09-08', 5_000, 'expense', 'cafe', ''), // 다른 카테고리
+  tx('2026-09-09', 100_000, 'income', 'food', ''), // 수입
+]
+assert.equal(countExpenses(countTx, 'food', '2026-09-06', '2026-09-12'), 3)
+assert.equal(countExpenses(countTx, 'food', MON, MON), 1)
+assert.equal(countExpenses(countTx, 'cafe', '2026-09-06', '2026-09-12'), 1)
+
+// 기간별 예산: 주 한도면 예산도 주 단위 (카페 5,000원 x 주 2회 = 이번 주 10,000원)
+assert.deepEqual(periodAllowance({ kind: 'perUse', unitAmount: 5_000, freq: { mode: 'perWeek', timesPerWeek: 2 } }, MON), { scope: 'week', amount: 10_000 })
+assert.deepEqual(periodAllowance(foodRule, MON), { scope: 'week', amount: 65_000 }) // 6,500 x 10
+assert.deepEqual(periodAllowance(cafeRule, MON), { scope: 'day', amount: 5_000 })
+assert.deepEqual(periodAllowance(cafeRule, TUE), { scope: 'day', amount: 0 })
+assert.deepEqual(periodAllowance(busRule, MON), { scope: 'day', amount: 3_100 })
+assert.equal(periodAllowance({ kind: 'manual' }, MON), null)
+
+// 히어로 목록: 줄마다 자기 기간, 큰 숫자는 그 줄들의 합
+const homeCat = (id: string, budgetRule: object, hiddenOnHome = false): Category => ({
+  id, name: id, monthlyBudget: 0, color: '#8ebeff', isFixed: false, sortOrder: 0,
+  budgetRule: budgetRule as Category['budgetRule'], hiddenOnHome,
+})
+const homeCats = [homeCat('food', foodRule), homeCat('cafe', cafeRule), homeCat('bus', busRule), homeCat('etc', { kind: 'manual' })]
+const WEEK_FROM = '2026-09-06' // 일요일
+const WEEK_TO = '2026-09-12'
+const weekSpend = [
+  tx(WEEK_FROM, 6_500, 'expense', 'food', ''), // 이번 주지만 오늘은 아님
+  tx(MON, 6_500, 'expense', 'food', ''),
+  tx(MON, 5_000, 'expense', 'cafe', ''),
+  tx(MON, 30_000, 'expense', 'etc', ''), // 목록에 없는 카테고리 -> 자유에서 빠진다
+]
+const todaySpend = weekSpend.filter((t) => t.date === MON)
+const dayBudget = 57_358
+const rows = buildBreakdown(homeCats, todaySpend, weekSpend, dayBudget, MON, WEEK_FROM, WEEK_TO)
+
+assert.deepEqual(rows.map((r) => r.categoryId), ['food', 'cafe', 'bus', null])
+// 식비: 주 단위라 이번 주 65,000에서 이번 주 지출 13,000을 뺀다 (오늘치만 빼지 않는다)
+assert.deepEqual(
+  { scope: rows[0].scope, allowance: rows[0].allowance, spent: rows[0].spent, remaining: rows[0].remaining, used: rows[0].used },
+  { scope: 'week', allowance: 65_000, spent: 13_000, remaining: 52_000, used: 2 },
+)
+// 카페: 요일 지정이라 오늘 몫 5,000에서 오늘 지출 5,000
+assert.deepEqual({ allowance: rows[1].allowance, remaining: rows[1].remaining, used: rows[1].used }, { allowance: 5_000, remaining: 0, used: 1 })
+// 자유: 오늘 예산에서 하루 환산 몫(9,285 + 5,000 + 3,100)을 뺀 뒤 목록 밖 지출 30,000을 뺀다
+const freeRow = rows[3]
+assert.equal(freeRow.allowance, dayBudget - (9_285 + 5_000 + 3_100))
+assert.equal(freeRow.spent, 30_000)
+assert.equal(breakdownTotal(rows), rows.reduce((s, r) => s + r.remaining, 0))
+
+// 숨기면 그 줄이 빠지고, 떼어두지 않은 몫만큼 자유가 늘어난다
+const hidden = buildBreakdown(
+  [homeCat('food', foodRule), homeCat('cafe', cafeRule, true), homeCat('bus', busRule), homeCat('etc', { kind: 'manual' })],
+  todaySpend, weekSpend, dayBudget, MON, WEEK_FROM, WEEK_TO,
+)
+assert.deepEqual(hidden.map((r) => r.categoryId), ['food', 'bus', null])
+assert.equal(hidden[2].allowance, freeRow.allowance + 5_000) // 카페 하루 몫이 자유로
+assert.equal(hidden[2].spent, 35_000) // 카페 지출도 자유에서 빠진다
+console.log('하루 몫 분해 (기간별 예산, 주/일 한도, 건수, 자유 흡수) 통과')
 
 // --- CSV 생성 ---
 const csv = buildCsv(
