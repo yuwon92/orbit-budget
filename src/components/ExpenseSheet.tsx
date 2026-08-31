@@ -15,10 +15,12 @@ import { CategoryPlanet } from './CategoryPlanet'
 export function ExpenseSheet({
   transaction,
   preset,
+  initialDate,
   close,
 }: {
   transaction?: Transaction | null
   preset?: QuickPreset
+  initialDate?: string
   close: () => void
 }) {
   const categories = useCategories() ?? []
@@ -30,7 +32,7 @@ export function ExpenseSheet({
   const [selectedId, setSelectedId] = useState<string | null>(
     editing?.categoryId ?? preset?.categoryId ?? null,
   )
-  const [date, setDate] = useState(() => editing?.date ?? format(new Date(), 'yyyy-MM-dd'))
+  const [date, setDate] = useState(() => editing?.date ?? initialDate ?? format(new Date(), 'yyyy-MM-dd'))
   const [memo, setMemo] = useState(editing?.memo ?? '')
   const [saving, setSaving] = useState(false)
 

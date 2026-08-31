@@ -194,8 +194,7 @@ button.transaction-name,.history-row .row-open{border:0;background:none;padding:
 .calc-result strong{font-size:16px;font-variant-numeric:tabular-nums}
 .calc-result small{font-size:11px;line-height:1.6;color:var(--text-secondary)}
 
-/* 홈 빠른 기록 구슬 */
-/* 히어로 카드 안이라 행성 자리를 침범하지 않게 폭을 묶어두고, 넘치면 다음 줄로 내린다 */
+/* 홈 빠른 기록 구슬 (히어로 카드 바깥) */
 .quick-add{display:flex;flex-wrap:wrap;gap:14px;margin-top:18px}
 .quick-orb{border:0;background:none;padding:0;cursor:pointer;display:grid;justify-items:center;gap:7px}
 .quick-orb .orb{--category-color:#8ebeff;width:60px;height:60px;border-radius:50%;display:grid;place-items:center;text-align:center;padding:0 7px;font-size:11px;font-weight:700;line-height:1.2;letter-spacing:-.02em;color:#1b2030;overflow:hidden;background:linear-gradient(145deg,color-mix(in srgb,var(--category-color) 58%,white),var(--category-color));box-shadow:inset -3px -2px 5px color-mix(in srgb,var(--category-color) 65%,#7583aa);transition:transform .12s}
@@ -228,4 +227,22 @@ button.transaction-name,.history-row .row-open{border:0;background:none;padding:
   .hero-breakdown .note{font-size:9px;padding-left:2px}
   /* 좁은 폭에서는 카드가 2단 그리드라 점 세 개를 카드 오른쪽 위에 고정한다 */
   .category-card .category-top>button{position:absolute;top:13px;right:11px}
+}
+
+/* 모바일 달력 날짜 상세 바텀시트 */
+.selected-head-side{display:flex;align-items:center;gap:12px;font-variant-numeric:tabular-nums}
+.selected-head-side>strong{font-size:15px}
+.calendar-detail-close,.calendar-sheet-handle{display:none}
+.selected-day-add{height:42px;margin:8px 0 4px;border:1px solid var(--border);border-radius:12px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:7px;font-size:12px;font-weight:700;cursor:pointer;color:var(--text-primary)}
+@media(max-width:680px){
+  .calendar-detail-layer{display:none}
+  .calendar-detail-layer.open{position:fixed;z-index:40;inset:0 0 76px;background:rgba(4,7,16,.38);backdrop-filter:blur(3px);display:flex;align-items:flex-end;padding:12px 12px 0}
+  .calendar-detail-layer .selected-day{width:min(100%,520px);max-height:min(62vh,560px);margin:0 auto;overflow:auto;border-radius:24px 24px 16px 16px;padding:13px 18px 16px;box-shadow:0 -12px 36px rgba(22,29,52,.16);animation:sheet-up .22s ease-out}
+  .calendar-sheet-handle{display:block;margin-bottom:12px}
+  .calendar-detail-close{display:grid;width:38px;height:38px}
+  .selected-head{padding:3px 0 10px}
+  .selected-head-side{gap:9px}
+  .selected-head-side>strong{font-size:14px}
+  .selected-day-content{overflow:auto}
+  .selected-day-add{width:100%;height:48px;margin-top:12px;background:linear-gradient(135deg,#7baaf0,#9c91e6);border:0;color:#fff;font-size:13px}
 }
