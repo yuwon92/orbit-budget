@@ -4,13 +4,13 @@ import type { Category, MonthSettings, RecurringRule, Transaction } from './type
 
 // UI 가이드 §20 카테고리 팔레트
 export const CATEGORY_PALETTE = [
-  '#8ebeff', // Food
-  '#b7a7f8', // Cafe
-  '#83dad8', // Transport
-  '#c4a8e7', // Subscription
-  '#e6b8dc', // Beauty
-  '#95b7e9', // Investment
-  '#a8aebb', // Other
+  '#79a7f2', // Food · sky blue
+  '#e5b66f', // Cafe · amber
+  '#62c7c2', // Transport · teal
+  '#a98be8', // Subscription · violet
+  '#d995bc', // Beauty · rose
+  '#8fbc91', // Investment · sage
+  '#9aa3b4', // Other · slate
 ]
 
 export const db = new Dexie('orbital-budget') as Dexie & {
@@ -31,12 +31,31 @@ db.version(1).stores({
 // 이미 v2로 올라간 DB가 열리려면 이 선언 자체는 남아 있어야 한다.
 db.version(2).stores({})
 
+// v3: 서로 비슷했던 파랑·보라 계열을 색상각이 분명한 새 팔레트로 한 번만 교체한다.
+// 사용자가 팔레트 밖의 사용자 지정 색을 쓰고 있다면 그대로 보존한다.
+const categoryColorMigration: Record<string, string> = {
+  '#8ebeff': '#79a7f2',
+  '#b7a7f8': '#e5b66f',
+  '#83dad8': '#62c7c2',
+  '#c4a8e7': '#a98be8',
+  '#e6b8dc': '#d995bc',
+  '#95b7e9': '#8fbc91',
+  '#a8aebb': '#9aa3b4',
+}
+
+db.version(3).stores({}).upgrade((tx) =>
+  tx.table<Category>('categories').toCollection().modify((category) => {
+    const migratedColor = categoryColorMigration[category.color.toLowerCase()]
+    if (migratedColor) category.color = migratedColor
+  }),
+)
+
 // 기본 카테고리. 예산 금액은 사용자가 직접 정하도록 0(미설정)으로 둔다.
 const seedCategories: Omit<Category, 'id'>[] = [
-  { name: '식비', monthlyBudget: 0, color: '#8ebeff', isFixed: false, sortOrder: 0 },
-  { name: '교통비', monthlyBudget: 0, color: '#83dad8', isFixed: false, sortOrder: 1 },
-  { name: '구독', monthlyBudget: 0, color: '#c4a8e7', isFixed: true, sortOrder: 2 },
-  { name: '카페', monthlyBudget: 0, color: '#b7a7f8', isFixed: false, sortOrder: 3 },
+  { name: '식비', monthlyBudget: 0, color: '#79a7f2', isFixed: false, sortOrder: 0 },
+  { name: '교통비', monthlyBudget: 0, color: '#62c7c2', isFixed: false, sortOrder: 1 },
+  { name: '구독', monthlyBudget: 0, color: '#a98be8', isFixed: true, sortOrder: 2 },
+  { name: '카페', monthlyBudget: 0, color: '#e5b66f', isFixed: false, sortOrder: 3 },
 ]
 
 db.on('populate', (tx) => {

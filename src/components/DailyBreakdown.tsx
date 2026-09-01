@@ -28,7 +28,7 @@ export function DailyBreakdown({ rows, categories }: { rows: BreakdownRow[]; cat
             {/* 클래스 이름 주의: 전역 .dot은 행성 장식용 position:absolute라 쓰면 안 된다 */}
             <span
               className="cat-dot"
-              style={{ '--category-color': category?.color ?? '#a8aebb' } as CSSProperties}
+              style={{ '--category-color': category?.color ?? '#9aa3b4' } as CSSProperties}
             />
             <span className="name">{category?.name ?? '자유'}</span>
             <strong className={row.remaining < 0 ? 'over' : ''}>{money(row.remaining)}원</strong>

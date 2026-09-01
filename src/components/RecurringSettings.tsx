@@ -153,7 +153,7 @@ export function RecurringSettings({ back }: { back: () => void }) {
           const income = rule.type === 'income'
           return (
             <button className="setting-row" key={rule.id} onClick={() => setEditing(rule)}>
-              <CategoryPlanet color={income ? '#83dad8' : cat?.color ?? '#a8aebb'} />
+              <CategoryPlanet color={income ? '#83dad8' : cat?.color ?? '#9aa3b4'} />
               <div>
                 <strong>{rule.name}{income && <em className="income-chip">수입</em>}</strong>
                 <small>매달 {rule.dayOfMonth}일 · {money(rule.amount)}원{!income && ` · ${cat?.name ?? '미분류'}`}</small>

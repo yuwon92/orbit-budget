@@ -333,3 +333,7 @@ button.transaction-name,.history-row .row-open{border:0;background:none;padding:
   main{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior-y:contain;padding:86px 16px 24px}
   .bottom-nav{position:static;flex:0 0 auto}
 }
+
+/* 카테고리 팔레트 v2: 색이 없을 때도 새 스카이·슬레이트 기본값을 사용한다 */
+.category-planet,.quick-orb .orb,.quick-toggle-planet .orb{--category-color:#79a7f2}
+.hero-breakdown .cat-dot{--category-color:#9aa3b4}

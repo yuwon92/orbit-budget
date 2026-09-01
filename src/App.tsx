@@ -197,7 +197,7 @@ function HomeView({ openExpense, openEdit, openPreset, goTransactions, goCategor
             const income = t.type === 'income'
             return <div className="transaction-row" key={t.id}>
               <span className="transaction-time">{format(t.createdAt, 'HH:mm')}</span>
-              <CategoryPlanet color={cat?.color ?? '#a8aebb'}/>
+              <CategoryPlanet color={cat?.color ?? '#9aa3b4'}/>
               {/* 메모가 없으면 제목이 곧 카테고리라 아래 줄을 또 쓰지 않는다 */}
               <button className="transaction-name" onClick={() => openEdit(t)}><strong>{t.memo || cat?.name || (income ? '수입' : '지출')}</strong>{t.memo && <span>{income ? '수입' : cat?.name ?? '미분류'}</span>}</button>
               <strong className={`transaction-amount ${income ? 'income-text' : ''}`}>{income ? '+' : '-'}{money(t.amount)}원</strong>
@@ -329,7 +329,7 @@ function CalendarView({ openEdit, openExpenseForDate }: { openEdit: (t: Transact
                 const income = t.type === 'income'
                 return <div className="transaction-row" key={t.id}>
                   <span className={`transaction-time ${t.isPlanned ? 'planned-label' : ''}`}>{t.isPlanned ? '예정' : format(t.createdAt, 'HH:mm')}</span>
-                  <CategoryPlanet color={income ? '#83dad8' : cat?.color ?? '#a8aebb'}/>
+                  <CategoryPlanet color={income ? '#83dad8' : cat?.color ?? '#9aa3b4'}/>
                   <button className="transaction-name" onClick={() => openEdit(t)}><strong>{t.memo || cat?.name || (income ? '수입' : '지출')}</strong>{t.memo && <span>{income ? '수입' : cat?.name ?? '미분류'}</span>}</button>
                   <strong className={`transaction-amount ${income ? 'income-text' : ''}`}>{income ? '+' : '-'}{money(t.amount)}원</strong>
                 </div>
@@ -416,7 +416,7 @@ function TransactionsView({ openExpense, openEdit }: { openExpense: () => void; 
               <CategoryPlanet color={c.color}/>{c.name}
             </button>)}
           <button className={catFilter.includes('none') ? 'selected' : ''} onClick={() => toggleCat('none')}>
-            <CategoryPlanet color="#a8aebb"/>미분류
+            <CategoryPlanet color="#9aa3b4"/>미분류
           </button>
         </div>
       </div>
