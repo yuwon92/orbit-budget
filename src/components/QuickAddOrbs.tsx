@@ -6,6 +6,7 @@ import { inQuickSlot, quickAddAmount, quickSlotCategories } from '../lib/budget'
 import { db, moveQuickSlot, setQuickSlot } from '../lib/db'
 import { money } from '../lib/format'
 import { useCategories } from '../lib/hooks'
+import { CategoryPlanet } from './CategoryPlanet'
 
 export interface QuickPreset {
   categoryId: string
@@ -134,10 +135,11 @@ export function QuickAddOrbs({
                 }
                 aria-label={actionLabel}
               >
-                <span className="orb" style={{ '--category-color': category.color } as CSSProperties}>
-                  {category.name}
+                <CategoryPlanet color={category.color} />
+                <span className="quick-orb-copy">
+                  <strong>{category.name}</strong>
+                  <small>{amount === null ? '직접 입력' : `${money(amount)}원`}</small>
                 </span>
-                <small>{amount === null ? '직접 입력' : `${money(amount)}원`}</small>
               </button>
             )
           })}

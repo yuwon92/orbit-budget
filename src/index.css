@@ -352,3 +352,20 @@ button.transaction-name,.history-row .row-open{border:0;background:none;padding:
   .calendar-amount{gap:2px}
   .calendar-amount strong{font-size:clamp(7px,1.9vw,8px);letter-spacing:-.07em}
 }
+
+/* 퀵 슬롯 B안: 카테고리 행성은 비우고 이름·금액을 아래 두 줄로 분리한다 */
+.quick-orb{min-width:64px;min-height:96px;gap:7px}
+.quick-orb .category-planet{width:56px;height:56px;box-shadow:inset -5px -4px 9px color-mix(in srgb,var(--category-color) 65%,#7583aa),0 5px 14px color-mix(in srgb,var(--category-color) 20%,transparent)}
+.quick-orb .category-planet i{width:14px;height:10px;left:10px;top:9px;border-radius:50%;transform:rotate(-22deg)}
+.quick-orb:hover .category-planet{transform:translateY(-2px)}
+.quick-orb:active .category-planet{transform:scale(.94)}
+.quick-orb-copy{display:grid;justify-items:center;gap:2px;max-width:76px}
+.quick-orb-copy strong,.quick-orb-copy small{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.quick-orb-copy strong{font-size:11px;line-height:1.2}
+.quick-orb-copy small{font-size:10px;color:var(--text-secondary);font-variant-numeric:tabular-nums;line-height:1.2}
+
+@media(max-width:680px){
+  .quick-orb{min-width:60px;min-height:94px;flex:0 0 60px}
+  .quick-orb .category-planet{width:52px;height:52px}
+  .quick-orb .category-planet i{width:13px;height:9px;left:9px;top:8px}
+}
