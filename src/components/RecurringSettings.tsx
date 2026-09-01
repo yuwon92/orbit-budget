@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import { db } from '../lib/db'
 import { money } from '../lib/format'
 import { useCategories } from '../lib/hooks'
+import { useSheetFocus, useSheetViewport } from '../lib/sheet'
 import { deleteRule, materializeRecurring, resyncRuleForMonth, syncRuleBudgets } from '../lib/recurring'
 import type { RecurringRule } from '../lib/types'
 import { CategoryPlanet } from './CategoryPlanet'
@@ -21,6 +22,9 @@ function RuleForm({ rule, close }: { rule: RecurringRule | null; close: () => vo
   const [startDate, setStartDate] = useState(rule?.startDate ?? todayStr())
   const [endDate, setEndDate] = useState(rule?.endDate ?? '')
   const [saving, setSaving] = useState(false)
+  // 폼이 길어서 좁은 화면에서는 키보드를 바로 띄우지 않는다.
+  const nameRef = useSheetFocus<HTMLInputElement>({ onMobile: false })
+  useSheetViewport()
 
   const selected = categoryId ?? categories[0]?.id ?? null
   const dayNum = Number(day)
@@ -61,14 +65,16 @@ function RuleForm({ rule, close }: { rule: RecurringRule | null; close: () => vo
   return (
     <div className="sheet-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
       <section className="expense-sheet">
-        <div className="sheet-handle" />
-        <header>
-          <div>
-            <p className="eyebrow">RECURRING</p>
-            <h2>{rule ? '반복 거래 수정' : '반복 거래 추가'}</h2>
-          </div>
-          <button className="icon-button" onClick={close} aria-label="닫기"><X size={20} /></button>
-        </header>
+        <div className="sheet-top">
+          <div className="sheet-handle" />
+          <header>
+            <div>
+              <p className="eyebrow">RECURRING</p>
+              <h2>{rule ? '반복 거래 수정' : '반복 거래 추가'}</h2>
+            </div>
+            <button className="icon-button" onClick={close} aria-label="닫기"><X size={20} /></button>
+          </header>
+        </div>
         <div className="type-toggle">
           <button className={type === 'expense' ? 'active' : ''} onClick={() => setType('expense')}>지출</button>
           <button className={type === 'income' ? 'active' : ''} onClick={() => setType('income')}>수입</button>
@@ -76,7 +82,7 @@ function RuleForm({ rule, close }: { rule: RecurringRule | null; close: () => vo
         <div className="form-fields">
           <label className="form-field">
             <span>이름</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 넷플릭스, 용돈" autoFocus />
+            <input ref={nameRef} value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 넷플릭스, 용돈" />
           </label>
           <div className="field-pair">
             <label className="form-field">

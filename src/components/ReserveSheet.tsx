@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { db } from '../lib/db'
 import { money } from '../lib/format'
+import { useSheetFocus, useSheetViewport } from '../lib/sheet'
 
 /**
  * 이번 달 예비비 입력. 예비비는 오늘 예산 계산에서 미리 떼어두는 금액이라
@@ -11,6 +12,8 @@ import { money } from '../lib/format'
 export function ReserveSheet({ month, current, close }: { month: string; current: number; close: () => void }) {
   const [amount, setAmount] = useState(current ? String(current) : '')
   const [saving, setSaving] = useState(false)
+  const amountRef = useSheetFocus<HTMLInputElement>()
+  useSheetViewport()
   const value = Number(amount) || 0
 
   const save = async () => {
@@ -23,20 +26,22 @@ export function ReserveSheet({ month, current, close }: { month: string; current
   return (
     <div className="sheet-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
       <section className="expense-sheet">
-        <div className="sheet-handle" />
-        <header>
-          <div>
-            <p className="eyebrow">RESERVE</p>
-            <h2>{format(parseISO(`${month}-01`), 'yyyy년 M월')} 예비비</h2>
-          </div>
-          <button className="icon-button" onClick={close} aria-label="닫기"><X size={20} /></button>
-        </header>
+        <div className="sheet-top">
+          <div className="sheet-handle" />
+          <header>
+            <div>
+              <p className="eyebrow">RESERVE</p>
+              <h2>{format(parseISO(`${month}-01`), 'yyyy년 M월')} 예비비</h2>
+            </div>
+            <button className="icon-button" onClick={close} aria-label="닫기"><X size={20} /></button>
+          </header>
+        </div>
         <div className="form-fields">
           <label className="form-field">
             <span>예비비</span>
             <div className="budget-input">
               <input
-                autoFocus
+                ref={amountRef}
                 inputMode="numeric"
                 value={amount ? money(value) : ''}
                 onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))}

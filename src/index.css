@@ -305,3 +305,12 @@ button.transaction-name,.history-row .row-open{border:0;background:none;padding:
   .quick-orb{min-width:56px;min-height:77px;flex:0 0 56px;scroll-snap-align:start}
   .quick-slot-list{grid-template-columns:1fr}
 }
+
+/* 바텀시트: 키보드가 올라와도 제목·금액칸이 잘리지 않게 */
+@media(max-width:680px){
+  /* 시트를 레이아웃 뷰포트가 아니라 실제로 보이는 영역에 맞춘다(iOS 키보드). */
+  .sheet-backdrop{top:var(--sheet-top,0px);height:var(--sheet-vh,100%);bottom:auto;overscroll-behavior:contain}
+  .expense-sheet{padding-top:0;overscroll-behavior:contain;scroll-padding-top:104px}
+  .sheet-top{position:sticky;z-index:3;top:0;margin:0 -20px;padding:14px 20px 12px;background:var(--surface)}
+  .sheet-handle{margin:0 auto 14px}
+}

@@ -4,6 +4,7 @@ import { format } from 'date-fns'
 import { db } from '../lib/db'
 import { money } from '../lib/format'
 import { useCategories } from '../lib/hooks'
+import { useSheetFocus, useSheetViewport } from '../lib/sheet'
 import type { Transaction } from '../lib/types'
 import type { QuickPreset } from './QuickAddOrbs'
 import { CategoryPlanet } from './CategoryPlanet'
@@ -35,6 +36,8 @@ export function ExpenseSheet({
   const [date, setDate] = useState(() => editing?.date ?? initialDate ?? format(new Date(), 'yyyy-MM-dd'))
   const [memo, setMemo] = useState(editing?.memo ?? '')
   const [saving, setSaving] = useState(false)
+  const amountRef = useSheetFocus<HTMLInputElement>()
+  useSheetViewport()
 
   const selected = selectedId ?? categories[0]?.id ?? null
   const formatted = amount ? money(Number(amount)) : '0'
@@ -71,14 +74,16 @@ export function ExpenseSheet({
   return (
     <div className="sheet-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
       <section className="expense-sheet">
-        <div className="sheet-handle" />
-        <header>
-          <div>
-            <p className="eyebrow">{editing ? 'EDIT TRANSACTION' : 'NEW TRANSACTION'}</p>
-            <h2>{type === 'expense' ? '지출' : '수입'} {editing ? '수정' : '추가'}</h2>
-          </div>
-          <button className="icon-button" onClick={close} aria-label="닫기"><X size={20} /></button>
-        </header>
+        <div className="sheet-top">
+          <div className="sheet-handle" />
+          <header>
+            <div>
+              <p className="eyebrow">{editing ? 'EDIT TRANSACTION' : 'NEW TRANSACTION'}</p>
+              <h2>{type === 'expense' ? '지출' : '수입'} {editing ? '수정' : '추가'}</h2>
+            </div>
+            <button className="icon-button" onClick={close} aria-label="닫기"><X size={20} /></button>
+          </header>
+        </div>
         <div className="type-toggle">
           <button className={type === 'expense' ? 'active' : ''} onClick={() => setType('expense')}>지출</button>
           <button className={type === 'income' ? 'active' : ''} onClick={() => setType('income')}>수입</button>
@@ -87,7 +92,7 @@ export function ExpenseSheet({
           <span>금액</span>
           <div>
             <input
-              autoFocus
+              ref={amountRef}
               inputMode="numeric"
               value={formatted}
               onFocus={(e) => e.target.select()}
