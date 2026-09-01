@@ -8,6 +8,8 @@ import { db } from './db'
 export async function materializeRecurring(today: string): Promise<void> {
   const month = today.slice(0, 7)
   await db.transaction('rw', db.recurringRules, db.transactions, async () => {
+    // 예정 여부는 생성 당시 값에 머물 수 있으므로, 날짜가 오면 실제 발생 거래로 확정한다.
+    await db.transactions.where('date').belowOrEqual(today).modify({ isPlanned: false })
     const rules = await db.recurringRules.toArray()
     for (const rule of rules) {
       if (rule.lastGeneratedMonth && rule.lastGeneratedMonth >= month) continue

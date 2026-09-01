@@ -6,7 +6,7 @@ import { money } from '../lib/format'
 import { useSheetFocus, useSheetViewport } from '../lib/sheet'
 
 /**
- * 이번 달 예비비 입력. 예비비는 오늘 예산 계산에서 미리 떼어두는 금액이라
+ * 이번 달 예비비 입력. 예비비는 남은 자유비용에서 미리 떼어두는 금액이라
  * 달마다 따로 저장한다(MonthSettings).
  */
 export function ReserveSheet({ month, current, close }: { month: string; current: number; close: () => void }) {
@@ -52,7 +52,7 @@ export function ReserveSheet({ month, current, close }: { month: string; current
           </label>
           <p className="field-note">
             비상금이나 아직 계획하지 않은 지출에 대비해 떼어두는 금액이에요.
-            이 금액을 뺀 나머지로 오늘 예산을 계산해요. 0이면 떼어두지 않아요.
+            이 금액만큼 남은 자유비용에서 빼둬요. 0이면 떼어두지 않아요.
           </p>
         </div>
         <button className="save-button" onClick={save} disabled={saving}>

@@ -10,7 +10,7 @@ import type { Category } from '../lib/types'
 export function DailyBreakdown({ rows, categories }: { rows: BreakdownRow[]; categories: Category[] }) {
   const catMap = new Map(categories.map((c) => [c.id, c]))
   const visibleRows = rows.filter((row) => !row.categoryId || !catMap.get(row.categoryId)?.hiddenOnHome)
-  if (visibleRows.length <= 1) return null // 자유 한 줄뿐이면 굳이 쪼개 보여주지 않는다
+  if (visibleRows.length === 0) return null
 
   return (
     <ul className="hero-breakdown">

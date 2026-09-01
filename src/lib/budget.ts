@@ -1,10 +1,16 @@
-import { getDaysInMonth, parseISO } from 'date-fns'
+import { getDaysInMonth } from 'date-fns'
 import type { BudgetRule, Category, Frequency, RecurringRule, Transaction } from './types'
 
 // 앱의 핵심 계산 로직. 전부 순수 함수로 유지한다 (DB, UI 접근 금지).
 // 금액은 전부 정수(원)로 계산하고, 나눗셈은 Math.floor로 내림한다.
 
 const inMonth = (t: Transaction, month: string) => t.date.startsWith(month)
+
+/** 그 날짜의 요일 (0=일 … 6=토) */
+const weekdayOf = (date: string) => {
+  const [year, month, day] = date.split('-').map(Number)
+  return new Date(year, month - 1, day).getDay()
+}
 
 /** 이번 달 총수입. 날짜와 금액이 확정된 예정 수입도 포함한다. */
 export function totalIncome(transactions: Transaction[], month: string): number {
@@ -13,56 +19,71 @@ export function totalIncome(transactions: Transaction[], month: string): number 
     .reduce((sum, t) => sum + t.amount, 0)
 }
 
+interface BudgetPeriod {
+  scope: 'week' | 'day'
+  from: string
+  to: string
+  allowance: number
+}
+
+const dateInMonth = (month: string, day: number) => `${month}-${String(day).padStart(2, '0')}`
+
 /**
- * 이미 발생한 지출: 오늘 이전 날짜(오늘 제외)의 지출 합계.
- * 오늘 예산은 아침에 정해지는 기준선이므로 오늘 당일의 지출은 여기 넣지 않는다.
- * (당일 지출은 '남은 금액'에서 차감된다)
+ * 횟수·교통 카테고리의 월 예산을 실제 일/달력 주 기간에 배분한다.
+ * 달을 걸치는 주는 월 경계에서 자르고, 앞 기간부터 채워 월 예산 총액을 절대 넘지 않는다.
  */
-export function occurredExpense(transactions: Transaction[], today: string): number {
-  const month = today.slice(0, 7)
-  return transactions
-    .filter((t) => inMonth(t, month) && t.type === 'expense' && t.date < today)
-    .reduce((sum, t) => sum + t.amount, 0)
+function categoryBudgetPeriods(category: Category, month: string): BudgetPeriod[] {
+  const rule = category.budgetRule
+  if (!rule || (rule.kind !== 'perUse' && rule.kind !== 'commute')) return []
+
+  const [year, monthNumber] = month.split('-').map(Number)
+  const lastDay = getDaysInMonth(new Date(year, monthNumber - 1, 1))
+  const unit = rule.kind === 'perUse' ? rule.unitAmount : rule.fare * (rule.roundTrip ? 2 : 1)
+  let remainingBudget = Math.max(category.monthlyBudget, 0)
+  const periods: BudgetPeriod[] = []
+
+  if (rule.freq.mode === 'weekdays') {
+    for (let day = 1; day <= lastDay; day++) {
+      const date = dateInMonth(month, day)
+      if (!rule.freq.weekdays.includes(weekdayOf(date))) continue
+      const allowance = Math.min(unit * rule.freq.timesPerDay, remainingBudget)
+      periods.push({ scope: 'day', from: date, to: date, allowance })
+      remainingBudget -= allowance
+    }
+    return periods
+  }
+
+  for (let day = 1; day <= lastDay;) {
+    const from = dateInMonth(month, day)
+    const daysUntilSaturday = 6 - weekdayOf(from)
+    const endDay = Math.min(day + daysUntilSaturday, lastDay)
+    const allowance = Math.min(unit * rule.freq.timesPerWeek, remainingBudget)
+    periods.push({ scope: 'week', from, to: dateInMonth(month, endDay), allowance })
+    remainingBudget -= allowance
+    day = endDay + 1
+  }
+  return periods
 }
 
-/** 남은 기간의 예정 지출: 오늘 이후 날짜에 잡힌 지출 (구독료, 계획 소비, 상환 등) */
-export function upcomingExpense(transactions: Transaction[], today: string): number {
-  const month = today.slice(0, 7)
-  return transactions
-    .filter((t) => inMonth(t, month) && t.type === 'expense' && t.date > today)
-    .reduce((sum, t) => sum + t.amount, 0)
-}
+function currentBudgetPeriod(category: Category, today: string): BudgetPeriod | null {
+  const periods = categoryBudgetPeriods(category, today.slice(0, 7))
+  const current = periods.find((period) => period.from <= today && period.to >= today)
+  if (current) return current
 
-/** 이번 달 가용액 = 총수입 - 이미 발생한 지출 */
-export function availableAmount(transactions: Transaction[], today: string): number {
-  return totalIncome(transactions, today.slice(0, 7)) - occurredExpense(transactions, today)
-}
-
-/** 오늘 포함, 이번 달 마지막 날까지 남은 일수 */
-export function remainingDays(today: string): number {
-  const date = parseISO(today)
-  return getDaysInMonth(date) - date.getDate() + 1
+  const rule = category.budgetRule
+  if (!rule || (rule.kind !== 'perUse' && rule.kind !== 'commute')) return null
+  // 요일 지정 카테고리에서 오늘이 사용 예정일이 아니면 0원짜리 오늘 행을 보여준다.
+  return rule.freq.mode === 'weekdays'
+    ? { scope: 'day', from: today, to: today, allowance: 0 }
+    : null
 }
 
 /**
- * 오늘 예산 = (가용액 - 남은 기간의 예정 지출 - 예비비) / 남은 일수 (내림)
- * 하루에 한 번, 날짜가 바뀔 때만 계산해서 저장해두고 그날 안에는 다시 계산하지 않는다.
- */
-export function calcTodayBudget(
-  transactions: Transaction[],
-  today: string,
-  reserveAmount: number,
-): number {
-  const base = availableAmount(transactions, today) - upcomingExpense(transactions, today) - reserveAmount
-  return Math.floor(base / remainingDays(today))
-}
-
-/**
- * 월 자유 금액.
+ * 현재 남은 자유비용.
  *
- * 모든 카테고리의 월 예산은 먼저 전액 확보한다. 오늘 이전의 실제 지출과 오늘 이후의
- * 예정 지출은 같은 카테고리의 월 예산으로 덮이는 범위까지 다시 빼지 않고, 예산 밖 금액과
- * 예산 초과분만 추가로 차감한다. 오늘 지출은 홈의 현재 잔액에서 별도로 차감한다.
+ * 월수입에서 모든 카테고리 월 예산과 예비비를 먼저 확보한다. 예산 밖 지출과 기간별
+ * 초과분은 실제·예정 여부와 관계없이 즉시 차감한다. 끝난 일/주 기간의 미사용액만
+ * 자유비용에 돌려주며, 진행 중이거나 미래인 기간의 잔액은 계속 카테고리에 남겨둔다.
  */
 export function monthlyFreeAmount(
   transactions: Transaction[],
@@ -71,34 +92,42 @@ export function monthlyFreeAmount(
   reserveAmount: number,
 ): number {
   const month = today.slice(0, 7)
-  const budgets = new Map(categories.map((category) => [category.id, Math.max(category.monthlyBudget, 0)]))
   const totalBudget = categories.reduce((sum, category) => sum + Math.max(category.monthlyBudget, 0), 0)
-  const committed = new Map<string, number>()
+  const expenses = transactions.filter((transaction) => inMonth(transaction, month) && transaction.type === 'expense')
+  const categoriesById = new Map(categories.map((category) => [category.id, category]))
+  let adjustment = 0
 
-  for (const transaction of transactions) {
-    if (!inMonth(transaction, month) || transaction.type !== 'expense' || transaction.date === today) continue
-    const categoryId = transaction.categoryId && budgets.has(transaction.categoryId)
-      ? transaction.categoryId
-      : '__outside_budget__'
-    committed.set(categoryId, (committed.get(categoryId) ?? 0) + transaction.amount)
+  // 카테고리가 없거나 예산이 없는 거래는 실제·예정 모두 자유비용에서 전액 나간다.
+  adjustment -= expenses
+    .filter((transaction) => !transaction.categoryId || !categoriesById.has(transaction.categoryId))
+    .reduce((sum, transaction) => sum + transaction.amount, 0)
+
+  for (const category of categories) {
+    const categoryExpenses = expenses.filter((transaction) => transaction.categoryId === category.id)
+    const periods = categoryBudgetPeriods(category, month)
+
+    if (periods.length === 0) {
+      // 직접 입력·구독 합계는 월 전체가 한 기간이다. 초과분만 즉시 자유비용에서 차감한다.
+      const spentOrPlanned = categoryExpenses.reduce((sum, transaction) => sum + transaction.amount, 0)
+      adjustment -= Math.max(spentOrPlanned - Math.max(category.monthlyBudget, 0), 0)
+      continue
+    }
+
+    for (const period of periods) {
+      const spentOrPlanned = categoryExpenses
+        .filter((transaction) => transaction.date >= period.from && transaction.date <= period.to)
+        .reduce((sum, transaction) => sum + transaction.amount, 0)
+      const difference = period.allowance - spentOrPlanned
+      if (difference < 0 || period.to < today) adjustment += difference
+    }
+
+    // 요일이 아닌 날 등 어떤 예산 기간에도 속하지 않는 거래는 전액 자유비용 부담이다.
+    adjustment -= categoryExpenses
+      .filter((transaction) => !periods.some((period) => transaction.date >= period.from && transaction.date <= period.to))
+      .reduce((sum, transaction) => sum + transaction.amount, 0)
   }
 
-  let outsideOrOverBudget = 0
-  for (const [categoryId, amount] of committed) {
-    outsideOrOverBudget += Math.max(amount - (budgets.get(categoryId) ?? 0), 0)
-  }
-
-  return totalIncome(transactions, month) - totalBudget - outsideOrOverBudget - reserveAmount
-}
-
-/** 월 자유 금액을 그 달의 30일/31일 전체로 균등하게 나눈 하루 자유 비용. */
-export function dailyFreeAmount(
-  transactions: Transaction[],
-  categories: Category[],
-  today: string,
-  reserveAmount: number,
-): number {
-  return Math.floor(monthlyFreeAmount(transactions, categories, today, reserveAmount) / getDaysInMonth(parseISO(today)))
+  return totalIncome(transactions, month) - totalBudget - reserveAmount + adjustment
 }
 
 /** 특정 날짜의 지출 합계 */
@@ -106,11 +135,6 @@ export function spentOnDate(transactions: Transaction[], date: string): number {
   return transactions
     .filter((t) => t.date === date && t.type === 'expense')
     .reduce((sum, t) => sum + t.amount, 0)
-}
-
-/** 남은 금액 = 오늘 예산 - 오늘 이미 쓴 금액. 음수가 될 수 있다. */
-export function remainingToday(todayBudget: number, todaySpent: number): number {
-  return todayBudget - todaySpent
 }
 
 /** 이번 달 카테고리별 지출 합계 (categoryId -> 금액) */
@@ -261,46 +285,6 @@ export function quickSlotCategories(categories: Category[]): Category[] {
   return categories.filter(inQuickSlot).sort((a, b) => rank(a) - rank(b) || a.sortOrder - b.sortOrder)
 }
 
-/** 그 날짜의 요일 (0=일 … 6=토) */
-const weekdayOf = (date: string) => {
-  const [year, month, day] = date.split('-').map(Number)
-  return new Date(year, month - 1, day).getDay()
-}
-
-/**
- * 이 카테고리가 그 날 쓸 수 있는 몫. 횟수·교통이 아니면 null (자유에 섞인다).
- *
- * 요일을 지정했으면 그 날 실제로 나가는 돈이라 해당 요일이 아닌 날은 0이고,
- * 주 단위 한도면 요일을 모르니 7로 나눈 평균을 쓴다.
- * 교통의 하루치는 왕복을 반영한다 (구슬을 한 번 눌렀을 때의 편도와는 다르다).
- */
-export function dailyAllowance(rule: BudgetRule, date: string): number | null {
-  if (rule.kind !== 'perUse' && rule.kind !== 'commute') return null
-  const unit = rule.kind === 'perUse' ? rule.unitAmount : rule.fare * (rule.roundTrip ? 2 : 1)
-  const freq = rule.freq
-  if (freq.mode === 'perWeek') return Math.floor((unit * freq.timesPerWeek) / 7)
-  return freq.weekdays.includes(weekdayOf(date)) ? unit * freq.timesPerDay : 0
-}
-
-/**
- * 화면에 보여줄 예산과 그 기간. 한도가 주 단위면 예산도 주 단위다.
- * 카페가 한 번에 5,000원 주 2회면 이번 주 10,000원이고, 주가 바뀌면 다시 채워진다.
- * (자유 몫을 구할 때만 dailyAllowance로 하루치 환산을 쓴다)
- */
-export function periodAllowance(
-  rule: BudgetRule,
-  date: string,
-): { scope: 'week' | 'day'; amount: number } | null {
-  if (rule.kind !== 'perUse' && rule.kind !== 'commute') return null
-  const unit = rule.kind === 'perUse' ? rule.unitAmount : rule.fare * (rule.roundTrip ? 2 : 1)
-  const freq = rule.freq
-  if (freq.mode === 'perWeek') return { scope: 'week', amount: unit * freq.timesPerWeek }
-  return {
-    scope: 'day',
-    amount: freq.weekdays.includes(weekdayOf(date)) ? unit * freq.timesPerDay : 0,
-  }
-}
-
 /**
  * 그 날 기준 횟수 한도. 주 단위 한도면 주간 횟수를, 요일 지정이면 그 날 횟수를 센다.
  * active가 false면 오늘은 쓰기로 한 요일이 아니다.
@@ -353,89 +337,42 @@ export interface BreakdownRow {
  * 홈 히어로 목록을 만든다. 줄마다 자기 기간을 쓴다 —
  * 주 단위 한도면 이번 주 예산에서 이번 주 지출을, 요일 지정이면 오늘 몫에서 오늘 지출을 뺀다.
  *
- * 자유는 월 자유 금액을 30일/31일로 나눈 하루짜리 몫이다.
- * hiddenOnHome은 표시만 숨길 뿐 예산과 큰 숫자의 계산에는 영향을 주지 않는다.
+ * 월 경계에서 주를 자르고 월 예산을 앞 기간부터 배분하므로, 모든 기간 몫의 합은
+ * 카테고리 월 예산을 넘지 않는다. 예정 거래도 해당 기간의 사용 예정액으로 반영한다.
+ * hiddenOnHome은 표시만 숨기며 계산에는 영향을 주지 않는다.
  */
 export function buildBreakdown(
   categories: Category[],
-  todayTx: Transaction[],
-  weekTx: Transaction[],
-  freeAllowance: number,
+  transactions: Transaction[],
   today: string,
-  weekStart: string,
 ): BreakdownRow[] {
   const rows: BreakdownRow[] = []
-  const shown = new Set<string>()
 
   for (const category of categories) {
     if (!category.budgetRule) continue
-    const period = periodAllowance(category.budgetRule, today)
+    const period = currentBudgetPeriod(category, today)
     const limit = usageLimit(category.budgetRule, today)
     if (!period || !limit) continue
-    const weekly = period.scope === 'week'
-    const source = weekly ? weekTx : todayTx
-    const from = weekly ? weekStart : today
-    // 주간 몫에서도 오늘 이후의 예정 거래는 아직 사용한 금액으로 세지 않는다.
-    const to = today
-    const spent = source
+    const periodExpenses = transactions
       .filter(
         (t) =>
           t.type === 'expense' &&
           t.categoryId === category.id &&
-          t.date >= from &&
-          t.date <= to,
+          t.date >= period.from &&
+          t.date <= period.to,
       )
-      .reduce((sum, t) => sum + t.amount, 0)
+    const spent = periodExpenses.reduce((sum, t) => sum + t.amount, 0)
+    const used = periodExpenses.filter((t) => t.date <= today).length
     rows.push({
       categoryId: category.id,
       scope: period.scope,
-      allowance: period.amount,
+      allowance: period.allowance,
       spent,
-      remaining: period.amount - spent,
+      remaining: period.allowance - spent,
       limit: limit.limit,
-      used: countExpenses(source, category.id, from, to),
+      used,
       active: limit.active,
     })
-    shown.add(category.id)
   }
-
-  const freeSpent = todayTx
-    .filter((t) => t.type === 'expense' && (!t.categoryId || !shown.has(t.categoryId)))
-    .reduce((sum, t) => sum + t.amount, 0)
-  rows.push({
-    categoryId: null,
-    scope: 'day',
-    allowance: freeAllowance,
-    spent: freeSpent,
-    remaining: freeAllowance - freeSpent,
-    limit: null,
-    used: 0,
-    active: true,
-  })
   return rows
-}
-
-/** 히어로 큰 숫자 = 화면에 뜬 줄들의 합 */
-export function breakdownTotal(rows: BreakdownRow[]): number {
-  return rows.reduce((sum, r) => sum + r.remaining, 0)
-}
-
-/**
- * 자유 예산 (앱 가이드 §8 검산 기준)
- * = 총수입 - 고정비 카테고리의 월 예산 합 - 고정비 카테고리 밖의 지출(미분류 포함)
- * 고정비 카테고리 안의 실제 지출은 예산으로 이미 떼어두었으므로 이중으로 빼지 않는다.
- */
-export function freeBudget(
-  transactions: Transaction[],
-  categories: Category[],
-  month: string,
-): number {
-  const fixedIds = new Set(categories.filter((c) => c.isFixed).map((c) => c.id))
-  const fixedBudgets = categories
-    .filter((c) => c.isFixed)
-    .reduce((sum, c) => sum + c.monthlyBudget, 0)
-  const nonFixedExpense = transactions
-    .filter((t) => inMonth(t, month) && t.type === 'expense' && (!t.categoryId || !fixedIds.has(t.categoryId)))
-    .reduce((sum, t) => sum + t.amount, 0)
-  return totalIncome(transactions, month) - fixedBudgets - nonFixedExpense
 }

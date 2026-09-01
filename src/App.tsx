@@ -22,9 +22,9 @@ import {
   X,
 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { addMonths, endOfWeek, format, getDaysInMonth, parseISO, startOfWeek } from 'date-fns'
+import { addMonths, format, getDaysInMonth, parseISO } from 'date-fns'
 import { ko } from 'date-fns/locale'
-import { breakdownTotal, buildBreakdown, dailyFreeAmount, inQuickSlot, spentByCategory, spentOnDate } from './lib/budget'
+import { buildBreakdown, inQuickSlot, monthlyFreeAmount, spentByCategory, spentOnDate } from './lib/budget'
 import { db, requestPersistentStorage, setQuickSlot } from './lib/db'
 import { money } from './lib/format'
 import { useCategories } from './lib/hooks'
@@ -41,6 +41,19 @@ import { ReserveSheet } from './components/ReserveSheet'
 
 type Tab = 'home' | 'calendar' | 'transactions' | 'settings'
 type SettingsSub = 'categories' | 'recurring' | null
+
+function useToday(): string {
+  const getToday = () => format(new Date(), 'yyyy-MM-dd')
+  const [today, setToday] = useState(getToday)
+  useEffect(() => {
+    const timer = window.setInterval(() => setToday((current) => {
+      const next = getToday()
+      return next === current ? current : next
+    }), 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
+  return today
+}
 
 function Planet({ small = false }: { small?: boolean }) {
   return (
@@ -97,13 +110,6 @@ function HomeView({ openExpense, openEdit, openPreset, goTransactions, goCategor
   const settings = useLiveQuery(() => db.monthSettings.get(month), [month])
   const loaded = monthTx !== undefined
   const txs = monthTx ?? []
-  // 주 단위 횟수 한도는 주가 달을 걸칠 수 있어서(8/30 일요일 ~ 9/5) 따로 읽는다.
-  const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 0 }), 'yyyy-MM-dd')
-  const weekEnd = format(endOfWeek(new Date(), { weekStartsOn: 0 }), 'yyyy-MM-dd')
-  const weekTx = useLiveQuery(
-    () => db.transactions.where('date').between(weekStart, weekEnd, true, true).toArray(),
-    [weekStart, weekEnd],
-  )
   const [menuFor, setMenuFor] = useState<string | null>(null)
   useEffect(() => {
     if (!menuFor) return
@@ -117,14 +123,10 @@ function HomeView({ openExpense, openEdit, openPreset, goTransactions, goCategor
   const todayTx = loaded
     ? txs.filter(t => t.date === today).sort((a, b) => a.createdAt - b.createdAt)
     : undefined
-  const freeAllowance = dailyFreeAmount(txs, categories, today, settings?.reserveAmount ?? 0)
-  // 카테고리 이름이 아니라 각 카테고리에 저장된 주기 설정을 순회한다.
-  // 주 단위 항목은 이번 주 잔액, 요일 지정 항목은 오늘 잔액, 자유는 하루 자유 비용이다.
-  const rows = buildBreakdown(categories, todayTx ?? [], weekTx ?? [], freeAllowance, today, weekStart)
-  const remaining = breakdownTotal(rows)
-  // 현재 잔액에는 오늘 지출이 이미 각 줄에서 빠져 있으므로 다시 빼지 않는다.
-  const todayBudget = remaining + todaySpent
-  const over = remaining < 0
+  const freeRemaining = monthlyFreeAmount(txs, categories, today, settings?.reserveAmount ?? 0)
+  // 카테고리 이름이 아니라 각 카테고리에 저장된 일/주 주기 설정을 순회한다.
+  const rows = buildBreakdown(categories, txs, today)
+  const over = freeRemaining < 0
   const budgeted = categories.filter(c => c.monthlyBudget > 0)
   const toggleHidden = async (category: typeof categories[number]) => {
     setMenuFor(null)
@@ -138,11 +140,10 @@ function HomeView({ openExpense, openEdit, openPreset, goTransactions, goCategor
     <section className="hero-card">
       <div className="hero-copy">
         <p className="eyebrow">{format(new Date(), 'M월 d일, EEEE', { locale: ko })}</p>
-        <p className="hero-label">오늘 사용할 수 있는 금액</p>
-        <h1 className={over ? 'negative' : ''}><span>{loaded ? money(remaining) : '—'}</span><small>원</small></h1>
-        <div className="daily-budget"><span>오늘 예산</span><strong>{loaded ? money(todayBudget) : '—'}원</strong></div>
-        {loaded && <DailyBreakdown rows={rows} categories={categories}/>}
+        <p className="hero-label">남은 자유비용</p>
+        <h1 className={over ? 'negative' : ''}><span>{loaded ? money(freeRemaining) : '—'}</span><small>원</small></h1>
         <p className="hero-note">오늘 {money(todaySpent)}원을 사용했어요</p>
+        {loaded && <DailyBreakdown rows={rows} categories={categories}/>}
       </div>
       <Planet />
     </section>
@@ -485,6 +486,7 @@ function SettingsView({ dark, onTheme, sub, setSub }: { dark: boolean; onTheme: 
 }
 
 function App() {
+  const today = useToday()
   const [active, setActive] = useState<Tab>('home')
   const [dark, setDark] = useState(false)
   // 빈 객체면 새 거래, transaction이 있으면 수정, preset이 있으면 퀵 슬롯에서 넘어온 프리필.
@@ -497,13 +499,12 @@ function App() {
   const openExpenseForDate = (initialDate: string) => setSheet({ initialDate })
   const openEdit = (t: Transaction) => setSheet({ transaction: t })
   const openPreset = (preset: QuickPreset) => setSheet({ preset })
-  // 달이 바뀌면 요일 수도 달라지므로 앱을 열 때 계산식 예산을 이번 달 기준으로 맞춘다.
+  // 날짜가 바뀌면 지난 예정 거래를 확정하고, 새 달의 반복 거래·계산식 예산을 맞춘다.
   useEffect(() => {
-    const today = format(new Date(), 'yyyy-MM-dd')
     materializeRecurring(today).then(() => syncRuleBudgets(today.slice(0, 7)))
-  }, [])
+  }, [today])
   useEffect(() => { requestPersistentStorage() }, [])
-  const content = useMemo(() => ({home:<HomeView openExpense={openExpense} openEdit={openEdit} openPreset={openPreset} goTransactions={()=>setActive('transactions')} goCategories={()=>goSettings('categories')}/>,calendar:<CalendarView openEdit={openEdit} openExpenseForDate={openExpenseForDate}/>,transactions:<TransactionsView openExpense={openExpense} openEdit={openEdit}/>,settings:<SettingsView dark={dark} onTheme={()=>setDark(!dark)} sub={settingsSub} setSub={setSettingsSub}/>})[active], [active,dark,settingsSub])
+  const content = useMemo(() => ({home:<HomeView openExpense={openExpense} openEdit={openEdit} openPreset={openPreset} goTransactions={()=>setActive('transactions')} goCategories={()=>goSettings('categories')}/>,calendar:<CalendarView openEdit={openEdit} openExpenseForDate={openExpenseForDate}/>,transactions:<TransactionsView openExpense={openExpense} openEdit={openEdit}/>,settings:<SettingsView dark={dark} onTheme={()=>setDark(!dark)} sub={settingsSub} setSub={setSettingsSub}/>})[active], [active,dark,settingsSub,today])
   return <div className="app-shell"><Header dark={dark} onTheme={()=>setDark(!dark)}/><Sidebar active={active} setActive={(tab)=>{if(tab==='settings')setSettingsSub(null);setActive(tab)}}/><main>{content}</main>{(active==='home'||active==='transactions')&&<button className="desktop-add" onClick={openExpense}><Plus size={20}/> 추가</button>}<nav className="bottom-nav">{([{id:'home',label:'홈',icon:Home},{id:'calendar',label:'달력',icon:CalendarDays},{id:'transactions',label:'거래',icon:ListFilter},{id:'settings',label:'설정',icon:Settings}] as const).map(item=>{const Icon=item.icon;return <button key={item.id} className={active===item.id?'active':''} onClick={()=>{if(item.id==='settings')setSettingsSub(null);setActive(item.id)}}><Icon size={20}/><span>{item.label}</span></button>})}</nav>{sheet&&<ExpenseSheet transaction={sheet.transaction} preset={sheet.preset} initialDate={sheet.initialDate} close={()=>setSheet(null)}/>}</div>
 }
 

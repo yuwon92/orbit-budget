@@ -3,31 +3,20 @@
 import assert from 'node:assert/strict'
 import {
   activeRecurringForCategory,
-  availableAmount,
-  breakdownTotal,
   budgetFromRule,
   buildBreakdown,
-  calcTodayBudget,
   categoryProgress,
   countExpenses,
-  dailyAllowance,
-  dailyFreeAmount,
-  freeBudget,
   inQuickSlot,
   monthlyOccurrences,
   monthlyFreeAmount,
-  occurredExpense,
   occurrenceDate,
-  periodAllowance,
   quickAddAmount,
   quickSlotCategories,
   recurringSumForCategory,
-  remainingDays,
-  remainingToday,
   spentByCategory,
   spentOnDate,
   totalIncome,
-  upcomingExpense,
   usageLimit,
   weekdayCountInMonth,
   weeksInMonth,
@@ -79,17 +68,11 @@ const income = totalIncome(transactions, month)
 console.log(`총수입        = ${income.toLocaleString()} (기대: 1,640,950)`)
 assert.equal(income, 1_640_950)
 
-const free = freeBudget(transactions, categories, month)
-console.log(`자유 예산     = ${free.toLocaleString()} (기대: 556,490)`)
-assert.equal(free, 556_490)
-
-// 월 자유 금액: 카테고리 예산은 전액 확보하고, 그 예산으로 덮이지 않는 거래만 추가 차감한다.
-// 9/13 당일 지출 100,000원은 홈 잔액에서 빠지므로 월 자유 금액의 아침 기준선에는 넣지 않는다.
+// 월 자유 금액: 카테고리 예산은 전액 확보하고, 예산 밖·초과 거래는 실제/예정 모두 차감한다.
 const monthlyFree = monthlyFreeAmount(transactions, categories, today, 0)
 console.log(`월 자유 금액   = ${monthlyFree.toLocaleString()} (카테고리 예산 + 예산 밖 거래 차감)`)
-assert.equal(monthlyFree, 656_490)
-assert.equal(dailyFreeAmount(transactions, categories, today, 0), 21_883)
-assert.equal(dailyFreeAmount(transactions, categories, today, 50_000), 20_216)
+assert.equal(monthlyFree, 556_490)
+assert.equal(monthlyFreeAmount(transactions, categories, today, 50_000), 506_490)
 
 // 실제 설정 화면과 같은 9/1 사례. 이름이 아니라 모든 카테고리의 저장된 월 예산을 합산한다.
 const screenCategories = [
@@ -114,37 +97,10 @@ const screenTransactions = [
   tx('2026-09-13', 100_000, 'expense', null, ''),
 ]
 assert.equal(monthlyFreeAmount(screenTransactions, screenCategories, '2026-09-01', 100_000), 195_560)
-assert.equal(dailyFreeAmount(screenTransactions, screenCategories, '2026-09-01', 100_000), 6_518)
-
-// --- 오늘 예산 흐름 (9/13 아침 기준) ---
-const occurred = occurredExpense(transactions, today)
-console.log(`발생 지출     = ${occurred.toLocaleString()} (9/13 이전: 50,000 + 9,900 + 500,000)`)
-assert.equal(occurred, 559_900)
-
-const available = availableAmount(transactions, today)
-console.log(`가용액        = ${available.toLocaleString()}`)
-assert.equal(available, 1_081_050)
-
-const upcoming = upcomingExpense(transactions, today)
-console.log(`예정 지출     = ${upcoming.toLocaleString()} (9/13 이후 구독료)`)
-assert.equal(upcoming, 48_590)
-
-const days = remainingDays(today)
-console.log(`남은 일수     = ${days} (9/13~9/30)`)
-assert.equal(days, 18)
-
-const todayBudget = calcTodayBudget(transactions, today, 0)
-console.log(`오늘 예산     = ${todayBudget.toLocaleString()} (= floor(1,032,460 / 18))`)
-assert.equal(todayBudget, 57_358)
-
-const todayBudgetWithReserve = calcTodayBudget(transactions, today, 50_000)
-console.log(`오늘 예산(예비비 5만) = ${todayBudgetWithReserve.toLocaleString()}`)
-assert.equal(todayBudgetWithReserve, 54_581)
 
 const todaySpent = spentOnDate(transactions, today)
-const remaining = remainingToday(todayBudget, todaySpent)
-console.log(`오늘 지출     = ${todaySpent.toLocaleString()}, 남은 금액 = ${remaining.toLocaleString()} (음수 허용)`)
-assert.equal(remaining, -42_642)
+console.log(`오늘 총지출   = ${todaySpent.toLocaleString()}`)
+assert.equal(todaySpent, 100_000)
 
 // --- 카테고리 진행률 ---
 const spent = spentByCategory(transactions, month)
@@ -274,15 +230,6 @@ const foodRule = { kind: 'perUse', unitAmount: 6_500, freq: perWeek10 } as const
 const cafeRule = { kind: 'perUse', unitAmount: 5_000, freq: monWedFri } as const
 const busRule = { ...commute, freq: weekdaysAll } as const
 
-assert.equal(dailyAllowance(foodRule, MON), 9_285) // 6,500 x 10 / 7 = 9,285.7 -> 내림
-assert.equal(dailyAllowance(cafeRule, MON), 5_000) // 월요일이라 그날 몫이 있다
-assert.equal(dailyAllowance(cafeRule, TUE), 0) // 화요일은 쓰기로 한 요일이 아니다
-assert.equal(dailyAllowance(busRule, MON), 3_100) // 편도 1,550 왕복 = 하루 3,100
-assert.equal(dailyAllowance(busRule, '2026-09-05'), 0) // 토요일
-assert.equal(dailyAllowance({ ...commute, freq: { mode: 'perWeek', timesPerWeek: 5 } }, MON), 2_214) // 3,100 x 5 / 7
-assert.equal(dailyAllowance({ kind: 'manual' }, MON), null)
-assert.equal(dailyAllowance({ kind: 'recurringSum' }, MON), null)
-
 assert.deepEqual(usageLimit(foodRule, MON), { scope: 'week', limit: 10, active: true })
 assert.deepEqual(usageLimit(cafeRule, MON), { scope: 'day', limit: 1, active: true })
 assert.deepEqual(usageLimit(cafeRule, TUE), { scope: 'day', limit: 1, active: false })
@@ -305,33 +252,64 @@ assert.equal(countExpenses(countTx, 'food', '2026-09-06', '2026-09-12'), 3)
 assert.equal(countExpenses(countTx, 'food', MON, MON), 1)
 assert.equal(countExpenses(countTx, 'cafe', '2026-09-06', '2026-09-12'), 1)
 
-// 기간별 예산: 주 한도면 예산도 주 단위 (카페 5,000원 x 주 2회 = 이번 주 10,000원)
-assert.deepEqual(periodAllowance({ kind: 'perUse', unitAmount: 5_000, freq: { mode: 'perWeek', timesPerWeek: 2 } }, MON), { scope: 'week', amount: 10_000 })
-assert.deepEqual(periodAllowance(foodRule, MON), { scope: 'week', amount: 65_000 }) // 6,500 x 10
-assert.deepEqual(periodAllowance(cafeRule, MON), { scope: 'day', amount: 5_000 })
-assert.deepEqual(periodAllowance(cafeRule, TUE), { scope: 'day', amount: 0 })
-assert.deepEqual(periodAllowance(busRule, MON), { scope: 'day', amount: 3_100 })
-assert.equal(periodAllowance({ kind: 'manual' }, MON), null)
-
-// 히어로 목록: 줄마다 자기 기간, 큰 숫자는 그 줄들의 합
-const homeCat = (id: string, budgetRule: object, hiddenOnHome = false): Category => ({
-  id, name: id, monthlyBudget: 0, color: '#8ebeff', isFixed: false, sortOrder: 0,
+// 히어로 목록: 카테고리별 현재 일/주 기간 잔액만 보여준다.
+const homeCat = (id: string, monthlyBudget: number, budgetRule: object, hiddenOnHome = false): Category => ({
+  id, name: id, monthlyBudget, color: '#8ebeff', isFixed: false, sortOrder: 0,
   budgetRule: budgetRule as Category['budgetRule'], hiddenOnHome,
 })
-const homeCats = [homeCat('food', foodRule), homeCat('cafe', cafeRule), homeCat('bus', busRule), homeCat('etc', { kind: 'manual' })]
+
+// --- 남은 자유비용: 기간 종료 이월 / 즉시 초과 차감 / 예정 거래 ---
+const dailyFood = homeCat('daily-food', 40_000, {
+  kind: 'perUse', unitAmount: 10_000, freq: { mode: 'weekdays', weekdays: [2, 3], timesPerDay: 2 },
+})
+const dailyIncome = tx('2026-09-01', 100_000, 'income', null, '')
+const spent15 = tx('2026-09-01', 15_000, 'expense', 'daily-food', '')
+assert.equal(monthlyFreeAmount([dailyIncome, spent15], [dailyFood], '2026-09-01', 0), 60_000) // 진행 중 잔액은 미이월
+assert.equal(monthlyFreeAmount([dailyIncome, spent15], [dailyFood], '2026-09-02', 0), 65_000) // 다음 날 5천원 이월
+
+const spent25 = tx('2026-09-01', 25_000, 'expense', 'daily-food', '')
+assert.equal(monthlyFreeAmount([dailyIncome, spent25], [dailyFood], '2026-09-01', 0), 55_000) // 초과 5천원 즉시 차감
+
+const weeklyCafe = homeCat('weekly-cafe', 45_000, {
+  kind: 'perUse', unitAmount: 5_000, freq: { mode: 'perWeek', timesPerWeek: 2 },
+})
+const spent9 = tx('2026-09-01', 9_000, 'expense', 'weekly-cafe', '')
+assert.equal(monthlyFreeAmount([dailyIncome, spent9], [weeklyCafe], '2026-09-05', 0), 55_000) // 토요일까지 유지
+assert.equal(monthlyFreeAmount([dailyIncome, spent9], [weeklyCafe], '2026-09-06', 0), 56_000) // 다음 주 1천원 이월
+assert.equal(buildBreakdown([weeklyCafe], [], '2026-09-28')[0].allowance, 5_000) // 9회=10k×4주+5k
+
+const plannedOutside = { ...tx('2026-09-20', 10_000, 'expense', null, ''), isPlanned: true }
+assert.equal(monthlyFreeAmount([dailyIncome, plannedOutside], [], '2026-09-01', 0), 90_000)
+const plannedCategory = homeCat('planned', 20_000, { kind: 'manual' })
+const coveredPlan = { ...tx('2026-09-20', 15_000, 'expense', 'planned', ''), isPlanned: true }
+assert.equal(monthlyFreeAmount([dailyIncome, coveredPlan], [plannedCategory], '2026-09-01', 0), 80_000)
+
+// 예산을 100k→50k로 줄이면 이미 쓴 80k 중 30k가 초과가 되어 실제 자유 증가분은 20k다.
+const income200 = tx('2026-09-01', 200_000, 'income', null, '')
+const spent80 = tx('2026-09-01', 80_000, 'expense', 'editable', '')
+assert.equal(monthlyFreeAmount([income200, spent80], [homeCat('editable', 100_000, { kind: 'manual' })], '2026-09-01', 0), 100_000)
+assert.equal(monthlyFreeAmount([income200, spent80], [homeCat('editable', 50_000, { kind: 'manual' })], '2026-09-01', 0), 120_000)
+
+// 9월에 풀린 잔액은 10월 자유비용으로 이월하지 않는다.
+const octoberIncome = tx('2026-10-01', 100_000, 'income', null, '')
+assert.equal(monthlyFreeAmount([dailyIncome, spent15, octoberIncome], [dailyFood], '2026-10-01', 0), 60_000)
+
+const homeCats = [
+  homeCat('food', 279_500, foodRule),
+  homeCat('cafe', 84_500, cafeRule),
+  homeCat('bus', 68_200, busRule),
+  homeCat('etc', 30_000, { kind: 'manual' }),
+]
 const WEEK_FROM = '2026-09-06' // 일요일
-const WEEK_TO = '2026-09-12'
 const weekSpend = [
   tx(WEEK_FROM, 6_500, 'expense', 'food', ''), // 이번 주지만 오늘은 아님
   tx(MON, 6_500, 'expense', 'food', ''),
   tx(MON, 5_000, 'expense', 'cafe', ''),
-  tx(MON, 30_000, 'expense', 'etc', ''), // 목록에 없는 카테고리 -> 자유에서 빠진다
+  tx(MON, 30_000, 'expense', 'etc', ''), // 월 단위 카테고리는 히어로 행에 표시하지 않는다
 ]
-const todaySpend = weekSpend.filter((t) => t.date === MON)
-const dayFree = 20_000
-const rows = buildBreakdown(homeCats, todaySpend, weekSpend, dayFree, MON, WEEK_FROM)
+const rows = buildBreakdown(homeCats, weekSpend, MON)
 
-assert.deepEqual(rows.map((r) => r.categoryId), ['food', 'cafe', 'bus', null])
+assert.deepEqual(rows.map((r) => r.categoryId), ['food', 'cafe', 'bus'])
 // 식비: 주 단위라 이번 주 65,000에서 이번 주 지출 13,000을 뺀다 (오늘치만 빼지 않는다)
 assert.deepEqual(
   { scope: rows[0].scope, allowance: rows[0].allowance, spent: rows[0].spent, remaining: rows[0].remaining, used: rows[0].used },
@@ -339,19 +317,20 @@ assert.deepEqual(
 )
 // 카페: 요일 지정이라 오늘 몫 5,000에서 오늘 지출 5,000
 assert.deepEqual({ allowance: rows[1].allowance, remaining: rows[1].remaining, used: rows[1].used }, { allowance: 5_000, remaining: 0, used: 1 })
-// 자유: 월 자유 금액에서 계산한 하루 자유 비용에서 목록 밖 오늘 지출을 뺀다.
-const freeRow = rows[3]
-assert.equal(freeRow.allowance, dayFree)
-assert.equal(freeRow.spent, 30_000)
-assert.equal(breakdownTotal(rows), rows.reduce((s, r) => s + r.remaining, 0))
 
-// 홈에서 숨기기는 표시 설정일 뿐 계산 결과와 큰 숫자를 바꾸지 않는다.
+// 홈에서 숨기기는 표시 설정일 뿐 순수 계산 결과를 바꾸지 않는다.
 const hidden = buildBreakdown(
-  [homeCat('food', foodRule), homeCat('cafe', cafeRule, true), homeCat('bus', busRule), homeCat('etc', { kind: 'manual' })],
-  todaySpend, weekSpend, dayFree, MON, WEEK_FROM,
+  [
+    homeCat('food', 279_500, foodRule),
+    homeCat('cafe', 84_500, cafeRule, true),
+    homeCat('bus', 68_200, busRule),
+    homeCat('etc', 30_000, { kind: 'manual' }),
+  ],
+  weekSpend,
+  MON,
 )
 assert.deepEqual(hidden, rows)
-console.log('하루 몫 분해 (기간별 예산, 주/일 한도, 건수, 자유 흡수) 통과')
+console.log('홈 예산 행 (기간별 예산, 주/일 한도, 건수) 통과')
 
 // --- CSV 생성 ---
 const csv = buildCsv(
