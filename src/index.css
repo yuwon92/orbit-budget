@@ -316,10 +316,12 @@ button.transaction-name,.history-row .row-open{border:0;background:none;padding:
 }
 
 /* 모바일: 페이지 대신 본문만 스크롤한다. 페이지가 스크롤되면 사파리 주소창이 접혔다
-   펴지면서 fixed 하단 바가 같이 떠올랐다 내려앉아 스크롤 내내 흔들린다. */
+   펴지면서 fixed 하단 바가 같이 떠올랐다 내려앉아 스크롤 내내 흔들린다.
+   셸 높이는 dvh(현재 보이는 영역)로 잡는다. svh는 주소창이 펴진 상태 기준이라,
+   스크롤 중 주소창이 접혀 화면이 커지면 셸이 그만큼 짧아 하단 바가 들뜬다. */
 @media(max-width:680px){
-  html,body{height:100%;min-height:0;overflow:hidden}
-  .app-shell{height:100vh;height:100svh;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+  html,body{height:100%;min-height:0;overflow:hidden;overscroll-behavior:none}
+  .app-shell{height:100vh;height:100svh;height:100dvh;min-height:0;display:flex;flex-direction:column;overflow:hidden}
   main{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior-y:contain;padding:86px 16px 24px}
   .bottom-nav{position:static;flex:0 0 auto}
 }
