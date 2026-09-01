@@ -101,7 +101,7 @@ remainingToday  = todayBudget - spentOnDate(오늘)
 - `자유 = 오늘 예산 - Σ(보이는 카테고리 하루 환산) - (그 카테고리들 밖의 오늘 지출)`
 - **히어로 큰 숫자 = 줄들의 합**(`breakdownTotal`). 주 단위 줄이 섞이므로 순수한 하루치가 아님
 
-**퀵 슬롯** — `quickAddAmount`(교통은 **편도**), `inQuickSlot`(`quickSlot ?? 단가 있으면 true`)
+**퀵 슬롯** — `quickAddAmount`(교통은 **편도**), `inQuickSlot`(`quickSlot ?? 단가 있으면 true`), `quickSlotCategories`(`quickOrder` 순, 미지정은 `sortOrder`로 뒤에). 넣기·빼기·순서 이동은 `db.ts`의 `setQuickSlot`·`moveQuickSlot`(항상 0..n-1로 다시 매김)
 
 `freeBudget`은 검산 전용, 화면 미사용.
 

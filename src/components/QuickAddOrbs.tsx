@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { format } from 'date-fns'
-import { inQuickSlot, quickAddAmount } from '../lib/budget'
-import { db } from '../lib/db'
+import { ChevronDown, ChevronUp } from 'lucide-react'
+import { inQuickSlot, quickAddAmount, quickSlotCategories } from '../lib/budget'
+import { db, moveQuickSlot, setQuickSlot } from '../lib/db'
 import { money } from '../lib/format'
 import { useCategories } from '../lib/hooks'
 
@@ -16,6 +17,7 @@ export interface QuickPreset {
  * 교통은 누르면 편도 요금이 바로 오늘 지출로 들어가고(왕복이면 두 번 누른다),
  * 횟수는 지출 시트를 그 카테고리·단가로 채워서 연다.
  * 교통을 잘못 눌렀으면 잠시 표시되는 알림에서 방금 추가한 거래를 취소할 수 있다.
+ * 편집에서 어떤 카테고리를 띄울지와 구슬이 놓이는 순서를 바꾼다.
  */
 export function QuickAddOrbs({
   openPreset,
@@ -38,15 +40,12 @@ export function QuickAddOrbs({
     return () => window.removeEventListener('keydown', closeEditor)
   }, [editingSlots])
 
-  const orbs = categories
-    .filter(inQuickSlot)
-    .map((category) => ({ category, amount: quickAddAmount(category.budgetRule) }))
+  const slots = quickSlotCategories(categories)
+  const orbs = slots.map((category) => ({ category, amount: quickAddAmount(category.budgetRule) }))
+  // 편집 목록은 표시 중인 슬롯을 실제 구슬 순서대로 위에 두고, 숨긴 카테고리를 뒤에 붙인다.
+  const editList = [...slots, ...categories.filter((c) => !inQuickSlot(c))]
 
   if (categoryResult === undefined) return null
-
-  const toggleSlot = async (category: typeof categories[number]) => {
-    await db.categories.update(category.id, { quickSlot: !inQuickSlot(category) })
-  }
 
   const addNow = async (categoryId: string, categoryName: string, amount: number) => {
     const transactionId = crypto.randomUUID()
@@ -87,17 +86,32 @@ export function QuickAddOrbs({
         </header>
 
         {editingSlots && <div className="quick-slot-editor" id="quick-slot-editor">
-          <p>홈에 표시할 카테고리를 선택하세요.</p>
-          <div className="quick-slot-list">
-            {categories.map((category) => {
+          <p>홈에 표시할 카테고리를 선택하고, 화살표로 순서를 바꾸세요.</p>
+          <ul className="quick-slot-list">
+            {editList.map((category) => {
               const active = inQuickSlot(category)
-              return <button key={category.id} aria-pressed={active} onClick={() => toggleSlot(category)}>
-                <span className="quick-toggle-planet"><span className="orb" style={{ '--category-color': category.color } as CSSProperties}/></span>
-                <strong>{category.name}</strong>
-                <span className="quick-toggle-state"><i className={active ? 'on' : ''}/>{active ? '표시 중' : '숨김'}</span>
-              </button>
+              const index = slots.findIndex((c) => c.id === category.id)
+              return <li key={category.id}>
+                <button aria-pressed={active} onClick={() => setQuickSlot(categories, category, !active)}>
+                  <span className="quick-toggle-planet"><span className="orb" style={{ '--category-color': category.color } as CSSProperties}/></span>
+                  <strong>{category.name}</strong>
+                  <span className="quick-toggle-state"><i className={active ? 'on' : ''}/>{active ? '표시 중' : '숨김'}</span>
+                </button>
+                {active && <span className="quick-slot-move">
+                  <button
+                    disabled={index === 0}
+                    onClick={() => moveQuickSlot(categories, category.id, -1)}
+                    aria-label={`${category.name} 앞으로 옮기기`}
+                  ><ChevronUp size={17}/></button>
+                  <button
+                    disabled={index === slots.length - 1}
+                    onClick={() => moveQuickSlot(categories, category.id, 1)}
+                    aria-label={`${category.name} 뒤로 옮기기`}
+                  ><ChevronDown size={17}/></button>
+                </span>}
+              </li>
             })}
-          </div>
+          </ul>
         </div>}
 
         {orbs.length > 0 && <div className="quick-add" role="group" aria-label="빠른 거래 기록">

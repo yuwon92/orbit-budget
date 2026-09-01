@@ -20,6 +20,7 @@ import {
   occurrenceDate,
   periodAllowance,
   quickAddAmount,
+  quickSlotCategories,
   recurringSumForCategory,
   remainingDays,
   remainingToday,
@@ -249,6 +250,21 @@ assert.equal(inQuickSlot(slotCat({ kind: 'manual' }, true)), true) // 직접 넣
 assert.equal(inQuickSlot(slotCat({ kind: 'recurringSum' }, true)), true)
 assert.equal(inQuickSlot(slotCat({ kind: 'perUse', unitAmount: 6_500, freq: perWeek10 }, false)), false) // 빼면 안 뜬다
 console.log('퀵 슬롯 표시 여부 (기본값 + 직접 설정) 통과')
+
+// 퀵 슬롯 순서: quickOrder를 정한 것부터, 안 정한 것은 카테고리 순서대로 뒤에
+const orderCat = (id: string, sortOrder: number, quickOrder?: number): Category => ({
+  id, name: id, monthlyBudget: 0, color: '#8ebeff', isFixed: false, sortOrder,
+  quickSlot: true, quickOrder,
+})
+const ordered = quickSlotCategories([
+  orderCat('c', 2),
+  orderCat('a', 0, 1),
+  orderCat('d', 3, 0),
+  orderCat('b', 1),
+  { ...orderCat('e', 4), quickSlot: false }, // 뺀 카테고리는 빠진다
+])
+assert.deepEqual(ordered.map((c) => c.id), ['d', 'a', 'b', 'c'])
+console.log('퀵 슬롯 순서 (지정 순서 우선, 미지정은 카테고리 순서로 뒤에) 통과')
 
 // --- 홈 하루 몫 분해 ---
 // 2026-09-07은 월요일, 09-08은 화요일

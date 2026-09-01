@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
+import { quickSlotCategories } from './budget'
 import type { Category, MonthSettings, RecurringRule, Transaction } from './types'
 
 // UI 가이드 §20 카테고리 팔레트
@@ -41,6 +42,37 @@ const seedCategories: Omit<Category, 'id'>[] = [
 db.on('populate', (tx) => {
   tx.table('categories').bulkAdd(seedCategories.map((c) => ({ ...c, id: crypto.randomUUID() })))
 })
+
+/**
+ * 퀵 슬롯에 넣거나 뺀다. 새로 넣은 카테고리는 항상 줄 맨 뒤에 붙는다.
+ * 넣을 때 나머지 슬롯의 순서도 0..n-1로 다시 매긴다. 순서를 한 번도 안 바꾼 슬롯은
+ * quickOrder가 없어서, 새 슬롯에만 번호를 주면 그 하나가 맨 앞으로 튀기 때문이다.
+ */
+export async function setQuickSlot(categories: Category[], category: Category, on: boolean) {
+  await db.transaction('rw', db.categories, async () => {
+    if (!on) {
+      await db.categories.update(category.id, { quickSlot: false })
+      return
+    }
+    const others = quickSlotCategories(categories).filter((c) => c.id !== category.id)
+    await Promise.all(others.map((c, i) => db.categories.update(c.id, { quickOrder: i })))
+    await db.categories.update(category.id, { quickSlot: true, quickOrder: others.length })
+  })
+}
+
+/** 퀵 슬롯 구슬을 한 칸 앞(-1)이나 뒤(+1)로 옮긴다. 줄 끝에서는 아무것도 하지 않는다. */
+export async function moveQuickSlot(categories: Category[], categoryId: string, delta: number) {
+  const slots = quickSlotCategories(categories)
+  const from = slots.findIndex((c) => c.id === categoryId)
+  const to = from + delta
+  if (from < 0 || to < 0 || to >= slots.length) return
+  const next = [...slots]
+  next[from] = slots[to]
+  next[to] = slots[from]
+  await db.transaction('rw', db.categories, () =>
+    Promise.all(next.map((c, i) => db.categories.update(c.id, { quickOrder: i }))),
+  )
+}
 
 /**
  * 브라우저가 저장소를 임의로 비우지 않도록 요청한다.

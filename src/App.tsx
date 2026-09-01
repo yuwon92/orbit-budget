@@ -25,7 +25,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { addMonths, endOfWeek, format, getDaysInMonth, parseISO, startOfWeek } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { breakdownTotal, buildBreakdown, dailyFreeAmount, inQuickSlot, spentByCategory, spentOnDate } from './lib/budget'
-import { db, requestPersistentStorage } from './lib/db'
+import { db, requestPersistentStorage, setQuickSlot } from './lib/db'
 import { money } from './lib/format'
 import { useCategories } from './lib/hooks'
 import type { Transaction } from './lib/types'
@@ -132,7 +132,7 @@ function HomeView({ openExpense, openEdit, openPreset, goTransactions, goCategor
   }
   const toggleQuickSlot = async (category: typeof categories[number]) => {
     setMenuFor(null)
-    await db.categories.update(category.id, { quickSlot: !inQuickSlot(category) })
+    await setQuickSlot(categories, category, !inQuickSlot(category))
   }
   return <div className="view home-view" onClick={() => menuFor && setMenuFor(null)}>
     <section className="hero-card">

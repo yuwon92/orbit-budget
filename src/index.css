@@ -306,6 +306,14 @@ button.transaction-name,.history-row .row-open{border:0;background:none;padding:
   .quick-slot-list{grid-template-columns:1fr}
 }
 
+/* 퀵 슬롯 순서 바꾸기: 순서 화살표가 붙어 편집 목록은 항상 한 줄에 하나씩 놓는다 */
+.quick-slot-list{grid-template-columns:1fr;margin:0;padding:0;list-style:none}
+.quick-slot-list li{display:flex;align-items:center;gap:7px}
+.quick-slot-list li>button{flex:1;min-width:0}
+.quick-slot-move{flex:0 0 auto;display:flex;gap:6px}
+.quick-slot-move button{width:44px;padding:0;justify-content:center;color:var(--text-secondary)}
+.quick-slot-move button:disabled{color:var(--text-tertiary);opacity:.4;cursor:default}
+
 /* 바텀시트: 키보드가 올라와도 제목·금액칸이 잘리지 않게 */
 @media(max-width:680px){
   /* 시트를 레이아웃 뷰포트가 아니라 실제로 보이는 영역에 맞춘다(iOS 키보드). */

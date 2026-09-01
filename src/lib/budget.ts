@@ -252,6 +252,15 @@ export function inQuickSlot(category: Category): boolean {
   return category.quickSlot ?? quickAddAmount(category.budgetRule) !== null
 }
 
+/**
+ * 퀵 슬롯 구슬을 사용자가 정한 순서대로 준다.
+ * 순서를 한 번도 안 바꾼 카테고리는 카테고리 목록 순서를 따라 뒤에 붙는다.
+ */
+export function quickSlotCategories(categories: Category[]): Category[] {
+  const rank = (c: Category) => c.quickOrder ?? Number.MAX_SAFE_INTEGER
+  return categories.filter(inQuickSlot).sort((a, b) => rank(a) - rank(b) || a.sortOrder - b.sortOrder)
+}
+
 /** 그 날짜의 요일 (0=일 … 6=토) */
 const weekdayOf = (date: string) => {
   const [year, month, day] = date.split('-').map(Number)
