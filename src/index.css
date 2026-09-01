@@ -337,3 +337,18 @@ button.transaction-name,.history-row .row-open{border:0;background:none;padding:
 /* 카테고리 팔레트 v2: 색이 없을 때도 새 스카이·슬레이트 기본값을 사용한다 */
 .category-planet,.quick-orb .orb,.quick-toggle-planet .orb{--category-color:#79a7f2}
 .hero-breakdown .cat-dot{--category-color:#9aa3b4}
+
+/* 달력 셀 균등화: 긴 금액이 특정 요일 열이나 주 행의 크기를 밀어내지 않게 한다 */
+.weekdays,.calendar-grid{grid-template-columns:repeat(7,minmax(0,1fr))}
+.calendar-grid{grid-auto-rows:92px}
+.weekdays span,.calendar-day{min-width:0}
+.calendar-day{height:100%;min-height:0;overflow:hidden}
+.calendar-amount{width:100%;min-width:0;white-space:nowrap}
+.calendar-amount strong{min-width:0}
+
+@media(max-width:680px){
+  .calendar-grid{grid-auto-rows:67px}
+  .calendar-day{padding:7px 4px}
+  .calendar-amount{gap:2px}
+  .calendar-amount strong{font-size:clamp(7px,1.9vw,8px);letter-spacing:-.07em}
+}
