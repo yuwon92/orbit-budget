@@ -22,7 +22,7 @@ import {
   X,
 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { addMonths, format, getDaysInMonth, parseISO } from 'date-fns'
+import { addDays, addMonths, format, getDaysInMonth, parseISO } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { buildBreakdown, inQuickSlot, monthlyFreeAmount, spentByCategory, spentOnDate } from './lib/budget'
 import { db, requestPersistentStorage, setQuickSlot } from './lib/db'
@@ -348,6 +348,20 @@ function CalendarView({ openEdit, openExpenseForDate }: { openEdit: (t: Transact
   </div>
 }
 
+/** 조회 기간 버튼. 기본은 오늘까지 최근 1주일이고, '전체'는 위아래 경계를 두지 않는다. */
+const RANGE_PRESETS = [
+  { id: 'week', label: '1주일' },
+  { id: 'month', label: '1개월' },
+  { id: 'all', label: '전체' },
+] as const
+type RangeId = typeof RANGE_PRESETS[number]['id']
+
+function presetRange(id: RangeId): { from: string; to: string } {
+  if (id === 'all') return { from: '', to: '' }
+  const start = id === 'week' ? addDays(new Date(), -6) : addMonths(new Date(), -1)
+  return { from: format(start, 'yyyy-MM-dd'), to: format(new Date(), 'yyyy-MM-dd') }
+}
+
 function TransactionsView({ openExpense, openEdit }: { openExpense: () => void; openEdit: (t: Transaction) => void }) {
   const categories = useCategories() ?? []
   const catMap = useMemo(() => new Map(categories.map(c => [c.id, c])), [categories])
@@ -357,22 +371,38 @@ function TransactionsView({ openExpense, openEdit }: { openExpense: () => void; 
   const [typeFilter, setTypeFilter] = useState<'all' | 'expense' | 'income'>('all')
   // 카테고리 id 목록. 'none'은 미분류. 비어 있으면 카테고리로 거르지 않는다.
   const [catFilter, setCatFilter] = useState<string[]>([])
+  // 예정 탭은 아직 오지 않은 거래를 모아 보는 자리라 조회 기간을 적용하지 않는다.
+  const [tab, setTab] = useState<'all' | 'planned'>('all')
+  const [range, setRange] = useState(() => presetRange('week'))
+  const defaultRange = presetRange('week')
+  const rangeChanged = range.from !== defaultRange.from || range.to !== defaultRange.to
+  const activePreset = RANGE_PRESETS.find(p => {
+    const r = presetRange(p.id)
+    return r.from === range.from && r.to === range.to
+  })?.id
   const activeCount = (typeFilter === 'all' ? 0 : 1) + (catFilter.length > 0 ? 1 : 0)
-  const filtering = activeCount > 0 || query.trim().length > 0
-  const reset = () => { setQuery(''); setTypeFilter('all'); setCatFilter([]) }
+  const filtering = activeCount > 0 || query.trim().length > 0 || (tab === 'all' && rangeChanged)
+  const reset = () => { setQuery(''); setTypeFilter('all'); setCatFilter([]); setRange(presetRange('week')) }
   const toggleCat = (id: string) =>
     setCatFilter((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  const plannedCount = (all ?? []).filter(t => t.isPlanned).length
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return (all ?? []).filter(t => {
+      if (tab === 'planned') {
+        if (!t.isPlanned) return false
+      } else {
+        if (range.from && t.date < range.from) return false
+        if (range.to && t.date > range.to) return false
+      }
       if (typeFilter !== 'all' && t.type !== typeFilter) return false
       if (catFilter.length > 0 && !catFilter.includes(t.categoryId ?? 'none')) return false
       if (!q) return true
       const name = t.categoryId ? catMap.get(t.categoryId)?.name ?? '' : '미분류'
       return t.memo.toLowerCase().includes(q) || name.toLowerCase().includes(q)
     })
-  }, [all, query, typeFilter, catFilter, catMap])
+  }, [all, query, typeFilter, catFilter, catMap, tab, range])
 
   const groups = useMemo(() => {
     const map = new Map<string, Transaction[]>()
@@ -380,12 +410,14 @@ function TransactionsView({ openExpense, openEdit }: { openExpense: () => void; 
       if (!map.has(t.date)) map.set(t.date, [])
       map.get(t.date)!.push(t)
     }
-    return [...map.entries()].map(([date, items]) => ({
+    const list = [...map.entries()].map(([date, items]) => ({
       date,
       items: [...items].sort((a, b) => b.createdAt - a.createdAt),
       net: items.reduce((sum, t) => sum + (t.type === 'income' ? t.amount : -t.amount), 0),
     }))
-  }, [filtered])
+    // 지난 내역은 최신순이지만, 예정은 곧 다가올 날짜부터 보는 편이 쓸모 있다.
+    return tab === 'planned' ? list.reverse() : list
+  }, [filtered, tab])
 
   const remove = async (t: Transaction) => {
     const cat = t.categoryId ? catMap.get(t.categoryId) : undefined
@@ -395,7 +427,11 @@ function TransactionsView({ openExpense, openEdit }: { openExpense: () => void; 
   }
 
   return <div className="view transactions-view">
-    <div className="page-heading"><div><p className="eyebrow">HISTORY</p><h1>거래 내역</h1><p>모든 수입과 지출을 날짜별로 확인하세요.</p></div></div>
+    <div className="page-heading"><div><p className="eyebrow">HISTORY</p><h1>거래 내역</h1><p>{tab === 'planned' ? '아직 오지 않은 예정 거래를 기간과 상관없이 모두 봅니다.' : '기간을 정해 수입과 지출을 확인하세요.'}</p></div></div>
+    <div className="type-toggle history-tabs" role="tablist">
+      <button role="tab" aria-selected={tab === 'all'} className={tab === 'all' ? 'active' : ''} onClick={() => setTab('all')}>전체</button>
+      <button role="tab" aria-selected={tab === 'planned'} className={tab === 'planned' ? 'active' : ''} onClick={() => setTab('planned')}>예정{plannedCount > 0 && <span>{plannedCount}</span>}</button>
+    </div>
     <div className="filterbar">
       <div>
         <Search size={18}/>
@@ -407,6 +443,17 @@ function TransactionsView({ openExpense, openEdit }: { openExpense: () => void; 
         {activeCount > 0 && <i className="filter-dot" aria-hidden="true"/>}
       </button>
     </div>
+    {tab === 'all' && <div className="range-bar">
+      <div className="range-dates">
+        <input type="date" value={range.from} max={range.to || undefined} onChange={e => setRange({ ...range, from: e.target.value })} aria-label="조회 시작일"/>
+        <span aria-hidden="true">~</span>
+        <input type="date" value={range.to} min={range.from || undefined} onChange={e => setRange({ ...range, to: e.target.value })} aria-label="조회 종료일"/>
+      </div>
+      <div className="range-presets">
+        {RANGE_PRESETS.map(p =>
+          <button key={p.id} className={activePreset === p.id ? 'active' : ''} onClick={() => setRange(presetRange(p.id))}>{p.label}</button>)}
+      </div>
+    </div>}
     {filterOpen && <section className="filter-panel">
       <div className="filter-group">
         <span className="field-label">종류</span>
@@ -436,12 +483,19 @@ function TransactionsView({ openExpense, openEdit }: { openExpense: () => void; 
         <p>첫 지출이나 수입을 기록해보세요.</p>
         <button className="outline-button" onClick={openExpense}><Plus size={16}/> 거래 추가</button>
       </div>}
-      {all && all.length > 0 && groups.length === 0 && <div className="empty-state">
-        <span className="empty-planet" aria-hidden="true" />
-        <strong>조건에 맞는 거래가 없어요</strong>
-        <p>검색어나 필터를 바꿔보세요.</p>
-        <button className="outline-button" onClick={reset}>필터 초기화</button>
-      </div>}
+      {all && all.length > 0 && groups.length === 0 && (tab === 'planned' && !filtering
+        ? <div className="empty-state">
+            <span className="empty-planet" aria-hidden="true" />
+            <strong>예정된 거래가 없어요</strong>
+            <p>반복 지출이나 앞으로의 거래를 예정으로 남기면 여기에 모여요.</p>
+            <button className="outline-button" onClick={openExpense}><Plus size={16}/> 거래 추가</button>
+          </div>
+        : <div className="empty-state">
+            <span className="empty-planet" aria-hidden="true" />
+            <strong>조건에 맞는 거래가 없어요</strong>
+            <p>{tab === 'planned' ? '검색어나 필터를 바꿔보세요.' : '조회 기간이나 필터를 바꿔보세요.'}</p>
+            <button className="outline-button" onClick={reset}>{tab === 'planned' ? '필터 초기화' : '기간·필터 초기화'}</button>
+          </div>)}
       {groups.map(group => <div key={group.date}>
         <div className="date-divider">
           <span>{format(parseISO(group.date), 'M월 d일')}</span>

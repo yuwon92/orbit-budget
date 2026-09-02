@@ -323,6 +323,24 @@ button.transaction-name,.history-row .row-open{border:0;background:none;padding:
   .sheet-handle{margin:0 auto 14px}
 }
 
+/* 거래 내역: 전체·예정 탭과 조회 기간 줄 */
+.history-tabs{margin:0 0 14px}
+.history-tabs button span{margin-left:5px;font-size:10px;color:var(--text-tertiary);font-variant-numeric:tabular-nums}
+.history-tabs button.active span{color:var(--text-secondary)}
+.range-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.range-dates{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+.range-dates input{flex:1;min-width:0;height:40px;border:1px solid var(--border);border-radius:11px;background:var(--surface);color:var(--text-primary);padding:0 10px;font-size:12px;font-variant-numeric:tabular-nums}
+.range-dates span{color:var(--text-tertiary);font-size:12px}
+.range-presets{display:flex;gap:6px}
+.range-presets button{height:40px;padding:0 13px;border:1px solid var(--border);border-radius:11px;background:var(--surface);color:var(--text-secondary);font-size:12px;cursor:pointer;white-space:nowrap}
+.range-presets button.active{border-color:var(--planet-blue);color:var(--text-primary);font-weight:700}
+@media(max-width:680px){
+  /* 좁은 화면에서는 날짜 두 칸과 기간 버튼을 각각 한 줄씩 쓴다 */
+  .range-dates,.range-presets{flex:1 0 100%}
+  .range-dates input,.range-presets button{height:44px}
+  .range-presets button{flex:1;padding:0}
+}
+
 /* 예산을 안 정한 카테고리 카드: 위 금액 줄과 같은 왼쪽 선에 맞추고, 옆 카드의 진행률
    문구 줄 높이에 둔다. 아래 여백까지 더한 높이가 옆 카드의 (문구 + 진행바)와 같다. */
 .category-card .no-budget-note{margin:12px 0 20px;font-size:11px;line-height:1;color:var(--text-tertiary)}
