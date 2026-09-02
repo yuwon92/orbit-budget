@@ -186,7 +186,11 @@ function HomeView({ openExpense, openEdit, openPreset, goTransactions, goCategor
                 <div className="progress-meta"><span>{progress}% 사용</span><span>{money(category.monthlyBudget - used)}원 남음</span></div>
                 <div className="category-progress"><i style={{ width: `${Math.min(progress, 100)}%`, background: barColor }} /></div>
               </>
-            : <p className="no-budget-note">예산 미설정</p>}
+            : <>
+                {/* 진행바 있는 카드와 줄 위치를 맞추려고 위 여백 한 줄은 그대로 비워 둔다 */}
+                <div className="progress-meta" aria-hidden="true"><span>&#160;</span></div>
+                <p className="no-budget-note">예산 미설정</p>
+              </>}
         </article>
       })}
     </section>
