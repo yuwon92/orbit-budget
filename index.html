@@ -8,6 +8,15 @@
     <link rel="icon" type="image/png" href="/icon-192.png" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
     <title>Orbit — 오늘의 예산</title>
+    <script>
+      // 첫 페인트 전에 저장된 테마를 입힌다. React가 붙은 뒤에 칠하면 다크 사용자에게
+      // 흰 화면이 한 번 번쩍인다. 키는 App.tsx의 THEME_KEY와 같아야 한다.
+      try {
+        var saved = localStorage.getItem('orbit-theme')
+        var dark = saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches
+        if (dark) document.documentElement.classList.add('dark')
+      } catch (e) { /* 저장소 접근 불가 */ }
+    </script>
   </head>
   <body>
     <div id="root"></div>

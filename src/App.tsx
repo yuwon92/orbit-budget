@@ -42,6 +42,18 @@ import { ReserveSheet } from './components/ReserveSheet'
 type Tab = 'home' | 'calendar' | 'transactions' | 'settings'
 type SettingsSub = 'categories' | 'recurring' | null
 
+/** 테마 저장 키. index.html의 첫 페인트 스크립트도 같은 키를 읽는다. */
+const THEME_KEY = 'orbit-theme'
+
+/** 저장된 테마. 고른 적이 없으면 기기 설정을 따른다. */
+function readTheme(): boolean {
+  try {
+    const saved = localStorage.getItem(THEME_KEY)
+    if (saved === 'dark' || saved === 'light') return saved === 'dark'
+  } catch { /* 읽기 불가 */ }
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
+}
+
 function useToday(): string {
   const getToday = () => format(new Date(), 'yyyy-MM-dd')
   const [today, setToday] = useState(getToday)
@@ -556,12 +568,16 @@ function SettingsView({ dark, onTheme, sub, setSub }: { dark: boolean; onTheme: 
 function App() {
   const today = useToday()
   const [active, setActive] = useState<Tab>('home')
-  const [dark, setDark] = useState(false)
+  const [dark, setDark] = useState(readTheme)
   // 빈 객체면 새 거래, transaction이 있으면 수정, preset이 있으면 퀵 슬롯에서 넘어온 프리필.
   const [sheet, setSheet] = useState<{ transaction?: Transaction; preset?: QuickPreset; initialDate?: string } | null>(null)
   const [settingsSub, setSettingsSub] = useState<SettingsSub>(null)
   const goSettings = (sub: SettingsSub) => { setSettingsSub(sub); setActive('settings') }
-  useEffect(() => { document.documentElement.classList.toggle('dark', dark) }, [dark])
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark)
+    // 시크릿 모드 등에서 쓰기가 막힐 수 있다. 저장에 실패해도 화면은 그대로 둔다.
+    try { localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light') } catch { /* 저장 불가 */ }
+  }, [dark])
   useEffect(() => { document.body.style.overflow = sheet ? 'hidden' : '' }, [sheet])
   const openExpense = () => setSheet({})
   const openExpenseForDate = (initialDate: string) => setSheet({ initialDate })

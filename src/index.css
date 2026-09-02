@@ -258,7 +258,7 @@ button.transaction-name,.history-row .row-open{border:0;background:none;padding:
 .month-switch .today-button{width:auto;height:32px;padding:0 9px;font-size:11px;color:var(--text-secondary)}
 .calendar-day{touch-action:manipulation}
 .calendar-day:focus-visible{z-index:1;outline:2px solid var(--planet-blue);outline-offset:-2px}
-.calendar-day.selected.today .day-num{box-shadow:0 0 0 2px var(--surface),0 0 0 3.5px var(--planet-blue)}
+.calendar-day.selected.today .day-num{box-shadow:0 0 0 1.5px var(--surface),0 0 0 3px var(--planet-blue)}
 @media(max-width:680px){
   .month-switch>button{width:44px;height:44px}
   .month-switch .today-button{width:auto;height:36px;padding:0 10px}
@@ -458,3 +458,8 @@ button.transaction-name,.history-row .row-open{border:0;background:none;padding:
    달력 점 규칙을 달력 안으로 한정하고, 화살표는 글자색을 섞어 대비를 올린다. */
 .money-direction.expense{color:color-mix(in srgb,var(--stardust-pink) 55%,var(--text-primary))}
 .money-direction.income{color:color-mix(in srgb,var(--cosmic-cyan) 55%,var(--text-primary))}
+
+/* 오늘이면서 선택된 날짜의 파란 테두리가 셀에 잘리던 문제. 셀은 overflow:hidden이고
+   좁은 화면에서는 좌우 패딩이 4px인데 숫자 원을 왼쪽으로 2px 더 당겨, 3px 테두리가
+   들어갈 자리가 없었다. 좁은 화면에서만 당김을 없앤다. */
+@media(max-width:680px){.calendar-day .day-num{margin-left:0}}
