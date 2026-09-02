@@ -264,6 +264,15 @@ function CalendarView({ openEdit, openExpenseForDate }: { openEdit: (t: Transact
     ? (monthTx ?? []).filter(t => t.date === selected).sort((a, b) => a.createdAt - b.createdAt)
     : []
   const dayNet = dayTx.reduce((sum, t) => sum + (t.type === 'income' ? t.amount : -t.amount), 0)
+  const editFromDetail = (transaction: Transaction) => {
+    setDetailOpen(false)
+    openEdit(transaction)
+  }
+  const addFromDetail = () => {
+    if (!selected) return
+    setDetailOpen(false)
+    openExpenseForDate(selected)
+  }
 
   return <div className="view">
     <div className="page-heading">
@@ -337,12 +346,12 @@ function CalendarView({ openEdit, openExpenseForDate }: { openEdit: (t: Transact
                 return <div className="transaction-row" key={t.id}>
                   <span className={`transaction-time ${t.isPlanned ? 'planned-label' : ''}`}>{t.isPlanned ? '예정' : format(t.createdAt, 'HH:mm')}</span>
                   <CategoryPlanet color={income ? '#83dad8' : cat?.color ?? '#9aa3b4'}/>
-                  <button className="transaction-name" onClick={() => openEdit(t)}><strong>{t.memo || cat?.name || (income ? '수입' : '지출')}</strong>{t.memo && <span>{income ? '수입' : cat?.name ?? '미분류'}</span>}</button>
+                  <button className="transaction-name" onClick={() => editFromDetail(t)}><strong>{t.memo || cat?.name || (income ? '수입' : '지출')}</strong>{t.memo && <span>{income ? '수입' : cat?.name ?? '미분류'}</span>}</button>
                   <strong className={`transaction-amount ${income ? 'income-text' : ''}`}>{income ? '+' : '-'}{money(t.amount)}원</strong>
                 </div>
               })}
         </div>
-        <button className="selected-day-add" onClick={() => openExpenseForDate(selected)}><Plus size={17}/> 이 날짜에 추가</button>
+        <button className="selected-day-add" onClick={addFromDetail}><Plus size={17}/> 이 날짜에 추가</button>
       </section>
     </div>}
   </div>
