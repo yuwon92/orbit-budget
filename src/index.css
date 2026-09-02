@@ -412,3 +412,10 @@ button.transaction-name,.history-row .row-open{border:0;background:none;padding:
 .category-planet i{width:25%;height:25%;left:21.5%;top:21.5%}
 /* 필터 칩 구슬만 유독 작아 다른 화면의 구슬과 달라 보인다(칩 높이 38px) */
 .filter-pills .category-planet{width:22px;height:22px}
+
+/* 모바일 필터 버튼: 글자를 숨겨도 아이콘 옆 여백이 남아 아이콘이 왼쪽으로 쏠렸다.
+   정사각형으로 잡아 가운데 두고, 필터가 걸렸다는 점은 모서리 배지로 뺀다. */
+@media(max-width:680px){
+  .filterbar>button{position:relative;flex:0 0 43px;width:43px;padding:0;gap:0;justify-content:center}
+  .filter-dot{position:absolute;top:7px;right:7px}
+}

@@ -427,7 +427,7 @@ function TransactionsView({ openExpense, openEdit }: { openExpense: () => void; 
   }
 
   return <div className="view transactions-view">
-    <div className="page-heading"><div><p className="eyebrow">HISTORY</p><h1>거래 내역</h1><p>{tab === 'planned' ? '아직 오지 않은 예정 거래를 기간과 상관없이 모두 봅니다.' : '기간을 정해 수입과 지출을 확인하세요.'}</p></div></div>
+    <div className="page-heading"><div><p className="eyebrow">HISTORY</p><h1>거래 내역</h1></div></div>
     <div className="type-toggle history-tabs" role="tablist">
       <button role="tab" aria-selected={tab === 'all'} className={tab === 'all' ? 'active' : ''} onClick={() => setTab('all')}>전체</button>
       <button role="tab" aria-selected={tab === 'planned'} className={tab === 'planned' ? 'active' : ''} onClick={() => setTab('planned')}>예정{plannedCount > 0 && <span>{plannedCount}</span>}</button>
