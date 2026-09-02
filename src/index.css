@@ -463,3 +463,6 @@ button.transaction-name,.history-row .row-open{border:0;background:none;padding:
    좁은 화면에서는 좌우 패딩이 4px인데 숫자 원을 왼쪽으로 2px 더 당겨, 3px 테두리가
    들어갈 자리가 없었다. 좁은 화면에서만 당김을 없앤다. */
 @media(max-width:680px){.calendar-day .day-num{margin-left:0}}
+
+/* 시트 카테고리 라벨 옆 보조 문구 */
+.field-optional{font-style:normal;font-weight:500;font-size:10px;color:var(--text-tertiary);margin-left:6px}

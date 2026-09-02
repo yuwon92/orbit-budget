@@ -39,9 +39,10 @@ export function ExpenseSheet({
   const amountRef = useSheetFocus<HTMLInputElement>()
   useSheetViewport()
 
-  const selected = selectedId ?? categories[0]?.id ?? null
+  // 고르지 않으면 그대로 미분류로 저장한다. 첫 카테고리를 임의로 채우지 않는다.
+  const selected = selectedId
   const formatted = amount ? money(Number(amount)) : '0'
-  const canSave = Number(amount) > 0 && (type === 'income' || selected !== null)
+  const canSave = Number(amount) > 0
 
   const save = async () => {
     if (!canSave || saving) return
@@ -102,10 +103,16 @@ export function ExpenseSheet({
           </div>
         </label>
         {type === 'expense' && <>
-          <div className="field-label">카테고리</div>
+          <div className="field-label">카테고리 <em className="field-optional">고르지 않으면 미분류</em></div>
           <div className="category-pills">
             {categories.map((c) => (
-              <button key={c.id} className={selected === c.id ? 'selected' : ''} onClick={() => setSelectedId(c.id)}>
+              // 한 번 더 누르면 선택이 풀린다(미분류로 되돌릴 방법이 이것뿐이다).
+              <button
+                key={c.id}
+                className={selected === c.id ? 'selected' : ''}
+                aria-pressed={selected === c.id}
+                onClick={() => setSelectedId(selected === c.id ? null : c.id)}
+              >
                 <CategoryPlanet color={c.color} />{c.name}
               </button>
             ))}
