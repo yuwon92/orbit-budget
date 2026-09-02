@@ -172,6 +172,7 @@ dark:        boolean → <html class="dark">
 ## 함정
 
 - **전역 `.dot{position:absolute}`** 이 행성 장식용으로 존재. 목록용 점은 `.cat-dot` 사용
+- 달력 점 색 클래스(`.planned`/`.income`/`.spent`)는 이름이 흔해 다른 곳과 부딪힌다. `.calendar-amount`/`.calendar-legend` 안으로 한정해 뒀으니 전역으로 되돌리지 말 것(예전엔 `!important` 전역이라 거래 내역 수입 원 배경까지 덮었다)
 - `.category-card p{font-size:12px}`가 카드 안 모든 `p`를 이김. 카드 안에 작은 글씨를 넣으려면 `.category-card .클래스`로 선택자를 올릴 것
 - `@media(max-width:400px)`에서 카드가 2단 그리드로 바뀜. `.category-top>button`은 그 폭에서 절대 위치로 고정
 - 모바일에서 `input{font-size:16px!important}`(iOS 확대 방지). 작은 입력칸을 만들 때 크기가 예상과 다름
