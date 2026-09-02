@@ -419,3 +419,36 @@ button.transaction-name,.history-row .row-open{border:0;background:none;padding:
   .filterbar>button{position:relative;flex:0 0 43px;width:43px;padding:0;gap:0;justify-content:center}
   .filter-dot{position:absolute;top:7px;right:7px}
 }
+
+/* 카테고리 관리: 둥근 사각형 형태를 유지하고 각 카테고리색이 드러나는 볼록한 표면으로 만든다 */
+.category-manage .setting-row .category-planet{
+  background:linear-gradient(145deg,
+    color-mix(in srgb,var(--category-color) 34%,var(--surface)),
+    color-mix(in srgb,var(--category-color) 64%,var(--surface)));
+  box-shadow:
+    inset 3px 3px 5px rgba(255,255,255,.38),
+    inset -3px -2px 6px color-mix(in srgb,var(--category-color) 44%,#7583aa),
+    0 3px 8px color-mix(in srgb,var(--category-color) 20%,transparent),
+    0 0 0 1px color-mix(in srgb,var(--category-color) 26%,transparent);
+}
+.category-manage .setting-row .category-planet i{
+  background:rgba(255,255,255,.48);
+  box-shadow:0 0 3px rgba(255,255,255,.12);
+}
+
+/* 다크 모드에서는 밝은 면과 바깥 그림자를 더 분명하게 유지한다 */
+:root.dark .category-manage .setting-row .category-planet{
+  background:linear-gradient(145deg,
+    color-mix(in srgb,var(--category-color) 68%,#f5f7fb),
+    color-mix(in srgb,var(--category-color) 76%,#141824));
+  box-shadow:
+    inset 3px 3px 5px rgba(255,255,255,.12),
+    inset -4px -3px 7px color-mix(in srgb,var(--category-color) 42%,#05070d),
+    0 4px 9px color-mix(in srgb,var(--category-color) 24%,transparent),
+    0 1px 2px rgba(0,0,0,.34);
+}
+:root.dark .category-manage .setting-row .category-planet i{
+  background:rgba(255,255,255,.18);
+  box-shadow:0 0 4px rgba(255,255,255,.12);
+  filter:blur(.35px);
+}
