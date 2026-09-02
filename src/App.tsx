@@ -267,7 +267,7 @@ function CalendarView({ openEdit, openExpenseForDate }: { openEdit: (t: Transact
 
   return <div className="view">
     <div className="page-heading">
-      <div><p className="eyebrow">MONTHLY ORBIT</p><h1>달력</h1><p>날짜별 소비 흐름과 예정 거래를 확인하세요.</p></div>
+      <div><p className="eyebrow">MONTHLY ORBIT</p><h1>달력</h1></div>
       <div className="month-switch">
         <button onClick={() => moveMonth(-1)} aria-label="이전 달"><ChevronLeft size={18}/></button>
         <div className="month-switch-center">
