@@ -118,7 +118,7 @@ dark:        boolean → <html class="dark">
 
 앱 시작 시 `materializeRecurring()` → `syncRuleBudgets()` → `requestPersistentStorage()`.
 
-**HomeView** 구성: 히어로(큰 숫자 · 오늘 예산 · `DailyBreakdown` · 오늘 사용액) → `QuickAddOrbs`(**카드 밖**) → 이번 달 예산 카드 그리드 → 오늘 내역.
+**HomeView** 구성: 히어로(큰 숫자 · 오늘 예산 · `DailyBreakdown` · 오늘 사용액) → `QuickAddOrbs`(**카드 밖**) → 이번 달 예산 카드 그리드(**모든 카테고리**. `monthlyBudget > 0`이면 진행바·남은 금액, 아니면 사용액과 `예산 미설정`만. 헤더 `편집`은 카테고리 설정으로) → 오늘 내역.
 카드의 ⋯ 메뉴에서 `홈에서 숨기기`(횟수·교통만) / `퀵 슬롯에서 숨기기·추가하기`(전 카테고리) 토글. `menuFor` state 하나로 한 번에 하나만 열림.
 
 **반복 거래 동기화** — `RecurringSettings`에서 규칙을 저장·삭제하면 `resyncRuleForMonth`/`deleteRule` 후 `syncRuleBudgets` 호출. `budgetRule`이 `manual`이 아닌 카테고리의 `monthlyBudget`만 덮어씀.

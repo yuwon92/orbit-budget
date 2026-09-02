@@ -127,7 +127,6 @@ function HomeView({ openExpense, openEdit, openPreset, goTransactions, goCategor
   // 카테고리 이름이 아니라 각 카테고리에 저장된 일/주 주기 설정을 순회한다.
   const rows = buildBreakdown(categories, txs, today)
   const over = freeRemaining < 0
-  const budgeted = categories.filter(c => c.monthlyBudget > 0)
   const toggleHidden = async (category: typeof categories[number]) => {
     setMenuFor(null)
     await db.categories.update(category.id, { hiddenOnHome: !category.hiddenOnHome })
@@ -150,19 +149,21 @@ function HomeView({ openExpense, openEdit, openPreset, goTransactions, goCategor
 
     <QuickAddOrbs openPreset={openPreset} goCategories={goCategories} />
 
-    <div className="section-heading"><div><p className="eyebrow">MONTHLY PLAN</p><h2>이번 달 예산</h2></div><button className="text-button" onClick={goCategories}>전체 보기 <ChevronRight size={16}/></button></div>
-    {budgeted.length === 0 && loaded && <section className="transaction-card">
+    <div className="section-heading"><div><p className="eyebrow">MONTHLY PLAN</p><h2>이번 달 예산</h2></div><button className="text-button" onClick={goCategories}>편집 <ChevronRight size={16}/></button></div>
+    {categories.length === 0 && loaded && <section className="transaction-card">
       <div className="empty-state">
         <span className="empty-planet" aria-hidden="true" />
-        <strong>아직 예산을 정하지 않았어요</strong>
-        <p>카테고리마다 월 예산을 정하면 여기에 진행률이 보여요.</p>
+        <strong>아직 카테고리가 없어요</strong>
+        <p>카테고리를 만들면 이번 달 소비가 여기에 보여요.</p>
         <button className="outline-button" onClick={goCategories}>카테고리 관리로 이동</button>
       </div>
     </section>}
     <section className="category-grid">
-      {budgeted.map((category) => {
+      {categories.map((category) => {
         const used = spent.get(category.id) ?? 0
-        const progress = Math.round(used / category.monthlyBudget * 100)
+        // 예산을 안 정한 카테고리는 진행률의 기준이 없어서 쓴 금액만 보여준다.
+        const hasBudget = category.monthlyBudget > 0
+        const progress = hasBudget ? Math.round(used / category.monthlyBudget * 100) : 0
         const barColor = progress >= 100 ? '#ef7777' : progress >= 80 ? '#e7b96a' : category.color
         // 홈 요약에 오르는 건 횟수·교통뿐이라 그 항목은 해당 카테고리에만 띄운다.
         // 퀵 슬롯은 모든 카테고리가 넣고 뺄 수 있다.
@@ -177,9 +178,15 @@ function HomeView({ openExpense, openEdit, openPreset, goTransactions, goCategor
             {canToggleHome && <button onClick={() => toggleHidden(category)}>{category.hiddenOnHome ? '홈에 추가하기' : '홈에서 숨기기'}</button>}
             <button onClick={() => toggleQuickSlot(category)}>{inQuickSlot(category) ? '퀵 슬롯에서 숨기기' : '퀵 슬롯에 추가하기'}</button>
           </div>}
-          <div><h3>{category.name}{category.hiddenOnHome && <em className="hidden-note">홈에서 숨김</em>}</h3><p><strong>{money(used)}</strong> <span>/ {money(category.monthlyBudget)}원</span></p></div>
-          <div className="progress-meta"><span>{progress}% 사용</span><span>{money(category.monthlyBudget - used)}원 남음</span></div>
-          <div className="category-progress"><i style={{ width: `${Math.min(progress, 100)}%`, background: barColor }} /></div>
+          <div><h3>{category.name}{category.hiddenOnHome && <em className="hidden-note">홈에서 숨김</em>}</h3><p>{hasBudget
+            ? <><strong>{money(used)}</strong> <span>/ {money(category.monthlyBudget)}원</span></>
+            : <><strong>{money(used)}원</strong> <span>사용</span></>}</p></div>
+          {hasBudget
+            ? <>
+                <div className="progress-meta"><span>{progress}% 사용</span><span>{money(category.monthlyBudget - used)}원 남음</span></div>
+                <div className="category-progress"><i style={{ width: `${Math.min(progress, 100)}%`, background: barColor }} /></div>
+              </>
+            : <p className="no-budget-note">예산 미설정</p>}
         </article>
       })}
     </section>
