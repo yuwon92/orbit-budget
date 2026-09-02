@@ -325,7 +325,7 @@ button.transaction-name,.history-row .row-open{border:0;background:none;padding:
 
 /* 예산을 안 정한 카테고리 카드: 위 금액 줄과 같은 왼쪽 선에 맞추고, 옆 카드의 진행률
    문구 줄 높이에 둔다. 아래 여백까지 더한 높이가 옆 카드의 (문구 + 진행바)와 같다. */
-.category-card .no-budget-note{margin:23px 0 9px;font-size:11px;line-height:1;color:var(--text-tertiary)}
+.category-card .no-budget-note{margin:20px 0 12px;font-size:11px;line-height:1;color:var(--text-tertiary)}
 @media(max-width:680px){.category-card .no-budget-note{font-size:10px}}
 
 /* 모바일 [+] 버튼: 목록 끝까지 내리지 않아도 거래를 추가한다.
