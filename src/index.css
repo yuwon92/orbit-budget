@@ -323,10 +323,10 @@ button.transaction-name,.history-row .row-open{border:0;background:none;padding:
   .sheet-handle{margin:0 auto 14px}
 }
 
-/* 예산을 안 정한 카테고리 카드: 진행바가 놓이는 줄에 글씨만 둔다.
-   line-height를 진행바 높이(4px)로 잡아 옆 카드의 진행바와 높이가 정확히 맞는다. */
-.category-card .no-budget-note{margin:0;font-size:9px;line-height:4px;color:var(--text-tertiary)}
-@media(max-width:680px){.category-card .no-budget-note{font-size:8px}}
+/* 예산을 안 정한 카테고리 카드: 진행률 문구와 진행바 사이 높이에 가운데로 둔다.
+   아래 여백까지 더한 높이가 옆 카드의 (문구 + 진행바)와 같아 카드 높이가 어긋나지 않는다. */
+.category-card .no-budget-note{margin:28px 0 5px;font-size:11px;line-height:1;text-align:center;color:var(--text-tertiary)}
+@media(max-width:680px){.category-card .no-budget-note{font-size:10px}}
 
 /* 모바일 [+] 버튼: 목록 끝까지 내리지 않아도 거래를 추가한다.
    fixed가 아니라 셸 기준 absolute라, 주소창이 접혔다 펴져도 하단 바 위에 그대로 붙어 있다. */
