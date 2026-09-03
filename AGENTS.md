@@ -105,6 +105,8 @@ Dexie `'orbital-budget'`. 스토어: `categories`(id) / `transactions`(id, **dat
 - **이미 끝난** 일/주 기간의 미사용액 → 자유비용으로 환급. 진행 중·미래 기간의 잔액은 카테고리에 남겨둠
 - 어떤 예산 기간에도 안 걸치는 날의 지출(요일 지정 카테고리의 비지정 요일 등) → 전액 차감
 
+`monthlyFreeAmount(txs, categories, today, reserve, includePlannedIncome = true)` — 마지막 인자가 false면 `isPlanned` 수입을 빼고 센다(설정 첫 카드의 `자유비용에 예정 수입 포함` 토글). **수입에만 걸린다.** 예정 지출은 어차피 나갈 돈이라 늘 차감한다.
+
 **기간 배분**(내부 `categoryBudgetPeriods`) — 횟수·교통 카테고리의 월 예산을 실제 달력 주/요일 기간에 앞에서부터 채운다. 달을 걸치는 주는 월 경계에서 자르고, 배분 총합은 월 예산을 넘지 않는다.
 
 **예산 계산 도구** — `budgetRule` → 월 예산
@@ -135,7 +137,10 @@ active:      'home' | 'calendar' | 'transactions' | 'settings'
 settingsSub: 'categories' | 'recurring' | null
 sheet:       { transaction?, preset?, initialDate? } | null   // {}=추가
 dark:        boolean → <html class="dark">
+plannedIncome: boolean  // 자유비용에 예정 수입을 넣을지. 기본 true
 ```
+
+`plannedIncome`은 `localStorage['orbit-planned-income']`(`'include'`|`'exclude'`)에 저장하고, 값이 없으면 포함이 기본이다. `monthlyFreeAmount`의 마지막 인자로만 흘러간다 — 사이드바 사용률·거래 목록 같은 다른 화면은 예정 수입을 늘 포함한다.
 
 테마는 `localStorage['orbit-theme']`에 저장하고, 고른 적이 없으면 `prefers-color-scheme`를 따른다. `index.html`의 인라인 스크립트가 첫 페인트 전에 같은 키를 읽어 `.dark`를 붙인다(키를 바꾸면 양쪽 다 고칠 것).
 

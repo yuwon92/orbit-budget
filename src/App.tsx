@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleDollarSign,
+  Coins,
   Download,
   HelpCircle,
   Home,
@@ -49,6 +50,17 @@ type SettingsSub = 'categories' | 'recurring' | null
 
 /** 테마 저장 키. index.html의 첫 페인트 스크립트도 같은 키를 읽는다. */
 const THEME_KEY = 'orbit-theme'
+
+/** 예정 수입을 자유비용에 넣을지. 저장된 적이 없으면 포함이 기본. */
+const PLANNED_INCOME_KEY = 'orbit-planned-income'
+
+function readPlannedIncome(): boolean {
+  try {
+    return localStorage.getItem(PLANNED_INCOME_KEY) !== 'exclude'
+  } catch {
+    return true
+  }
+}
 const ONBOARDING_KEY = 'orbit-onboarding-v1'
 
 function onboardingSeen(): boolean {
@@ -127,7 +139,7 @@ function Sidebar({ active, setActive }: { active: Tab; setActive: (tab: Tab) => 
   return <aside className="sidebar"><nav>{items.map(item => { const Icon = item.icon; return <button key={item.id} onClick={() => setActive(item.id)} className={active === item.id ? 'active' : ''}><Icon size={19}/><span>{item.label}</span></button> })}</nav><div className="month-chip"><Planet small/><div><span>{Number(month.slice(5))}월의 행성</span><strong>{usage ?? 0}% 사용 중</strong></div></div></aside>
 }
 
-function HomeView({ openExpense, openEdit, openPreset, goTransactions, goCategoryTransactions, goCategories }: { openExpense: () => void; openEdit: (t: Transaction) => void; openPreset: (preset: QuickPreset) => void; goTransactions: () => void; goCategoryTransactions: (categoryId: string) => void; goCategories: () => void }) {
+function HomeView({ openExpense, openEdit, openPreset, goTransactions, goCategoryTransactions, goCategories, plannedIncome }: { openExpense: () => void; openEdit: (t: Transaction) => void; openPreset: (preset: QuickPreset) => void; goTransactions: () => void; goCategoryTransactions: (categoryId: string) => void; goCategories: () => void; plannedIncome: boolean }) {
   const categories = useCategories() ?? []
   const today = format(new Date(), 'yyyy-MM-dd')
   const month = today.slice(0, 7)
@@ -149,7 +161,7 @@ function HomeView({ openExpense, openEdit, openPreset, goTransactions, goCategor
   const todayTx = loaded
     ? txs.filter(t => t.date === today).sort((a, b) => a.createdAt - b.createdAt)
     : undefined
-  const freeRemaining = monthlyFreeAmount(txs, categories, today, settings?.reserveAmount ?? 0)
+  const freeRemaining = monthlyFreeAmount(txs, categories, today, settings?.reserveAmount ?? 0, plannedIncome)
   // 카테고리 이름이 아니라 각 카테고리에 저장된 일/주 주기 설정을 순회한다.
   const rows = buildBreakdown(categories, txs, today)
   const over = freeRemaining < 0
@@ -557,7 +569,7 @@ function TransactionsView({ openExpense, openEdit, focus, clearFocus }: { openEx
   </div>
 }
 
-function SettingsView({ dark, onTheme, openOnboarding, sub, setSub }: { dark: boolean; onTheme: () => void; openOnboarding: () => void; sub: SettingsSub; setSub: (sub: SettingsSub) => void }) {
+function SettingsView({ dark, onTheme, openOnboarding, sub, setSub, plannedIncome, onPlannedIncome }: { dark: boolean; onTheme: () => void; openOnboarding: () => void; sub: SettingsSub; setSub: (sub: SettingsSub) => void; plannedIncome: boolean; onPlannedIncome: () => void }) {
   const month = format(new Date(), 'yyyy-MM')
   const monthSettings = useLiveQuery(() => db.monthSettings.get(month), [month])
   const [reserveOpen, setReserveOpen] = useState(false)
@@ -579,13 +591,15 @@ function SettingsView({ dark, onTheme, openOnboarding, sub, setSub }: { dark: bo
       onClick: () => setReserveOpen(true),
     },
   ]
-  return <div className="view"><div className="page-heading"><div><p className="eyebrow">PREFERENCES</p><h1>설정</h1><p>나의 예산 행성을 관리하세요.</p></div></div><section className="settings-card">{settings.map(row=>{const Icon=row.icon;return <button className="setting-row" key={row.title} onClick={row.onClick}><span><Icon size={20}/></span><div><strong>{row.title}</strong><small>{row.desc}</small></div><ChevronRight size={18}/></button>})}</section><h2 className="settings-subhead">앱 설정</h2><section className="settings-card"><button className="setting-row" onClick={openOnboarding}><span><HelpCircle size={20}/></span><div><strong>시작 안내 다시 보기</strong><small>수입·예산·예비비를 순서대로 설정</small></div><ChevronRight size={18}/></button><button className="setting-row" onClick={onTheme}><span>{dark?<Moon size={20}/>:<Sun size={20}/>}</span><div><strong>화면 테마</strong><small>{dark?'다크 모드':'라이트 모드'}</small></div><i className={`toggle ${dark?'on':''}`}><b/></i></button><button className="setting-row" onClick={exportCsv}><span><Download size={20}/></span><div><strong>데이터 내보내기</strong><small>CSV 파일로 안전하게 보관</small></div><ChevronRight size={18}/></button></section><p className="version">ORBIT BUDGET · UI PROTOTYPE 0.4</p>{reserveOpen && <ReserveSheet month={month} current={reserve} close={() => setReserveOpen(false)} />}</div>
+  return <div className="view"><div className="page-heading"><div><p className="eyebrow">PREFERENCES</p><h1>설정</h1><p>나의 예산 행성을 관리하세요.</p></div></div><section className="settings-card">{settings.map(row=>{const Icon=row.icon;return <button className="setting-row" key={row.title} onClick={row.onClick}><span><Icon size={20}/></span><div><strong>{row.title}</strong><small>{row.desc}</small></div><ChevronRight size={18}/></button>})}<button className="setting-row" onClick={onPlannedIncome}><span><Coins size={20}/></span><div><strong>자유비용에 예정 수입 포함</strong><small>{plannedIncome?'아직 안 들어온 예정 수입도 더해서 계산':'실제로 들어온 수입만으로 계산'}</small></div><i className={`toggle ${plannedIncome?'on':''}`}><b/></i></button></section><h2 className="settings-subhead">앱 설정</h2><section className="settings-card"><button className="setting-row" onClick={openOnboarding}><span><HelpCircle size={20}/></span><div><strong>시작 안내 다시 보기</strong><small>수입·예산·예비비를 순서대로 설정</small></div><ChevronRight size={18}/></button><button className="setting-row" onClick={onTheme}><span>{dark?<Moon size={20}/>:<Sun size={20}/>}</span><div><strong>화면 테마</strong><small>{dark?'다크 모드':'라이트 모드'}</small></div><i className={`toggle ${dark?'on':''}`}><b/></i></button><button className="setting-row" onClick={exportCsv}><span><Download size={20}/></span><div><strong>데이터 내보내기</strong><small>CSV 파일로 안전하게 보관</small></div><ChevronRight size={18}/></button></section><p className="version">ORBIT BUDGET · UI PROTOTYPE 0.4</p>{reserveOpen && <ReserveSheet month={month} current={reserve} close={() => setReserveOpen(false)} />}</div>
 }
 
 function App() {
   const today = useToday()
   const [active, setActive] = useState<Tab>('home')
   const [dark, setDark] = useState(readTheme)
+  // 자유비용 계산에 예정 수입을 넣을지. 이 값은 큰 숫자 계산에만 쓴다.
+  const [plannedIncome, setPlannedIncome] = useState(readPlannedIncome)
   // 빈 객체면 새 거래, transaction이 있으면 수정, preset이 있으면 퀵 슬롯에서 넘어온 프리필.
   const [sheet, setSheet] = useState<{ transaction?: Transaction; preset?: QuickPreset; initialDate?: string } | null>(null)
   const [settingsSub, setSettingsSub] = useState<SettingsSub>(null)
@@ -604,6 +618,10 @@ function App() {
     // 시크릿 모드 등에서 쓰기가 막힐 수 있다. 저장에 실패해도 화면은 그대로 둔다.
     try { localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light') } catch { /* 저장 불가 */ }
   }, [dark])
+  useEffect(() => {
+    // 시크릿 모드 등에서 쓰기가 막혀도 화면은 그대로 둔다.
+    try { localStorage.setItem(PLANNED_INCOME_KEY, plannedIncome ? 'include' : 'exclude') } catch { /* 저장 불가 */ }
+  }, [plannedIncome])
   useEffect(() => { document.body.style.overflow = sheet ? 'hidden' : '' }, [sheet])
   const openExpense = () => setSheet({})
   const openExpenseForDate = (initialDate: string) => setSheet({ initialDate })
@@ -621,7 +639,7 @@ function App() {
     })
   }, [])
   const closeOnboarding = () => { rememberOnboarding(); setOnboardingOpen(false) }
-  const content = useMemo(() => ({home:<HomeView openExpense={openExpense} openEdit={openEdit} openPreset={openPreset} goTransactions={()=>{setTxFocus(null);setActive('transactions')}} goCategoryTransactions={goCategoryTransactions} goCategories={()=>goSettings('categories')}/>,calendar:<CalendarView openEdit={openEdit} openExpenseForDate={openExpenseForDate}/>,transactions:<TransactionsView openExpense={openExpense} openEdit={openEdit} focus={txFocus} clearFocus={clearTxFocus}/>,settings:<SettingsView dark={dark} onTheme={()=>setDark(!dark)} openOnboarding={()=>setOnboardingOpen(true)} sub={settingsSub} setSub={setSettingsSub}/>})[active], [active,dark,settingsSub,today,txFocus])
+  const content = useMemo(() => ({home:<HomeView openExpense={openExpense} openEdit={openEdit} openPreset={openPreset} goTransactions={()=>{setTxFocus(null);setActive('transactions')}} goCategoryTransactions={goCategoryTransactions} goCategories={()=>goSettings('categories')} plannedIncome={plannedIncome}/>,calendar:<CalendarView openEdit={openEdit} openExpenseForDate={openExpenseForDate}/>,transactions:<TransactionsView openExpense={openExpense} openEdit={openEdit} focus={txFocus} clearFocus={clearTxFocus}/>,settings:<SettingsView dark={dark} onTheme={()=>setDark(!dark)} openOnboarding={()=>setOnboardingOpen(true)} sub={settingsSub} setSub={setSettingsSub} plannedIncome={plannedIncome} onPlannedIncome={()=>setPlannedIncome(!plannedIncome)}/>})[active], [active,dark,settingsSub,today,txFocus,plannedIncome])
   return <div className="app-shell"><Header dark={dark} onTheme={()=>setDark(!dark)}/><Sidebar active={active} setActive={(tab)=>{if(tab==='settings')setSettingsSub(null);if(tab==='transactions')setTxFocus(null);setActive(tab)}}/><main>{content}</main>{(active==='home'||active==='transactions')&&<><button className="desktop-add" onClick={openExpense}><Plus size={20}/> 추가</button><button className="fab-add" onClick={openExpense} aria-label="거래 추가"><Plus size={26}/></button></>}<nav className="bottom-nav">{([{id:'home',label:'홈',icon:Home},{id:'calendar',label:'달력',icon:CalendarDays},{id:'transactions',label:'거래',icon:ListFilter},{id:'settings',label:'설정',icon:Settings}] as const).map(item=>{const Icon=item.icon;return <button key={item.id} className={active===item.id?'active':''} onClick={()=>{if(item.id==='settings')setSettingsSub(null);if(item.id==='transactions')setTxFocus(null);setActive(item.id)}}><Icon size={20}/><span>{item.label}</span></button>})}</nav>{sheet&&<ExpenseSheet transaction={sheet.transaction} preset={sheet.preset} initialDate={sheet.initialDate} close={()=>setSheet(null)}/>} {onboardingOpen&&<Onboarding close={closeOnboarding} finish={closeOnboarding}/>}</div>
 }
 

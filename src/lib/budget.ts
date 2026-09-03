@@ -15,10 +15,13 @@ const weekdayOf = (date: string) => {
   return new Date(year, month - 1, day).getDay()
 }
 
-/** 이번 달 총수입. 날짜와 금액이 확정된 예정 수입도 포함한다. */
-export function totalIncome(transactions: Transaction[], month: string): number {
+/**
+ * 이번 달 총수입. 기본은 아직 안 들어온 예정 수입까지 포함한다.
+ * includePlanned를 false로 주면 실제로 들어온 수입만 센다 (설정의 예정 수입 포함 토글).
+ */
+export function totalIncome(transactions: Transaction[], month: string, includePlanned = true): number {
   return transactions
-    .filter((t) => inMonth(t, month) && t.type === 'income')
+    .filter((t) => inMonth(t, month) && t.type === 'income' && (includePlanned || !t.isPlanned))
     .reduce((sum, t) => sum + t.amount, 0)
 }
 
@@ -87,12 +90,16 @@ function currentBudgetPeriod(category: Category, today: string): BudgetPeriod | 
  * 월수입에서 모든 카테고리 월 예산과 예비비를 먼저 확보한다. 예산 밖 지출과 기간별
  * 초과분은 실제·예정 여부와 관계없이 즉시 차감한다. 끝난 일/주 기간의 미사용액만
  * 자유비용에 돌려주며, 진행 중이거나 미래인 기간의 잔액은 계속 카테고리에 남겨둔다.
+ *
+ * 수입 쪽만 골라낼 수 있다. includePlannedIncome이 false면 아직 안 들어온 예정 수입을
+ * 빼고 계산한다 (지출은 그대로 — 예정 지출은 어차피 나갈 돈이라 늘 차감한다).
  */
 export function monthlyFreeAmount(
   transactions: Transaction[],
   categories: Category[],
   today: string,
   reserveAmount: number,
+  includePlannedIncome = true,
 ): number {
   const month = today.slice(0, 7)
   const totalBudget = categories.reduce((sum, category) => sum + Math.max(category.monthlyBudget, 0), 0)
@@ -130,7 +137,7 @@ export function monthlyFreeAmount(
       .reduce((sum, transaction) => sum + transaction.amount, 0)
   }
 
-  return totalIncome(transactions, month) - totalBudget - reserveAmount + adjustment
+  return totalIncome(transactions, month, includePlannedIncome) - totalBudget - reserveAmount + adjustment
 }
 
 /** 특정 날짜의 지출 합계 */

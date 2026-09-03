@@ -75,6 +75,16 @@ const monthlyFree = monthlyFreeAmount(transactions, categories, today, 0)
 console.log(`월 자유 금액   = ${monthlyFree.toLocaleString()} (카테고리 예산 + 예산 밖 거래 차감)`)
 assert.equal(monthlyFree, 556_490)
 assert.equal(monthlyFreeAmount(transactions, categories, today, 50_000), 506_490)
+// 설정 → 자유비용에서 예정 수입을 빼면 아직 안 들어온 수입만큼 줄어든다
+const plannedPay: Transaction = {
+  id: 'planned-pay', date: '2026-09-25', amount: 200_000, type: 'income', categoryId: null,
+  memo: '용돈', isPlanned: true, createdAt: 0,
+}
+assert.equal(totalIncome([...transactions, plannedPay], month), income + 200_000)
+assert.equal(totalIncome([...transactions, plannedPay], month, false), income)
+assert.equal(monthlyFreeAmount([...transactions, plannedPay], categories, today, 0), monthlyFree + 200_000)
+assert.equal(monthlyFreeAmount([...transactions, plannedPay], categories, today, 0, false), monthlyFree)
+console.log('예정 수입 제외 설정 (수입만 걸러내고 지출은 그대로) 통과')
 
 // 실제 설정 화면과 같은 9/1 사례. 이름이 아니라 모든 카테고리의 저장된 월 예산을 합산한다.
 const screenCategories = [
