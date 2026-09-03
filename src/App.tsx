@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -22,7 +22,7 @@ import {
   X,
 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { addDays, addMonths, format, getDaysInMonth, parseISO } from 'date-fns'
+import { addDays, addMonths, endOfMonth, format, getDaysInMonth, parseISO } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { buildBreakdown, inQuickSlot, monthlyFreeAmount, spentByCategory, spentOnDate } from './lib/budget'
 import { db, requestPersistentStorage, setQuickSlot } from './lib/db'
@@ -40,6 +40,9 @@ import { RecurringSettings } from './components/RecurringSettings'
 import { ReserveSheet } from './components/ReserveSheet'
 
 type Tab = 'home' | 'calendar' | 'transactions' | 'settings'
+
+/** 홈 예산 카드에서 거래 내역으로 넘어갈 때 미리 걸어 둘 카테고리 필터와 조회 기간. */
+interface TxFocus { categoryId: string; from: string; to: string }
 type SettingsSub = 'categories' | 'recurring' | null
 
 /** 테마 저장 키. index.html의 첫 페인트 스크립트도 같은 키를 읽는다. */
@@ -113,7 +116,7 @@ function Sidebar({ active, setActive }: { active: Tab; setActive: (tab: Tab) => 
   return <aside className="sidebar"><nav>{items.map(item => { const Icon = item.icon; return <button key={item.id} onClick={() => setActive(item.id)} className={active === item.id ? 'active' : ''}><Icon size={19}/><span>{item.label}</span></button> })}</nav><div className="month-chip"><Planet small/><div><span>{Number(month.slice(5))}월의 행성</span><strong>{usage ?? 0}% 사용 중</strong></div></div></aside>
 }
 
-function HomeView({ openExpense, openEdit, openPreset, goTransactions, goCategories }: { openExpense: () => void; openEdit: (t: Transaction) => void; openPreset: (preset: QuickPreset) => void; goTransactions: () => void; goCategories: () => void }) {
+function HomeView({ openExpense, openEdit, openPreset, goTransactions, goCategoryTransactions, goCategories }: { openExpense: () => void; openEdit: (t: Transaction) => void; openPreset: (preset: QuickPreset) => void; goTransactions: () => void; goCategoryTransactions: (categoryId: string) => void; goCategories: () => void }) {
   const categories = useCategories() ?? []
   const today = format(new Date(), 'yyyy-MM-dd')
   const month = today.slice(0, 7)
@@ -190,7 +193,7 @@ function HomeView({ openExpense, openEdit, openPreset, goTransactions, goCategor
             {canToggleHome && <button onClick={() => toggleHidden(category)}>{category.hiddenOnHome ? '홈에 추가하기' : '홈에서 숨기기'}</button>}
             <button onClick={() => toggleQuickSlot(category)}>{inQuickSlot(category) ? '퀵 슬롯에서 숨기기' : '퀵 슬롯에 추가하기'}</button>
           </div>}
-          <div><h3>{category.name}{category.hiddenOnHome && <em className="hidden-note">홈에서 숨김</em>}</h3><p>{hasBudget
+          <div><h3><button className="category-title" onClick={() => goCategoryTransactions(category.id)} aria-label={`${category.name} 이번 달 거래 내역 보기`}>{category.name}</button>{category.hiddenOnHome && <em className="hidden-note">홈에서 숨김</em>}</h3><p>{hasBudget
             ? <><strong>{money(used)}</strong> <span>/ {money(category.monthlyBudget)}원</span></>
             : <><strong>{money(used)}원</strong> <span>사용</span></>}</p></div>
           {hasBudget
@@ -383,18 +386,21 @@ function presetRange(id: RangeId): { from: string; to: string } {
   return { from: format(start, 'yyyy-MM-dd'), to: format(new Date(), 'yyyy-MM-dd') }
 }
 
-function TransactionsView({ openExpense, openEdit }: { openExpense: () => void; openEdit: (t: Transaction) => void }) {
+function TransactionsView({ openExpense, openEdit, focus, clearFocus }: { openExpense: () => void; openEdit: (t: Transaction) => void; focus: TxFocus | null; clearFocus: () => void }) {
   const categories = useCategories() ?? []
   const catMap = useMemo(() => new Map(categories.map(c => [c.id, c])), [categories])
   const all = useLiveQuery(() => db.transactions.orderBy('date').reverse().toArray(), [])
   const [query, setQuery] = useState('')
-  const [filterOpen, setFilterOpen] = useState(false)
+  // 홈 카드에서 넘어왔으면 어떤 조건이 걸렸는지 보이도록 필터 패널을 펼친 채로 연다.
+  const [filterOpen, setFilterOpen] = useState(Boolean(focus))
   const [typeFilter, setTypeFilter] = useState<'all' | 'expense' | 'income'>('all')
   // 카테고리 id 목록. 'none'은 미분류. 비어 있으면 카테고리로 거르지 않는다.
-  const [catFilter, setCatFilter] = useState<string[]>([])
+  const [catFilter, setCatFilter] = useState<string[]>(focus ? [focus.categoryId] : [])
   // 예정 탭은 아직 오지 않은 거래를 모아 보는 자리라 조회 기간을 적용하지 않는다.
   const [tab, setTab] = useState<'all' | 'planned'>('all')
-  const [range, setRange] = useState(() => presetRange('week'))
+  const [range, setRange] = useState(() => (focus ? { from: focus.from, to: focus.to } : presetRange('week')))
+  // 한 번 반영하고 비운다. 다음에 탭으로 다시 들어올 때 옛 필터가 되살아나면 안 된다.
+  useEffect(() => { if (focus) clearFocus() }, [focus, clearFocus])
   const defaultRange = presetRange('week')
   const rangeChanged = range.from !== defaultRange.from || range.to !== defaultRange.to
   const activePreset = RANGE_PRESETS.find(p => {
@@ -572,6 +578,14 @@ function App() {
   // 빈 객체면 새 거래, transaction이 있으면 수정, preset이 있으면 퀵 슬롯에서 넘어온 프리필.
   const [sheet, setSheet] = useState<{ transaction?: Transaction; preset?: QuickPreset; initialDate?: string } | null>(null)
   const [settingsSub, setSettingsSub] = useState<SettingsSub>(null)
+  // 홈 예산 카드 제목 → 그 카테고리·이번 달로 필터를 건 거래 내역.
+  const [txFocus, setTxFocus] = useState<TxFocus | null>(null)
+  const clearTxFocus = useCallback(() => setTxFocus(null), [])
+  const goCategoryTransactions = (categoryId: string) => {
+    const month = today.slice(0, 7)
+    setTxFocus({ categoryId, from: `${month}-01`, to: format(endOfMonth(parseISO(`${month}-01`)), 'yyyy-MM-dd') })
+    setActive('transactions')
+  }
   const goSettings = (sub: SettingsSub) => { setSettingsSub(sub); setActive('settings') }
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
@@ -588,8 +602,8 @@ function App() {
     materializeRecurring(today).then(() => syncRuleBudgets(today.slice(0, 7)))
   }, [today])
   useEffect(() => { requestPersistentStorage() }, [])
-  const content = useMemo(() => ({home:<HomeView openExpense={openExpense} openEdit={openEdit} openPreset={openPreset} goTransactions={()=>setActive('transactions')} goCategories={()=>goSettings('categories')}/>,calendar:<CalendarView openEdit={openEdit} openExpenseForDate={openExpenseForDate}/>,transactions:<TransactionsView openExpense={openExpense} openEdit={openEdit}/>,settings:<SettingsView dark={dark} onTheme={()=>setDark(!dark)} sub={settingsSub} setSub={setSettingsSub}/>})[active], [active,dark,settingsSub,today])
-  return <div className="app-shell"><Header dark={dark} onTheme={()=>setDark(!dark)}/><Sidebar active={active} setActive={(tab)=>{if(tab==='settings')setSettingsSub(null);setActive(tab)}}/><main>{content}</main>{(active==='home'||active==='transactions')&&<><button className="desktop-add" onClick={openExpense}><Plus size={20}/> 추가</button><button className="fab-add" onClick={openExpense} aria-label="거래 추가"><Plus size={26}/></button></>}<nav className="bottom-nav">{([{id:'home',label:'홈',icon:Home},{id:'calendar',label:'달력',icon:CalendarDays},{id:'transactions',label:'거래',icon:ListFilter},{id:'settings',label:'설정',icon:Settings}] as const).map(item=>{const Icon=item.icon;return <button key={item.id} className={active===item.id?'active':''} onClick={()=>{if(item.id==='settings')setSettingsSub(null);setActive(item.id)}}><Icon size={20}/><span>{item.label}</span></button>})}</nav>{sheet&&<ExpenseSheet transaction={sheet.transaction} preset={sheet.preset} initialDate={sheet.initialDate} close={()=>setSheet(null)}/>}</div>
+  const content = useMemo(() => ({home:<HomeView openExpense={openExpense} openEdit={openEdit} openPreset={openPreset} goTransactions={()=>{setTxFocus(null);setActive('transactions')}} goCategoryTransactions={goCategoryTransactions} goCategories={()=>goSettings('categories')}/>,calendar:<CalendarView openEdit={openEdit} openExpenseForDate={openExpenseForDate}/>,transactions:<TransactionsView openExpense={openExpense} openEdit={openEdit} focus={txFocus} clearFocus={clearTxFocus}/>,settings:<SettingsView dark={dark} onTheme={()=>setDark(!dark)} sub={settingsSub} setSub={setSettingsSub}/>})[active], [active,dark,settingsSub,today,txFocus])
+  return <div className="app-shell"><Header dark={dark} onTheme={()=>setDark(!dark)}/><Sidebar active={active} setActive={(tab)=>{if(tab==='settings')setSettingsSub(null);if(tab==='transactions')setTxFocus(null);setActive(tab)}}/><main>{content}</main>{(active==='home'||active==='transactions')&&<><button className="desktop-add" onClick={openExpense}><Plus size={20}/> 추가</button><button className="fab-add" onClick={openExpense} aria-label="거래 추가"><Plus size={26}/></button></>}<nav className="bottom-nav">{([{id:'home',label:'홈',icon:Home},{id:'calendar',label:'달력',icon:CalendarDays},{id:'transactions',label:'거래',icon:ListFilter},{id:'settings',label:'설정',icon:Settings}] as const).map(item=>{const Icon=item.icon;return <button key={item.id} className={active===item.id?'active':''} onClick={()=>{if(item.id==='settings')setSettingsSub(null);if(item.id==='transactions')setTxFocus(null);setActive(item.id)}}><Icon size={20}/><span>{item.label}</span></button>})}</nav>{sheet&&<ExpenseSheet transaction={sheet.transaction} preset={sheet.preset} initialDate={sheet.initialDate} close={()=>setSheet(null)}/>}</div>
 }
 
 export default App
