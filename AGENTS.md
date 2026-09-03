@@ -29,7 +29,7 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `src/lib/sheet.ts` | 바텀시트용 훅 — `useSheetViewport`(visualViewport·배경 스크롤 잠금), `useSheetFocus` |
 | `src/lib/csv.ts` | CSV 문자열 생성 + 다운로드 |
 | `src/lib/hooks.ts` | `useCategories()` (sortOrder 정렬) |
-| `src/lib/format.ts` | `money()` — 천 단위 콤마 |
+| `src/lib/format.ts` | `money()` — 천 단위 콤마, `WEEKDAY_NAMES`·`formatWeekdays()` — 요일 이름·목록 문구 |
 | `src/index.css` (421줄) | 전역 CSS 한 파일. 클래스명 기반 |
 | `scripts/verify-budget.ts` | 검산 |
 | `scripts/gen-icons.ts` | PWA 아이콘 생성 |
@@ -53,7 +53,8 @@ Category        id, name, monthlyBudget, color, isFixed, sortOrder,
                 budgetRule?, hiddenOnHome?, quickSlot?, quickOrder?
 Transaction     id, date('yyyy-MM-dd'), amount(항상 양수), type, categoryId|null,
                 memo, isPlanned, createdAt, recurringRuleId?
-RecurringRule   id, name, amount, type, categoryId, dayOfMonth,
+RecurringRule   id, name, amount, type, categoryId, interval?('monthly'|'weekly'),
+                dayOfMonth, weekdays?(0=일…6=토, 여러 개),
                 startDate, endDate|null, lastGeneratedMonth|null
 MonthSettings   yearMonth('yyyy-MM'), reserveAmount
 ```
@@ -69,6 +70,7 @@ BudgetRule = { kind:'manual' }
 날짜는 전부 `'yyyy-MM-dd'` 문자열, 월은 `'yyyy-MM'`. 문자열 비교로 대소 판단(`t.date < today`).
 요일은 `0=일 … 6=토`. 주 시작은 **일요일**(달력과 일치).
 
+- `interval`이 없으면 월 단위(예전 규칙). 주 단위는 `weekdays`(여러 요일 가능)를 쓰고 `dayOfMonth`는 안 씀(주기를 되돌릴 때를 위해 값은 남겨둠)
 - `isPlanned`는 저장 시 `date > 오늘`로 자동 결정. `materializeRecurring`이 앱을 열 때 오늘 이하 날짜를 전부 `false`로 확정
 - `hiddenOnHome`은 히어로 예산 행 **표시만** 숨김. 계산에는 그대로 들어감
 - `isFixed`는 현재 **라벨 전용**(목록의 `고정비` 칩). 계산에서 안 씀
@@ -107,11 +109,12 @@ Dexie `'orbital-budget'`. 스토어: `categories`(id) / `transactions`(id, **dat
 
 **예산 계산 도구** — `budgetRule` → 월 예산
 `weeksInMonth` `weekdayCountInMonth` `monthlyOccurrences` `budgetFromRule`
-`activeRecurringForCategory` `recurringSumForCategory`
+`activeRecurringForCategory` `monthlyAmountForRule` `recurringSumForCategory`
 
 - 요일 지정이면 **그 달 실제 요일 수**로 계산(달마다 값이 다름)
 - **횟수를 먼저 반올림**해서 금액이 단가의 배수로 떨어짐 (6,500 x 43회)
 - 구독 합계는 발생일이 아니라 **규칙이 그 달에 걸쳐 있는지**로 판정
+- 주 단위 규칙의 월 부담은 `monthlyAmountForRule` — 금액 x **고른 요일들이 그 달에 나오는 횟수**(`weekdayCountInMonth`). 시작·종료로 잘린 달도 온전한 한 달치로 잡는다
 
 **히어로 예산 행** — `buildBreakdown(categories, transactions, today)` → `BreakdownRow[]`
 
@@ -153,6 +156,8 @@ dark:        boolean → <html class="dark">
 **셸** — 홈·거래 탭에서만 추가 버튼. 데스크톱은 `.desktop-add`(fixed 알약), 모바일은 `.fab-add`(오른쪽 아래 원형).
 
 **반복 거래 동기화** — `RecurringSettings`에서 규칙을 저장·삭제하면 `resyncRuleForMonth`/`deleteRule` 후 `syncRuleBudgets` 호출. `budgetRule`이 `manual`이 아닌 카테고리의 `monthlyBudget`만 덮어씀.
+
+`occurrenceDates(rule, month)`가 그 달 발생일 전부를 낸다 — 월 단위 0~1건, 주 단위는 고른 요일마다 4~5건씩. `materializeRecurring`은 `lastGeneratedMonth`로 달 단위 중복을 막고, **이미 있는 날짜는 건너뛴다**. 그래서 `resyncRuleForMonth`가 `lastGeneratedMonth`를 늘 `null`로 되돌려도 지난 발생분이 다시 생기지 않고, 주 단위 규칙을 달 중간에 고쳐도 남은 날짜가 새 값으로 다시 선다.
 
 ## 모바일 셸 레이아웃 (680px 이하)
 

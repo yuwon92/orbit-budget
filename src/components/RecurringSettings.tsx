@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
 import { format } from 'date-fns'
+import { weekdayCountInMonth } from '../lib/budget'
 import { db } from '../lib/db'
-import { money } from '../lib/format'
+import { formatWeekdays, money, WEEKDAY_NAMES } from '../lib/format'
 import { useCategories } from '../lib/hooks'
 import { useSheetFocus, useSheetViewport } from '../lib/sheet'
 import { deleteRule, materializeRecurring, resyncRuleForMonth, syncRuleBudgets } from '../lib/recurring'
@@ -12,12 +13,23 @@ import { CategoryPlanet } from './CategoryPlanet'
 
 const todayStr = () => format(new Date(), 'yyyy-MM-dd')
 
+/** 목록 한 줄에 붙는 주기 문구. 주기가 없는 예전 규칙은 월 단위로 본다. */
+function describeCycle(rule: Pick<RecurringRule, 'interval' | 'dayOfMonth' | 'weekdays'>): string {
+  if (rule.interval !== 'weekly') return `매달 ${rule.dayOfMonth}일`
+  const days = rule.weekdays ?? []
+  // 하나면 "매주 화요일", 여러 개면 "매주 월·수·금"
+  return days.length === 1 ? `매주 ${formatWeekdays(days)}요일` : `매주 ${formatWeekdays(days)}`
+}
+
 function RuleForm({ rule, close }: { rule: RecurringRule | null; close: () => void }) {
   const categories = useCategories() ?? []
   const [type, setType] = useState<'expense' | 'income'>(rule?.type ?? 'expense')
   const [name, setName] = useState(rule?.name ?? '')
   const [amount, setAmount] = useState(rule?.amount ? String(rule.amount) : '')
+  // 주기를 오갈 수 있으므로 날짜와 요일은 따로 들고 있는다.
+  const [cycle, setCycle] = useState<'monthly' | 'weekly'>(rule?.interval ?? 'monthly')
   const [day, setDay] = useState(rule ? String(rule.dayOfMonth) : '')
+  const [weekdays, setWeekdays] = useState<number[]>(rule?.weekdays ?? [])
   const [categoryId, setCategoryId] = useState<string | null>(rule?.categoryId ?? null)
   const [startDate, setStartDate] = useState(rule?.startDate ?? todayStr())
   const [endDate, setEndDate] = useState(rule?.endDate ?? '')
@@ -28,7 +40,13 @@ function RuleForm({ rule, close }: { rule: RecurringRule | null; close: () => vo
 
   const selected = categoryId ?? categories[0]?.id ?? null
   const dayNum = Number(day)
-  const canSave = name.trim().length > 0 && Number(amount) > 0 && dayNum >= 1 && dayNum <= 31
+  const validDay = dayNum >= 1 && dayNum <= 31
+  // 주 단위는 고른 요일 수와 달에 따라 횟수가 갈린다. 이번 달 기준으로 몇 번인지 미리 알려준다.
+  const weeklyCount = weekdayCountInMonth(weekdays, todayStr().slice(0, 7))
+  const toggleWeekday = (day: number) =>
+    setWeekdays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort((a, b) => a - b)))
+  const canSave =
+    name.trim().length > 0 && Number(amount) > 0 && (cycle === 'weekly' ? weekdays.length > 0 : validDay)
 
   const save = async () => {
     if (!canSave || saving) return
@@ -38,7 +56,10 @@ function RuleForm({ rule, close }: { rule: RecurringRule | null; close: () => vo
       amount: Number(amount),
       type,
       categoryId: type === 'expense' ? selected : null,
-      dayOfMonth: dayNum,
+      interval: cycle,
+      // 주 단위는 며칠을 안 쓰지만, 주기를 월 단위로 되돌릴 때를 위해 자리는 남겨둔다.
+      dayOfMonth: validDay ? dayNum : 1,
+      weekdays: cycle === 'weekly' ? weekdays : undefined,
       startDate,
       endDate: endDate || null,
     }
@@ -84,6 +105,13 @@ function RuleForm({ rule, close }: { rule: RecurringRule | null; close: () => vo
             <span>이름</span>
             <input ref={nameRef} value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 넷플릭스, 용돈" />
           </label>
+          <div className="form-field">
+            <span>반복 주기</span>
+            <div className="type-toggle freq-toggle">
+              <button className={cycle === 'monthly' ? 'active' : ''} onClick={() => setCycle('monthly')}>월 단위</button>
+              <button className={cycle === 'weekly' ? 'active' : ''} onClick={() => setCycle('weekly')}>주 단위</button>
+            </div>
+          </div>
           <div className="field-pair">
             <label className="form-field">
               <span>금액</span>
@@ -92,14 +120,32 @@ function RuleForm({ rule, close }: { rule: RecurringRule | null; close: () => vo
                 <strong>원</strong>
               </div>
             </label>
-            <label className="form-field">
+            {cycle === 'monthly' && <label className="form-field">
               <span>매달 며칠</span>
               <div className="budget-input">
                 <input inputMode="numeric" value={day} onChange={(e) => setDay(e.target.value.replace(/\D/g, '').slice(0, 2))} placeholder="1~31" />
                 <strong>일</strong>
               </div>
-            </label>
+            </label>}
           </div>
+          {cycle === 'weekly' && <div className="form-field">
+            <span>매주 무슨 요일</span>
+            <div className="weekday-row">
+              {WEEKDAY_NAMES.map((label, i) => (
+                <button
+                  key={label}
+                  className={weekdays.includes(i) ? 'selected' : ''}
+                  onClick={() => toggleWeekday(i)}
+                  aria-pressed={weekdays.includes(i)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {weekdays.length > 0 && <p className="field-note">
+              이번 달에는 {weeklyCount}번, 모두 {money(Number(amount) * weeklyCount)}원이 나가요.
+            </p>}
+          </div>}
           {type === 'expense' && <div className="form-field">
             <span>카테고리</span>
             <div className="category-pills">
@@ -131,7 +177,15 @@ function RuleForm({ rule, close }: { rule: RecurringRule | null; close: () => vo
 export function RecurringSettings({ back }: { back: () => void }) {
   const categories = useCategories() ?? []
   const rules = useLiveQuery(
-    async () => (await db.recurringRules.toArray()).sort((a, b) => a.dayOfMonth - b.dayOfMonth),
+    // 월 단위를 날짜순으로 먼저, 주 단위를 요일순으로 뒤에.
+    async () =>
+      (await db.recurringRules.toArray()).sort((a, b) => {
+        const byCycle = Number(a.interval === 'weekly') - Number(b.interval === 'weekly')
+        if (byCycle !== 0) return byCycle
+        return a.interval === 'weekly'
+          ? (a.weekdays?.[0] ?? 0) - (b.weekdays?.[0] ?? 0)
+          : a.dayOfMonth - b.dayOfMonth
+      }),
     [],
   )
   const [editing, setEditing] = useState<RecurringRule | 'new' | null>(null)
@@ -143,7 +197,7 @@ export function RecurringSettings({ back }: { back: () => void }) {
         <div>
           <button className="back-button" onClick={back}><ChevronLeft size={16} /> 설정</button>
           <h1>반복 거래</h1>
-          <p>매달 정해진 날짜에 예정 거래가 자동으로 만들어져요.</p>
+          <p>매달 정해진 날짜나 매주 정해진 요일에 예정 거래가 자동으로 만들어져요.</p>
         </div>
         <button className="outline-button" onClick={() => setEditing('new')}><Plus size={17} /> 반복 거래 추가</button>
       </div>
@@ -156,7 +210,7 @@ export function RecurringSettings({ back }: { back: () => void }) {
               <CategoryPlanet color={income ? '#83dad8' : cat?.color ?? '#9aa3b4'} />
               <div>
                 <strong>{rule.name}{income && <em className="income-chip">수입</em>}</strong>
-                <small>매달 {rule.dayOfMonth}일 · {money(rule.amount)}원{!income && ` · ${cat?.name ?? '미분류'}`}</small>
+                <small>{describeCycle(rule)} · {money(rule.amount)}원{!income && ` · ${cat?.name ?? '미분류'}`}</small>
               </div>
               <ChevronRight size={18} />
             </button>

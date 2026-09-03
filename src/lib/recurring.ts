@@ -1,8 +1,9 @@
-import { budgetFromRule, occurrenceDate, recurringSumForCategory } from './budget'
+import { budgetFromRule, occurrenceDates, recurringSumForCategory } from './budget'
 import { db } from './db'
 
 /**
  * 앱을 열 때 호출. 이번 달 반복 규칙을 확인해서 아직 생성되지 않은 예정 거래를 만든다.
+ * 월 단위는 한 달에 한 건, 주 단위는 그 달의 해당 요일마다 한 건씩 만든다.
  * 트랜잭션으로 감싸서 동시에 두 번 호출돼도 중복 생성되지 않는다.
  */
 export async function materializeRecurring(today: string): Promise<void> {
@@ -11,10 +12,13 @@ export async function materializeRecurring(today: string): Promise<void> {
     // 예정 여부는 생성 당시 값에 머물 수 있으므로, 날짜가 오면 실제 발생 거래로 확정한다.
     await db.transactions.where('date').belowOrEqual(today).modify({ isPlanned: false })
     const rules = await db.recurringRules.toArray()
+    const monthTx = await db.transactions.where('date').startsWith(month).toArray()
     for (const rule of rules) {
       if (rule.lastGeneratedMonth && rule.lastGeneratedMonth >= month) continue
-      const date = occurrenceDate(rule, month)
-      if (date) {
+      // 규칙을 고쳐 다시 만들 때, 이미 지나간 발생분까지 겹쳐 만들지 않도록 날짜로 거른다.
+      const made = new Set(monthTx.filter((t) => t.recurringRuleId === rule.id).map((t) => t.date))
+      for (const date of occurrenceDates(rule, month)) {
+        if (made.has(date)) continue
         await db.transactions.add({
           id: crypto.randomUUID(),
           date,
@@ -35,19 +39,16 @@ export async function materializeRecurring(today: string): Promise<void> {
 
 /**
  * 규칙을 수정한 뒤 호출. 이번 달의 아직 안 지난 예정 거래를 지우고 새 값으로 다시 만든다.
- * 이미 발생한(날짜가 지난) 거래는 건드리지 않는다.
+ * 이미 발생한(날짜가 지난) 거래는 건드리지 않는다 — 남은 날짜만 새 값으로 다시 선다.
+ * 되돌린 뒤 다시 만드는 쪽(materializeRecurring)이 남아있는 날짜를 건너뛰므로 중복은 안 생긴다.
  */
 export async function resyncRuleForMonth(ruleId: string, today: string): Promise<void> {
   const month = today.slice(0, 7)
   await db.transaction('rw', db.recurringRules, db.transactions, async () => {
     const monthTx = await db.transactions.where('date').startsWith(month).toArray()
-    const generated = monthTx.filter((t) => t.recurringRuleId === ruleId)
-    const stillPlanned = generated.filter((t) => t.isPlanned && t.date > today)
+    const stillPlanned = monthTx.filter((t) => t.recurringRuleId === ruleId && t.isPlanned && t.date > today)
     await db.transactions.bulkDelete(stillPlanned.map((t) => t.id))
-    // 이번 달 발생분이 남아있지 않을 때만 다시 생성 대상으로 되돌린다.
-    if (generated.length === stillPlanned.length) {
-      await db.recurringRules.update(ruleId, { lastGeneratedMonth: null })
-    }
+    await db.recurringRules.update(ruleId, { lastGeneratedMonth: null })
   })
   await materializeRecurring(today)
 }

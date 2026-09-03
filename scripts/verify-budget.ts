@@ -8,9 +8,11 @@ import {
   categoryProgress,
   countExpenses,
   inQuickSlot,
+  monthlyAmountForRule,
   monthlyOccurrences,
   monthlyFreeAmount,
   occurrenceDate,
+  occurrenceDates,
   quickAddAmount,
   quickSlotCategories,
   recurringSumForCategory,
@@ -117,7 +119,32 @@ assert.equal(occurrenceDate(rule31, '2026-02'), '2026-02-28') // 2월 보정
 assert.equal(occurrenceDate(rule31, '2026-10'), '2026-10-31')
 assert.equal(occurrenceDate({ dayOfMonth: 8, startDate: '2026-09-10', endDate: null }, '2026-09'), null) // 시작 전
 assert.equal(occurrenceDate({ dayOfMonth: 21, startDate: '2026-01-01', endDate: '2026-09-15' }, '2026-09'), null) // 종료 후
-console.log('반복 거래 발생일 (31일 규칙 → 9/30, 2월 보정, 기간 검사) 통과')
+console.log('반복 거래 발생일 (31일 규칙 -> 9/30, 2월 보정, 기간 검사) 통과')
+
+// --- 주 단위 반복 거래 ---
+// 2026년 9월은 1일이 화요일이라 화요일이 5번(1·8·15·22·29), 월요일은 4번이다.
+const weeklyTue = { interval: 'weekly' as const, dayOfMonth: 1, weekdays: [2], startDate: '2026-01-01', endDate: null }
+assert.deepEqual(occurrenceDates(weeklyTue, '2026-09'),
+  ['2026-09-01', '2026-09-08', '2026-09-15', '2026-09-22', '2026-09-29'])
+// 시작·종료일 밖의 날짜는 빠진다
+assert.deepEqual(occurrenceDates({ ...weeklyTue, startDate: '2026-09-10', endDate: '2026-09-23' }, '2026-09'),
+  ['2026-09-15', '2026-09-22'])
+// 요일을 여러 개 고르면 그 요일마다 한 건씩 (9월 월4 + 수5 + 금4 = 13건)
+assert.equal(occurrenceDates({ ...weeklyTue, weekdays: [1, 3, 5] }, '2026-09').length, 13)
+assert.deepEqual(occurrenceDates({ ...weeklyTue, weekdays: [1, 3, 5] }, '2026-09').slice(0, 4),
+  ['2026-09-02', '2026-09-04', '2026-09-07', '2026-09-09'])
+// 요일을 안 고른 규칙은 아무것도 만들지 않는다
+assert.deepEqual(occurrenceDates({ ...weeklyTue, weekdays: [] }, '2026-09'), [])
+// 월 단위는 예전 그대로 0~1건
+assert.deepEqual(occurrenceDates(rule31, '2026-09'), ['2026-09-30'])
+assert.deepEqual(occurrenceDates({ dayOfMonth: 8, startDate: '2026-09-10', endDate: null }, '2026-09'), [])
+// 월 부담은 그 달의 요일 수만큼. 달마다 값이 달라진다
+assert.equal(monthlyAmountForRule({ amount: 20_000, interval: 'weekly', weekdays: [2] }, '2026-09'), 100_000)
+assert.equal(monthlyAmountForRule({ amount: 20_000, interval: 'weekly', weekdays: [2] }, '2026-10'), 80_000)
+assert.equal(monthlyAmountForRule({ amount: 10_000, interval: 'weekly', weekdays: [1, 3, 5] }, '2026-09'), 130_000)
+assert.equal(monthlyAmountForRule({ amount: 17_000, interval: 'monthly' }, '2026-09'), 17_000)
+assert.equal(monthlyAmountForRule({ amount: 17_000 }, '2026-09'), 17_000) // 주기가 없는 예전 규칙
+console.log('주 단위 반복 거래 (고른 요일마다 한 건, 월 부담은 그 달 요일 수만큼) 통과')
 
 // --- 예산 계산 도구 ---
 // 2026년 9월은 1일이 화요일이라 화·수만 5번, 나머지 요일은 4번이다.
@@ -175,6 +202,14 @@ assert.equal(occurrenceDate({ dayOfMonth: 10, startDate: '2026-09-20', endDate: 
 assert.equal(recurringSumForCategory(recRules, 'subs', '2026-09'), 42_900) // 17,000 + 14,900 + 11,000
 assert.equal(recurringSumForCategory(recRules, 'etc', '2026-09'), 50_000)
 assert.equal(recurringSumForCategory(recRules, 'food', '2026-09'), 0)
+// 주 단위 규칙은 한 번 금액이 아니라 그 달 발생 횟수만큼 합계에 들어간다
+const weeklyYoga: RecurringRule = {
+  id: 'yoga', name: '요가', amount: 20_000, type: 'expense', categoryId: 'etc',
+  interval: 'weekly', dayOfMonth: 1, weekdays: [2],
+  startDate: '2026-01-01', endDate: null, lastGeneratedMonth: null,
+}
+assert.equal(recurringSumForCategory([...recRules, weeklyYoga], 'etc', '2026-09'), 150_000) // 50,000 + 20,000 x 5
+assert.equal(recurringSumForCategory([...recRules, weeklyYoga], 'etc', '2026-10'), 130_000) // 10월은 화요일이 4번
 // 목록과 합계가 같은 함수에서 나오는지
 assert.deepEqual(
   activeRecurringForCategory(recRules, 'subs', '2026-09').map((r) => r.id),

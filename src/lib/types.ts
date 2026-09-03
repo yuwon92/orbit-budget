@@ -45,10 +45,13 @@ export interface RecurringRule {
   amount: number
   type: 'expense' | 'income'
   categoryId: string | null
-  dayOfMonth: number // 매달 며칠
+  interval?: 'monthly' | 'weekly' // 반복 주기. 없으면 월 단위(예전 규칙)
+  dayOfMonth: number // 월 단위일 때 매달 며칠. 주 단위면 안 쓴다
+  weekdays?: number[] // 주 단위일 때 매주 무슨 요일 (0=일 … 6=토). 여러 개 고를 수 있다
   startDate: string
   endDate: string | null // null이면 무기한
   lastGeneratedMonth: string | null // 이 달("yyyy-MM")까지 예정 거래를 만들었음. 중복 생성 방지
+  // 주 단위는 한 달에 4~5건이 한꺼번에 만들어진다. 재생성 때는 날짜로 중복을 거른다.
 }
 
 export interface MonthSettings {

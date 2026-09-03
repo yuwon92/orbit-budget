@@ -6,6 +6,9 @@ import type { BudgetRule, Category, Frequency, RecurringRule, Transaction } from
 
 const inMonth = (t: Transaction, month: string) => t.date.startsWith(month)
 
+/** 발생일 계산에 필요한 규칙 조각. 저장 전 폼 값으로도 계산할 수 있게 최소한만 받는다. */
+type OccurrenceRule = Pick<RecurringRule, 'interval' | 'dayOfMonth' | 'weekdays' | 'startDate' | 'endDate'>
+
 /** 그 날짜의 요일 (0=일 … 6=토) */
 const weekdayOf = (date: string) => {
   const [year, month, day] = date.split('-').map(Number)
@@ -172,6 +175,30 @@ export function occurrenceDate(
   return date
 }
 
+/**
+ * 반복 규칙이 해당 월에 발생하는 날짜 전부. 월 단위는 0~1건, 주 단위는 고른 요일 수에 따라 4~5건씩.
+ * 주 단위는 그 달에서 지정 요일인 날을 모두 세고, 시작·종료일 밖은 뺀다.
+ */
+export function occurrenceDates(rule: OccurrenceRule, month: string): string[] {
+  if (rule.interval !== 'weekly') {
+    const date = occurrenceDate(rule, month)
+    return date ? [date] : []
+  }
+  const wanted = new Set(rule.weekdays ?? [])
+  if (wanted.size === 0) return []
+  const [year, monthNum] = month.split('-').map(Number)
+  const lastDay = getDaysInMonth(new Date(year, monthNum - 1, 1))
+  const dates: string[] = []
+  for (let day = 1; day <= lastDay; day++) {
+    if (!wanted.has(new Date(year, monthNum - 1, day).getDay())) continue
+    const date = `${month}-${String(day).padStart(2, '0')}`
+    if (date < rule.startDate) continue
+    if (rule.endDate && date > rule.endDate) continue
+    dates.push(date)
+  }
+  return dates
+}
+
 // --- 카테고리 예산 계산 도구 ---
 
 /** 그 달의 일수를 7로 나눈 값. 정수가 아니다 (9월 = 30/7 = 4.285…) */
@@ -225,13 +252,26 @@ export function activeRecurringForCategory(
   )
 }
 
+/**
+ * 그 규칙이 이 달에 쓰는 총액. 월 단위는 금액 그대로, 주 단위는 고른 요일이 그 달에 몇 번인지 곱한다.
+ * 달마다 4주인지 5주인지가 달라서 주 단위 구독의 월 부담도 달마다 달라진다.
+ * 시작·종료일로 잘린 달이어도 온전한 한 달치로 잡는다 (activeRecurringForCategory와 같은 기준).
+ */
+export function monthlyAmountForRule(rule: Pick<RecurringRule, 'amount' | 'interval' | 'weekdays'>, month: string): number {
+  if (rule.interval !== 'weekly') return rule.amount
+  return rule.amount * weekdayCountInMonth(rule.weekdays ?? [], month)
+}
+
 /** 위 목록의 합계. 화면에 보이는 목록과 금액이 어긋나지 않도록 같은 함수를 쓴다. */
 export function recurringSumForCategory(
   rules: RecurringRule[],
   categoryId: string,
   month: string,
 ): number {
-  return activeRecurringForCategory(rules, categoryId, month).reduce((sum, r) => sum + r.amount, 0)
+  return activeRecurringForCategory(rules, categoryId, month).reduce(
+    (sum, r) => sum + monthlyAmountForRule(r, month),
+    0,
+  )
 }
 
 /**

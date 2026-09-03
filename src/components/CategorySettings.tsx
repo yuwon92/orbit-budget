@@ -2,15 +2,13 @@ import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
 import { format } from 'date-fns'
-import { activeRecurringForCategory, budgetFromRule } from '../lib/budget'
+import { activeRecurringForCategory, budgetFromRule, monthlyAmountForRule } from '../lib/budget'
 import { CATEGORY_PALETTE, db } from '../lib/db'
-import { money } from '../lib/format'
+import { formatWeekdays, money, WEEKDAY_NAMES } from '../lib/format'
 import { useCategories } from '../lib/hooks'
 import { useSheetFocus, useSheetViewport } from '../lib/sheet'
 import type { BudgetRule, Category, Frequency } from '../lib/types'
 import { CategoryPlanet } from './CategoryPlanet'
-
-const WEEKDAY_NAMES = ['일', '월', '화', '수', '목', '금', '토']
 
 const METHODS: { id: BudgetRule['kind']; label: string }[] = [
   { id: 'manual', label: '직접 입력' },
@@ -18,24 +16,6 @@ const METHODS: { id: BudgetRule['kind']; label: string }[] = [
   { id: 'commute', label: '교통' },
   { id: 'recurringSum', label: '구독 합계' },
 ]
-
-/** [1,2,3,4,5] -> "월~금", [1,3,5] -> "월·수·금". 연속 3개 이상이면 물결표로 줄인다. */
-function formatWeekdays(days: number[]): string {
-  const sorted = [...days].sort((a, b) => a - b)
-  const runs: number[][] = []
-  for (const day of sorted) {
-    const last = runs[runs.length - 1]
-    if (last && day === last[last.length - 1] + 1) last.push(day)
-    else runs.push([day])
-  }
-  return runs
-    .map((run) =>
-      run.length >= 3
-        ? `${WEEKDAY_NAMES[run[0]]}~${WEEKDAY_NAMES[run[run.length - 1]]}`
-        : run.map((d) => WEEKDAY_NAMES[d]).join('·'),
-    )
-    .join('·')
-}
 
 /** 주기를 사람이 읽는 문구로. 단위는 횟수형이면 "회", 교통형이면 "일". */
 function describeFrequency(freq: Frequency, unit: '회' | '일'): string {
@@ -92,7 +72,7 @@ function CategoryForm({ category, close }: { category: Category | null; close: (
     () => (category ? activeRecurringForCategory(rules, category.id, month) : []),
     [rules, category, month],
   )
-  const recurringSum = catRules.reduce((sum, r) => sum + r.amount, 0)
+  const recurringSum = catRules.reduce((sum, r) => sum + monthlyAmountForRule(r, month), 0)
 
   const freq: Frequency =
     freqMode === 'perWeek'
@@ -287,8 +267,9 @@ function CategoryForm({ category, close }: { category: Category | null; close: (
                 <div className="rule-sum-list">
                   {catRules.map((r) => (
                     <div key={r.id}>
-                      <span>{r.name}</span>
-                      <strong>{money(r.amount)}원</strong>
+                      {/* 주 단위는 금액이 그대로 월 부담이 아니라서, 한 번에 얼마인지를 같이 적는다 */}
+                      <span>{r.name}{r.interval === 'weekly' && ` · ${formatWeekdays(r.weekdays ?? [])} 매주 ${money(r.amount)}원`}</span>
+                      <strong>{money(monthlyAmountForRule(r, month))}원</strong>
                     </div>
                   ))}
                 </div>
