@@ -7,6 +7,7 @@ import {
   ChevronRight,
   CircleDollarSign,
   Download,
+  HelpCircle,
   Home,
   ListFilter,
   Moon,
@@ -38,6 +39,7 @@ import { ExpenseSheet } from './components/ExpenseSheet'
 import { QuickAddOrbs, type QuickPreset } from './components/QuickAddOrbs'
 import { RecurringSettings } from './components/RecurringSettings'
 import { ReserveSheet } from './components/ReserveSheet'
+import { Onboarding } from './components/Onboarding'
 
 type Tab = 'home' | 'calendar' | 'transactions' | 'settings'
 
@@ -47,6 +49,15 @@ type SettingsSub = 'categories' | 'recurring' | null
 
 /** 테마 저장 키. index.html의 첫 페인트 스크립트도 같은 키를 읽는다. */
 const THEME_KEY = 'orbit-theme'
+const ONBOARDING_KEY = 'orbit-onboarding-v1'
+
+function onboardingSeen(): boolean {
+  try { return localStorage.getItem(ONBOARDING_KEY) === 'done' } catch { return false }
+}
+
+function rememberOnboarding() {
+  try { localStorage.setItem(ONBOARDING_KEY, 'done') } catch { /* 저장 불가 */ }
+}
 
 /** 저장된 테마. 고른 적이 없으면 기기 설정을 따른다. */
 function readTheme(): boolean {
@@ -546,7 +557,7 @@ function TransactionsView({ openExpense, openEdit, focus, clearFocus }: { openEx
   </div>
 }
 
-function SettingsView({ dark, onTheme, sub, setSub }: { dark: boolean; onTheme: () => void; sub: SettingsSub; setSub: (sub: SettingsSub) => void }) {
+function SettingsView({ dark, onTheme, openOnboarding, sub, setSub }: { dark: boolean; onTheme: () => void; openOnboarding: () => void; sub: SettingsSub; setSub: (sub: SettingsSub) => void }) {
   const month = format(new Date(), 'yyyy-MM')
   const monthSettings = useLiveQuery(() => db.monthSettings.get(month), [month])
   const [reserveOpen, setReserveOpen] = useState(false)
@@ -568,7 +579,7 @@ function SettingsView({ dark, onTheme, sub, setSub }: { dark: boolean; onTheme: 
       onClick: () => setReserveOpen(true),
     },
   ]
-  return <div className="view"><div className="page-heading"><div><p className="eyebrow">PREFERENCES</p><h1>설정</h1><p>나의 예산 행성을 관리하세요.</p></div></div><section className="settings-card">{settings.map(row=>{const Icon=row.icon;return <button className="setting-row" key={row.title} onClick={row.onClick}><span><Icon size={20}/></span><div><strong>{row.title}</strong><small>{row.desc}</small></div><ChevronRight size={18}/></button>})}</section><h2 className="settings-subhead">앱 설정</h2><section className="settings-card"><button className="setting-row" onClick={onTheme}><span>{dark?<Moon size={20}/>:<Sun size={20}/>}</span><div><strong>화면 테마</strong><small>{dark?'다크 모드':'라이트 모드'}</small></div><i className={`toggle ${dark?'on':''}`}><b/></i></button><button className="setting-row" onClick={exportCsv}><span><Download size={20}/></span><div><strong>데이터 내보내기</strong><small>CSV 파일로 안전하게 보관</small></div><ChevronRight size={18}/></button></section><p className="version">ORBIT BUDGET · UI PROTOTYPE 0.4</p>{reserveOpen && <ReserveSheet month={month} current={reserve} close={() => setReserveOpen(false)} />}</div>
+  return <div className="view"><div className="page-heading"><div><p className="eyebrow">PREFERENCES</p><h1>설정</h1><p>나의 예산 행성을 관리하세요.</p></div></div><section className="settings-card">{settings.map(row=>{const Icon=row.icon;return <button className="setting-row" key={row.title} onClick={row.onClick}><span><Icon size={20}/></span><div><strong>{row.title}</strong><small>{row.desc}</small></div><ChevronRight size={18}/></button>})}</section><h2 className="settings-subhead">앱 설정</h2><section className="settings-card"><button className="setting-row" onClick={openOnboarding}><span><HelpCircle size={20}/></span><div><strong>시작 안내 다시 보기</strong><small>수입·예산·예비비를 순서대로 설정</small></div><ChevronRight size={18}/></button><button className="setting-row" onClick={onTheme}><span>{dark?<Moon size={20}/>:<Sun size={20}/>}</span><div><strong>화면 테마</strong><small>{dark?'다크 모드':'라이트 모드'}</small></div><i className={`toggle ${dark?'on':''}`}><b/></i></button><button className="setting-row" onClick={exportCsv}><span><Download size={20}/></span><div><strong>데이터 내보내기</strong><small>CSV 파일로 안전하게 보관</small></div><ChevronRight size={18}/></button></section><p className="version">ORBIT BUDGET · UI PROTOTYPE 0.4</p>{reserveOpen && <ReserveSheet month={month} current={reserve} close={() => setReserveOpen(false)} />}</div>
 }
 
 function App() {
@@ -580,6 +591,7 @@ function App() {
   const [settingsSub, setSettingsSub] = useState<SettingsSub>(null)
   // 홈 예산 카드 제목 → 그 카테고리·이번 달로 필터를 건 거래 내역.
   const [txFocus, setTxFocus] = useState<TxFocus | null>(null)
+  const [onboardingOpen, setOnboardingOpen] = useState(false)
   const clearTxFocus = useCallback(() => setTxFocus(null), [])
   const goCategoryTransactions = (categoryId: string) => {
     const month = today.slice(0, 7)
@@ -602,8 +614,15 @@ function App() {
     materializeRecurring(today).then(() => syncRuleBudgets(today.slice(0, 7)))
   }, [today])
   useEffect(() => { requestPersistentStorage() }, [])
-  const content = useMemo(() => ({home:<HomeView openExpense={openExpense} openEdit={openEdit} openPreset={openPreset} goTransactions={()=>{setTxFocus(null);setActive('transactions')}} goCategoryTransactions={goCategoryTransactions} goCategories={()=>goSettings('categories')}/>,calendar:<CalendarView openEdit={openEdit} openExpenseForDate={openExpenseForDate}/>,transactions:<TransactionsView openExpense={openExpense} openEdit={openEdit} focus={txFocus} clearFocus={clearTxFocus}/>,settings:<SettingsView dark={dark} onTheme={()=>setDark(!dark)} sub={settingsSub} setSub={setSettingsSub}/>})[active], [active,dark,settingsSub,today,txFocus])
-  return <div className="app-shell"><Header dark={dark} onTheme={()=>setDark(!dark)}/><Sidebar active={active} setActive={(tab)=>{if(tab==='settings')setSettingsSub(null);if(tab==='transactions')setTxFocus(null);setActive(tab)}}/><main>{content}</main>{(active==='home'||active==='transactions')&&<><button className="desktop-add" onClick={openExpense}><Plus size={20}/> 추가</button><button className="fab-add" onClick={openExpense} aria-label="거래 추가"><Plus size={26}/></button></>}<nav className="bottom-nav">{([{id:'home',label:'홈',icon:Home},{id:'calendar',label:'달력',icon:CalendarDays},{id:'transactions',label:'거래',icon:ListFilter},{id:'settings',label:'설정',icon:Settings}] as const).map(item=>{const Icon=item.icon;return <button key={item.id} className={active===item.id?'active':''} onClick={()=>{if(item.id==='settings')setSettingsSub(null);if(item.id==='transactions')setTxFocus(null);setActive(item.id)}}><Icon size={20}/><span>{item.label}</span></button>})}</nav>{sheet&&<ExpenseSheet transaction={sheet.transaction} preset={sheet.preset} initialDate={sheet.initialDate} close={()=>setSheet(null)}/>}</div>
+  useEffect(() => {
+    if (onboardingSeen()) return
+    Promise.all([db.transactions.count(), db.monthSettings.count(), db.categories.toArray()]).then(([transactionCount, settingsCount, categories]) => {
+      if (transactionCount === 0 && settingsCount === 0 && categories.every((category) => category.monthlyBudget === 0)) setOnboardingOpen(true)
+    })
+  }, [])
+  const closeOnboarding = () => { rememberOnboarding(); setOnboardingOpen(false) }
+  const content = useMemo(() => ({home:<HomeView openExpense={openExpense} openEdit={openEdit} openPreset={openPreset} goTransactions={()=>{setTxFocus(null);setActive('transactions')}} goCategoryTransactions={goCategoryTransactions} goCategories={()=>goSettings('categories')}/>,calendar:<CalendarView openEdit={openEdit} openExpenseForDate={openExpenseForDate}/>,transactions:<TransactionsView openExpense={openExpense} openEdit={openEdit} focus={txFocus} clearFocus={clearTxFocus}/>,settings:<SettingsView dark={dark} onTheme={()=>setDark(!dark)} openOnboarding={()=>setOnboardingOpen(true)} sub={settingsSub} setSub={setSettingsSub}/>})[active], [active,dark,settingsSub,today,txFocus])
+  return <div className="app-shell"><Header dark={dark} onTheme={()=>setDark(!dark)}/><Sidebar active={active} setActive={(tab)=>{if(tab==='settings')setSettingsSub(null);if(tab==='transactions')setTxFocus(null);setActive(tab)}}/><main>{content}</main>{(active==='home'||active==='transactions')&&<><button className="desktop-add" onClick={openExpense}><Plus size={20}/> 추가</button><button className="fab-add" onClick={openExpense} aria-label="거래 추가"><Plus size={26}/></button></>}<nav className="bottom-nav">{([{id:'home',label:'홈',icon:Home},{id:'calendar',label:'달력',icon:CalendarDays},{id:'transactions',label:'거래',icon:ListFilter},{id:'settings',label:'설정',icon:Settings}] as const).map(item=>{const Icon=item.icon;return <button key={item.id} className={active===item.id?'active':''} onClick={()=>{if(item.id==='settings')setSettingsSub(null);if(item.id==='transactions')setTxFocus(null);setActive(item.id)}}><Icon size={20}/><span>{item.label}</span></button>})}</nav>{sheet&&<ExpenseSheet transaction={sheet.transaction} preset={sheet.preset} initialDate={sheet.initialDate} close={()=>setSheet(null)}/>} {onboardingOpen&&<Onboarding close={closeOnboarding} finish={closeOnboarding}/>}</div>
 }
 
 export default App
