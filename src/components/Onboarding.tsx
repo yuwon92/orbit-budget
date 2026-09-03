@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowLeft, ArrowRight, Check, CircleDollarSign, ShieldCheck, Tags, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, CircleDollarSign, ShieldCheck, Tags } from 'lucide-react'
 import { format } from 'date-fns'
 import { monthlyFreeAmount } from '../lib/budget'
 import { db } from '../lib/db'
@@ -117,9 +117,9 @@ export function Onboarding({ close, finish }: { close: () => void; finish: () =>
   return (
     <div className="onboarding-backdrop" role="presentation">
       <section className="onboarding-card" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+        <div className="onboarding-shell">
         <header className="onboarding-header">
           <div className="onboarding-brand"><span className="logo-orbit"><i /></span><strong>orbit 시작하기</strong></div>
-          <button className="icon-button" onClick={close} aria-label="나중에 설정하기"><X size={20} /></button>
         </header>
 
         <div className="onboarding-progress" aria-label={`${step + 1}/3 단계`}>
@@ -175,6 +175,7 @@ export function Onboarding({ close, finish }: { close: () => void; finish: () =>
             ? <button className="onboarding-next" onClick={() => setStep(step + 1)} disabled={!setup}><span>{step === 0 && existingIncome + addedIncome === 0 ? '수입 없이 다음' : '다음'}</span><ArrowRight size={17} /></button>
             : <button className="onboarding-next" onClick={save} disabled={!setup || saving}>{saving ? '저장 중…' : '예산 설정 완료'} <Check size={17} /></button>}
         </footer>
+        </div>
       </section>
     </div>
   )
