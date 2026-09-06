@@ -688,6 +688,8 @@ function ObserverScreen({ level, totalXp, pendingXp, stats, titles, budget, dark
   onThemeChange: (value: boolean) => void
 }) {
   const earned = new Set(titles)
+  // 두 앱이 같은 저장소를 보는지 눈으로 확인하는 진단값
+  const probe = budget?.snapshot?.probe
 
   return (
     <main className="observer-screen">
@@ -789,6 +791,18 @@ function ObserverScreen({ level, totalXp, pendingXp, stats, titles, budget, dark
               <i /> {budget?.snapshot && !budget.stale ? '연결됨' : '연결 안 됨'}
             </span>
           </div>
+          {probe && (
+            <div className="setting-row">
+              <div>
+                <strong>읽은 내용</strong>
+                <span>
+                  거래 {probe.transactions}건(이번 달 {probe.monthTransactions}건) · 카테고리 {probe.categories}개
+                  (예산 있는 것 {probe.budgetedCategories}개) · 예비비 {probe.hasMonthSettings ? '설정됨' : '없음'} ·
+                  예정 수입 {probe.includePlannedIncome ? '포함' : '제외'}
+                </span>
+              </div>
+            </div>
+          )}
           <div className="setting-row">
             <div><strong>프로토타입</strong><span>샘플 데이터 · 새로고침 시 초기화</span></div>
             <span className="version-label">WISH 0.1</span>

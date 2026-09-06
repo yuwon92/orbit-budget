@@ -17,8 +17,23 @@ export interface OrbitBudgetSnapshot {
   calculatedAt: number
   /** 스냅샷 구조 버전 */
   version: number
-  /** Orbit에 실제 데이터가 있는지. 빈 DB를 읽은 것과 구분한다 */
+  /** Orbit을 실제로 쓴 흔적이 있는지. 새로 만들어진 빈 DB와 구분한다 */
   connected: boolean
+  /** 무엇을 읽었는지 그대로 보여주는 진단값. 연결 문제를 눈으로 가릴 수 있게 한다 */
+  probe: SnapshotProbe
+}
+
+export interface SnapshotProbe {
+  /** 전체 거래 수 */
+  transactions: number
+  /** 이번 달 거래 수 */
+  monthTransactions: number
+  categories: number
+  /** 월 예산이 잡힌 카테고리 수 */
+  budgetedCategories: number
+  /** 이번 달 예비비 설정이 있는지 */
+  hasMonthSettings: boolean
+  includePlannedIncome: boolean
 }
 
 export const SNAPSHOT_VERSION = 1
@@ -38,12 +53,19 @@ export async function getOrbitSnapshot(
   includePlannedIncome = readPlannedIncome(),
 ): Promise<OrbitBudgetSnapshot> {
   const yearMonth = today.slice(0, 7)
-  const [categories, transactions, settings] = await Promise.all([
+  const [categories, transactions, settings, totalTransactions] = await Promise.all([
     db.categories.toArray(),
     db.transactions.where('date').startsWith(yearMonth).toArray(),
     db.monthSettings.get(yearMonth),
+    db.transactions.count(),
   ])
   const reserveAmount = settings?.reserveAmount ?? 0
+  const budgetedCategories = categories.filter((category) => category.monthlyBudget > 0).length
+
+  // 카테고리 존재만으로는 판단할 수 없다. 처음 열리는 DB에 기본 카테고리 4개가
+  // 자동으로 심어지기 때문에(db.on('populate')), 저장소가 분리된 환경에서도
+  // 카테고리는 항상 있다. 실제로 쓴 흔적으로만 연결을 판정한다.
+  const connected = totalTransactions > 0 || budgetedCategories > 0 || settings !== undefined
 
   return {
     yearMonth,
@@ -51,7 +73,15 @@ export async function getOrbitSnapshot(
     reserveAmount,
     calculatedAt: Date.now(),
     version: SNAPSHOT_VERSION,
-    connected: categories.length > 0 || transactions.length > 0,
+    connected,
+    probe: {
+      transactions: totalTransactions,
+      monthTransactions: transactions.length,
+      categories: categories.length,
+      budgetedCategories,
+      hasMonthSettings: settings !== undefined,
+      includePlannedIncome,
+    },
   }
 }
 
