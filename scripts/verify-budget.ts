@@ -22,9 +22,9 @@ import {
   usageLimit,
   weekdayCountInMonth,
   weeksInMonth,
-} from '../src/lib/budget.ts'
-import { buildCsv } from '../src/lib/csv.ts'
-import type { Category, RecurringRule, Transaction } from '../src/lib/types.ts'
+} from '../packages/budget-core/src/budget.ts'
+import { buildCsv } from '../apps/orbit/src/lib/csv.ts'
+import type { Category, RecurringRule, Transaction } from '../packages/budget-core/src/types.ts'
 
 const cat = (id: string, name: string, monthlyBudget: number, isFixed: boolean): Category => ({
   id, name, monthlyBudget, color: '#8ebeff', isFixed, sortOrder: 0,

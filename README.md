@@ -1,6 +1,12 @@
-# Orbit — 오늘의 예산
+# Orbit 제품군
 
-항목별 예산을 정해두고 오늘 쓸 수 있는 금액을 알려주는 개인 예산 웹앱. 서버 없음, 로컬 저장.
+서버 없이 같은 브라우저에서 연결되는 예산 앱과 목표형 위시리스트.
+
+## 앱
+
+- **Orbit Budget** (`/orbit/`) — 항목별 예산, 거래, 남은 자유비용
+- **Orbit Wish** (`/wish/`) — 목표형 위시리스트 UI 초안. 현재 샘플 데이터만 사용
+- **Orbit Wish Lab** (`/wish-lab/`) — 같은 UI 초안의 밝은 노랑 우주 디자인 비교안
 
 ## 기능
 
@@ -13,7 +19,7 @@
 - **반복 거래** — 월 단위(매달 며칠, 월말 날짜 보정) 또는 주 단위(매주 무슨 요일, 여러 요일 가능)로 예정 거래 자동 생성. 주 단위는 고른 요일마다 한 건씩, 구독 합계 예산에는 그 달 횟수만큼 반영
 - **PWA** — 홈 화면 추가로 앱처럼 실행
 
-계산식 ([`src/lib/budget.ts`](src/lib/budget.ts))
+계산식 ([`packages/budget-core/src/budget.ts`](packages/budget-core/src/budget.ts))
 
 ```
 남은 자유비용 = 총수입 − 전체 카테고리 월 예산 − 예산 밖·초과 지출 − 예비비
@@ -31,14 +37,22 @@
 
 ```bash
 npm install
-npm run dev      # 개발 서버
-npm run build    # 타입 검사 + 빌드
-npm run verify   # 계산 로직 검산
+npm run dev          # 제품 앱과 비교 디자인을 같은 origin에서 실행
+npm run dev:orbit    # Orbit만 실행
+npm run dev:wish    # Wish만 실행
+npm run dev:wish-lab # Wish 비교 디자인만 실행
+npm run build        # Orbit, Wish, Wish Lab 타입 검사 + 빌드
+npm run verify       # 계산 로직 검산
 ```
+
+통합 개발 서버 경로: `http://localhost:5173/apps/orbit/`, `http://localhost:5173/apps/wish/`, `http://localhost:5173/apps/wish-lab/`
+
+프로덕션 결과물: `dist/orbit/`, `dist/wish/`, `dist/wish-lab/`
 
 ## 주의사항
 
 - 데이터는 브라우저 IndexedDB에만 저장. 기기 간 동기화 없음 (PC와 폰 별개)
+- 두 앱 연동은 동일한 프로토콜·도메인·포트에서만 가능
 - 브라우저 데이터 삭제 시 함께 소실
 - iOS 사파리는 7일 미방문 시 저장소 삭제. 홈 화면 추가하면 제외
 - 백업 수단은 설정 → CSV 내보내기뿐. 주기적 백업 권장

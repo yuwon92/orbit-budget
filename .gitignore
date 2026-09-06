@@ -6,6 +6,10 @@ dev-dist
 budget-app-guide.md
 budget-app-ui-guide.md
 CURRENT-UI-GUIDE.md
+orbit-wish-spec.md
+orbit-wish-ui-design-guide.md
+wish-app-ui-guide.md
+ORBIT-WISH-HANDOFF.md
 *.tsbuildinfo
 vite.config.d.ts
 vite.config.js

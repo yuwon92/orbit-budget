@@ -1,18 +1,21 @@
-# Orbit Budget — 코드 구조 가이드
+# Orbit 제품군 — 코드 구조 가이드
 
-현재 코드 기준 구조 문서. 설계 의도는 `budget-app-guide.md`, 디자인 시스템은 `budget-app-ui-guide.md` (둘 다 gitignore된 로컬 전용 파일).
+Orbit Budget과 companion 앱 Orbit Wish의 현재 코드 기준 구조 문서. 설계 의도는 `budget-app-guide.md`, 디자인 시스템은 `budget-app-ui-guide.md` (둘 다 gitignore된 로컬 전용 파일).
 
 ## 스택
 
 React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite-plugin-pwa
-서버·로그인 없음. 라우터 없음(상태로 탭 전환). CSS 파일 하나. 데이터는 전부 브라우저 로컬.
+서버·로그인 없음. 데이터는 전부 브라우저 로컬. 두 앱은 동일 origin에서 `orbital-budget` DB를 연결하고 Wish 자체 데이터는 `orbital-wish` DB에 분리.
 
 ## 명령
 
 | 명령 | 내용 |
 |---|---|
-| `npm run dev` | 개발 서버 |
-| `npm run build` | `tsc -b` + vite 빌드 |
+| `npm run dev` | 제품 2개와 Wish 비교 디자인 통합 개발 서버 (`/apps/orbit/`, `/apps/wish/`, `/apps/wish-lab/`) |
+| `npm run dev:orbit` | Orbit 단독 개발 서버 |
+| `npm run dev:wish` | Wish 단독 개발 서버 |
+| `npm run dev:wish-lab` | Wish 비교 디자인 단독 개발 서버 |
+| `npm run build` | Orbit, Wish, Wish Lab 타입 검사 + vite 빌드 |
 | `npm run verify` | `scripts/verify-budget.ts` — 순수 계산 함수 검산 (node가 .ts 직접 실행) |
 
 **계산 로직을 고치면 `npm run verify`를 반드시 통과시킬 것.** 테스트 프레임워크 없음, assert 스크립트 하나가 전부.
@@ -21,20 +24,40 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 
 | 파일 | 역할 |
 |---|---|
-| `src/App.tsx` (570줄) | 화면 4개(Home/Calendar/Transactions/Settings) + 셸. 뷰가 전부 여기 있음 |
-| `src/lib/types.ts` | 도메인 타입 전부 |
-| `src/lib/budget.ts` (378줄) | **모든 계산. 순수 함수만. DB·UI 접근 금지** |
-| `src/lib/db.ts` | Dexie 인스턴스, 스키마·마이그레이션, 시드, 팔레트, 퀵 슬롯 쓰기 헬퍼 |
-| `src/lib/recurring.ts` | 반복 거래 생성·동기화 (DB 쓰기) |
-| `src/lib/sheet.ts` | 바텀시트용 훅 — `useSheetViewport`(visualViewport·배경 스크롤 잠금), `useSheetFocus` |
-| `src/lib/csv.ts` | CSV 문자열 생성 + 다운로드 |
-| `src/lib/hooks.ts` | `useCategories()` (sortOrder 정렬) |
-| `src/lib/format.ts` | `money()` — 천 단위 콤마, `WEEKDAY_NAMES`·`formatWeekdays()` — 요일 이름·목록 문구 |
-| `src/index.css` (421줄) | 전역 CSS 한 파일. 클래스명 기반 |
+| `apps/orbit/src/App.tsx` | Orbit 화면 4개(Home/Calendar/Transactions/Settings) + 셸 |
+| `apps/orbit/src/lib/sheet.ts` | 바텀시트용 훅 — `useSheetViewport`, `useSheetFocus` |
+| `apps/orbit/src/lib/csv.ts` | CSV 문자열 생성 + 다운로드 |
+| `apps/orbit/src/lib/hooks.ts` | `useCategories()` (sortOrder 정렬) |
+| `apps/orbit/src/index.css` | Orbit 전역 CSS 한 파일. 클래스명 기반 |
+| `apps/wish/src/App.tsx` | Wish UI 초안. 샘플 데이터 기반 4탭·위시 상태·등록 시트. DB 연결은 아직 없음 |
+| `apps/wish/src/types.ts` | 위시·이벤트 초안 타입 |
+| `apps/wish/src/db.ts` | `orbital-wish` DB 스키마 자리. 쓰기 API는 아직 없음 |
+| `apps/wish/src/index.css` | Wish 라이트·다크, 위시·성계·관측자·설정 화면 스타일 |
+| `apps/wish/src/components/PlanetVisual.tsx` | 진행 단계별 SVG 행성 그래픽 |
+| `apps/wish/src/components/DepositSheet.tsx` | 샘플 저금 바텀시트. 아직 저장하지 않음 |
+| `apps/wish-lab/src/App.tsx` | Wish Lab 셸 + 화면 4개(허브/퀘스트 로그/우주 도감/관측자). 자체 흐름 |
+| `apps/wish-lab/src/game.ts` | 레벨 곡선·XP·슬롯·하루 몫·미션 생성. **순수 함수만** |
+| `apps/wish-lab/src/planet.ts` | 픽셀 행성 블록 생성. 진행률 → 티끌·위성·행성·고리·위성대·성계 |
+| `apps/wish-lab/src/data.ts` | 샘플 위시·도감·칭호·통계 |
+| `apps/wish-lab/src/components/` | `PixelPlanet`(행성·궤도 링), `PixelBar`, `OrbitMap`, `RewardOverlay`, `Sheets` |
+| `apps/wish-lab/src/index.css` | Wish Lab 전용 단독 스타일시트. 밝은 노랑 우주 |
+| `packages/budget-core/src/types.ts` | Orbit 도메인 타입 전부 |
+| `packages/budget-core/src/budget.ts` | **모든 계산. 순수 함수만. DB·UI 접근 금지** |
+| `packages/budget-core/src/format.ts` | 금액·요일 표시 함수 |
+| `packages/orbit-bridge/src/db.ts` | Orbit Dexie 인스턴스, 스키마·마이그레이션, 쓰기 헬퍼 |
+| `packages/orbit-bridge/src/recurring.ts` | 반복 거래 생성·동기화 |
+| `packages/orbit-bridge/src/index.ts` | Wish용 읽기 전용 예산 스냅샷. 쓰기 API는 아직 없음 |
 | `scripts/verify-budget.ts` | 검산 |
 | `scripts/gen-icons.ts` | PWA 아이콘 생성 |
 
-### 컴포넌트 (`src/components/`)
+Wish Lab은 같은 도메인의 두 번째 설계안이다. 디자인 기준은 `orbit-wish-ui-design-guide.md`, 게임 규칙 수치는 `orbit-wish-spec.md`.
+
+- `apps/wish`(1안): 위시 상세 중심. 위시·성계·관측자·설정 4탭
+- `apps/wish-lab`(2안): 게임 허브 중심. 자원 HUD 상시 노출, 오늘의 미션·보상 수령, 퀘스트 로그·우주 도감 분리, 설정은 관측자 안
+- 두 앱은 코드를 공유하지 않는다. Wish Lab 작업으로 `apps/wish`를 수정하지 않는다
+- 데이터 모델·문구 의미가 갈리면 `orbit-wish-spec.md`를 기준으로 한다
+
+### Orbit 컴포넌트 (`apps/orbit/src/components/`)
 
 | 파일 | 역할 |
 |---|---|
@@ -176,7 +199,7 @@ plannedIncome: boolean  // 자유비용에 예정 수입을 넣을지. 기본 tr
 
 ## 스타일 규칙
 
-- `src/index.css` 한 파일. 상단은 원본 프로토타입 CSS(한 줄에 몰아쓴 압축 형태), **하단이 기능별 오버라이드 블록**. 새 스타일은 파일 **끝에 주석 헤더와 함께 추가**하고, 기존 규칙 수정보다 오버라이드를 우선
+- `apps/orbit/src/index.css` 한 파일. 상단은 원본 프로토타입 CSS(한 줄에 몰아쓴 압축 형태), **하단이 기능별 오버라이드 블록**. 새 스타일은 파일 **끝에 주석 헤더와 함께 추가**하고, 기존 규칙 수정보다 오버라이드를 우선
 - 반응형 분기: 900 / 680 / 400px
 - 테마: `:root` 변수 + `:root.dark` 재정의. 색은 항상 `var(--...)`
 - **텍스트에 배경색 칩·하이라이트 금지.** 상태 구분은 색 점 + 부호 + 흐린 회색 텍스트

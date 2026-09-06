@@ -1,6 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie'
-import { quickSlotCategories } from './budget'
-import type { Category, MonthSettings, RecurringRule, Transaction } from './types'
+import { quickSlotCategories } from '@orbit/budget-core/budget'
+import type { Category, MonthSettings, RecurringRule, Transaction } from '@orbit/budget-core/types'
 
 // UI 가이드 §20 카테고리 팔레트
 export const CATEGORY_PALETTE = [

@@ -1,0 +1,11 @@
+{
+  "name": "@orbit/budget-core",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./budget": "./src/budget.ts",
+    "./format": "./src/format.ts",
+    "./types": "./src/types.ts"
+  }
+}

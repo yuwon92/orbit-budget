@@ -1,4 +1,4 @@
-import { budgetFromRule, occurrenceDates, recurringSumForCategory } from './budget'
+import { budgetFromRule, occurrenceDates, recurringSumForCategory } from '@orbit/budget-core/budget'
 import { db } from './db'
 
 /**

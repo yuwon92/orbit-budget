@@ -106,8 +106,9 @@ function render(size: number, opts: { bg: Rgb | null; radiusRatio: number }): Bu
   return px
 }
 
-mkdirSync('public', { recursive: true })
-writeFileSync('public/icon-192.png', encodePng(192, render(192, { bg: null, radiusRatio: 0.46 })))
-writeFileSync('public/icon-512.png', encodePng(512, render(512, { bg: null, radiusRatio: 0.46 })))
-writeFileSync('public/icon-maskable-512.png', encodePng(512, render(512, { bg: [0xee, 0xf2, 0xfa], radiusRatio: 0.36 })))
-console.log('icons written: public/icon-192.png, icon-512.png, icon-maskable-512.png')
+const orbitPublic = 'apps/orbit/public'
+mkdirSync(orbitPublic, { recursive: true })
+writeFileSync(`${orbitPublic}/icon-192.png`, encodePng(192, render(192, { bg: null, radiusRatio: 0.46 })))
+writeFileSync(`${orbitPublic}/icon-512.png`, encodePng(512, render(512, { bg: null, radiusRatio: 0.46 })))
+writeFileSync(`${orbitPublic}/icon-maskable-512.png`, encodePng(512, render(512, { bg: [0xee, 0xf2, 0xfa], radiusRatio: 0.36 })))
+console.log(`icons written: ${orbitPublic}/icon-192.png, icon-512.png, icon-maskable-512.png`)
