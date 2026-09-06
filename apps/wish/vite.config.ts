@@ -17,13 +17,13 @@ export default defineConfig({
       manifest: {
         name: 'Orbit Wish — 위시를 현실로',
         short_name: 'Orbit Wish',
-        description: 'Orbit 예산과 연결되는 목표형 위시리스트',
+        description: '자유비용을 모아 위시를 이루는 목표 관리 앱',
         lang: 'ko',
         start_url: '/wish/',
         scope: '/wish/',
         display: 'standalone',
-        theme_color: '#111827',
-        background_color: '#f5f2ff',
+        theme_color: '#ffd43b',
+        background_color: '#fffdf8',
         icons: [
           { src: '/wish/wish-icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' },
         ],

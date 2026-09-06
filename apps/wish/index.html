@@ -3,12 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#111827" />
-    <meta name="description" content="Orbit 예산과 연결되는 목표형 위시리스트" />
+    <meta name="theme-color" content="#ffd43b" />
+    <meta name="description" content="자유비용을 모아 위시를 이루는 목표 관리 앱" />
     <link rel="icon" type="image/svg+xml" href="./wish-icon.svg" />
+    <link rel="apple-touch-icon" href="./wish-icon.svg" />
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/MonadABXY/mona-font/web/mona.css" />
     <title>Orbit Wish — 위시를 현실로</title>
+    <script>
+      // 첫 페인트 전에 저장된 테마를 입힌다. React가 붙은 뒤에 칠하면 다크 사용자에게
+      // 흰 화면이 한 번 번쩍인다. 키는 App.tsx의 THEME_KEY와 같아야 한다.
+      try {
+        var saved = localStorage.getItem('wish-theme') || localStorage.getItem('wish-lab-theme')
+        var dark = saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches
+        if (dark) document.documentElement.classList.add('dark')
+      } catch (e) { /* 저장소 접근 불가 */ }
+    </script>
   </head>
   <body>
     <div id="root"></div>

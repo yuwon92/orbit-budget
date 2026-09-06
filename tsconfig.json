@@ -2,7 +2,6 @@
   "files": [],
   "references": [
     { "path": "./apps/orbit/tsconfig.app.json" },
-    { "path": "./apps/wish/tsconfig.app.json" },
-    { "path": "./apps/wish-lab/tsconfig.app.json" }
+    { "path": "./apps/wish/tsconfig.app.json" }
   ]
 }

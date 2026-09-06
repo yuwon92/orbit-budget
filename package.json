@@ -11,16 +11,13 @@
     "dev": "vite --config vite.dev.config.ts",
     "dev:orbit": "vite --config apps/orbit/vite.config.ts",
     "dev:wish": "vite --config apps/wish/vite.config.ts",
-    "dev:wish-lab": "vite --config apps/wish-lab/vite.config.ts",
-    "build": "npm run build:orbit && npm run build:wish && npm run build:wish-lab",
+    "build": "npm run build:orbit && npm run build:wish",
     "build:orbit": "tsc -p apps/orbit/tsconfig.app.json && vite build --config apps/orbit/vite.config.ts",
     "build:wish": "tsc -p apps/wish/tsconfig.app.json && vite build --config apps/wish/vite.config.ts",
-    "build:wish-lab": "tsc -p apps/wish-lab/tsconfig.app.json && vite build --config apps/wish-lab/vite.config.ts",
     "verify": "node scripts/verify-budget.ts",
     "preview": "npm run preview:orbit",
     "preview:orbit": "vite preview --config apps/orbit/vite.config.ts",
-    "preview:wish": "vite preview --config apps/wish/vite.config.ts",
-    "preview:wish-lab": "vite preview --config apps/wish-lab/vite.config.ts"
+    "preview:wish": "vite preview --config apps/wish/vite.config.ts"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",

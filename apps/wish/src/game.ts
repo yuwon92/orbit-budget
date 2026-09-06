@@ -1,4 +1,4 @@
-// Wish Lab 게임 규칙. 순수 함수만. 화면·저장소 접근 금지.
+// Wish 게임 규칙. 순수 함수만. 화면·저장소 접근 금지.
 // 수치는 orbit-wish-spec.md의 XP·레벨 곡선을 그대로 따른다.
 
 export type WishState = 'active' | 'ready' | 'waiting'

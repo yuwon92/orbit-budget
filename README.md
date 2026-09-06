@@ -5,8 +5,7 @@
 ## 앱
 
 - **Orbit Budget** (`/orbit/`) — 항목별 예산, 거래, 남은 자유비용
-- **Orbit Wish** (`/wish/`) — 목표형 위시리스트 UI 초안. 현재 샘플 데이터만 사용
-- **Orbit Wish Lab** (`/wish-lab/`) — 같은 UI 초안의 밝은 노랑 우주 디자인 비교안
+- **Orbit Wish** (`/wish/`) — 자유비용을 모아 위시를 이루는 목표 관리. 오르빗 허브·퀘스트 로그·우주 도감·관측자 4화면. 현재 샘플 데이터만 사용
 
 ## 기능
 
@@ -37,17 +36,16 @@
 
 ```bash
 npm install
-npm run dev          # 제품 앱과 비교 디자인을 같은 origin에서 실행
+npm run dev          # 두 앱을 같은 origin에서 실행
 npm run dev:orbit    # Orbit만 실행
-npm run dev:wish    # Wish만 실행
-npm run dev:wish-lab # Wish 비교 디자인만 실행
-npm run build        # Orbit, Wish, Wish Lab 타입 검사 + 빌드
+npm run dev:wish     # Wish만 실행
+npm run build        # Orbit, Wish 타입 검사 + 빌드
 npm run verify       # 계산 로직 검산
 ```
 
-통합 개발 서버 경로: `http://localhost:5173/apps/orbit/`, `http://localhost:5173/apps/wish/`, `http://localhost:5173/apps/wish-lab/`
+통합 개발 서버 경로: `http://localhost:5173/apps/orbit/`, `http://localhost:5173/apps/wish/`
 
-프로덕션 결과물: `dist/orbit/`, `dist/wish/`, `dist/wish-lab/`
+프로덕션 결과물: `dist/orbit/`, `dist/wish/`
 
 ## 주의사항
 

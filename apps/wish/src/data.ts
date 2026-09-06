@@ -1,4 +1,4 @@
-// Wish Lab 샘플 데이터. 새로고침하면 초기화되는 디자인 검토용 상태.
+// 샘플 데이터. 새로고침하면 초기화된다. 실제 저장은 다음 단계에서 연결한다.
 import type { CodexEntry, LabWish } from './game'
 
 function dateAfter(days: number) {

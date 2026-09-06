@@ -11,11 +11,10 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 
 | 명령 | 내용 |
 |---|---|
-| `npm run dev` | 제품 2개와 Wish 비교 디자인 통합 개발 서버 (`/apps/orbit/`, `/apps/wish/`, `/apps/wish-lab/`) |
+| `npm run dev` | 두 앱 통합 개발 서버 (`/apps/orbit/`, `/apps/wish/`). IndexedDB 공유 검증에 필수 |
 | `npm run dev:orbit` | Orbit 단독 개발 서버 |
 | `npm run dev:wish` | Wish 단독 개발 서버 |
-| `npm run dev:wish-lab` | Wish 비교 디자인 단독 개발 서버 |
-| `npm run build` | Orbit, Wish, Wish Lab 타입 검사 + vite 빌드 |
+| `npm run build` | Orbit, Wish 타입 검사 + vite 빌드 → `dist/orbit/`, `dist/wish/` |
 | `npm run verify` | `scripts/verify-budget.ts` — 순수 계산 함수 검산 (node가 .ts 직접 실행) |
 
 **계산 로직을 고치면 `npm run verify`를 반드시 통과시킬 것.** 테스트 프레임워크 없음, assert 스크립트 하나가 전부.
@@ -29,18 +28,12 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `apps/orbit/src/lib/csv.ts` | CSV 문자열 생성 + 다운로드 |
 | `apps/orbit/src/lib/hooks.ts` | `useCategories()` (sortOrder 정렬) |
 | `apps/orbit/src/index.css` | Orbit 전역 CSS 한 파일. 클래스명 기반 |
-| `apps/wish/src/App.tsx` | Wish UI 초안. 샘플 데이터 기반 4탭·위시 상태·등록 시트. DB 연결은 아직 없음 |
-| `apps/wish/src/types.ts` | 위시·이벤트 초안 타입 |
-| `apps/wish/src/db.ts` | `orbital-wish` DB 스키마 자리. 쓰기 API는 아직 없음 |
-| `apps/wish/src/index.css` | Wish 라이트·다크, 위시·성계·관측자·설정 화면 스타일 |
-| `apps/wish/src/components/PlanetVisual.tsx` | 진행 단계별 SVG 행성 그래픽 |
-| `apps/wish/src/components/DepositSheet.tsx` | 샘플 저금 바텀시트. 아직 저장하지 않음 |
-| `apps/wish-lab/src/App.tsx` | Wish Lab 셸 + 화면 4개(허브/퀘스트 로그/우주 도감/관측자). 자체 흐름 |
-| `apps/wish-lab/src/game.ts` | 레벨 곡선·XP·슬롯·하루 몫·미션 생성. **순수 함수만** |
-| `apps/wish-lab/src/planet.ts` | 픽셀 행성 블록 생성. 진행률 → 티끌·위성·행성·고리·위성대·성계 |
-| `apps/wish-lab/src/data.ts` | 샘플 위시·도감·칭호·통계 |
-| `apps/wish-lab/src/components/` | `PixelPlanet`(행성·궤도 링), `PixelBar`, `OrbitMap`, `RewardOverlay`, `Sheets` |
-| `apps/wish-lab/src/index.css` | Wish Lab 전용 단독 스타일시트. 밝은 노랑 우주 |
+| `apps/wish/src/App.tsx` | Wish 셸 + 화면 4개(오르빗 허브/퀘스트 로그/우주 도감/관측자) |
+| `apps/wish/src/game.ts` | 레벨 곡선·XP·슬롯·하루 몫·미션 생성. **순수 함수만** |
+| `apps/wish/src/planet.ts` | 픽셀 행성 블록 생성. 진행률 → 티끌·위성·행성·고리·위성대·성계 |
+| `apps/wish/src/data.ts` | 샘플 위시·도감·칭호·통계. **DB 연결 전까지의 임시 데이터** |
+| `apps/wish/src/components/` | `PixelPlanet`(행성·궤도 링), `PixelBar`, `OrbitMap`, `RewardOverlay`, `Sheets` |
+| `apps/wish/src/index.css` | Wish 전역 CSS 한 파일. 밝은 노랑 우주 |
 | `packages/budget-core/src/types.ts` | Orbit 도메인 타입 전부 |
 | `packages/budget-core/src/budget.ts` | **모든 계산. 순수 함수만. DB·UI 접근 금지** |
 | `packages/budget-core/src/format.ts` | 금액·요일 표시 함수 |
@@ -50,12 +43,9 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `scripts/verify-budget.ts` | 검산 |
 | `scripts/gen-icons.ts` | PWA 아이콘 생성 |
 
-Wish Lab은 같은 도메인의 두 번째 설계안이다. 디자인 기준은 `orbit-wish-ui-design-guide.md`, 게임 규칙 수치는 `orbit-wish-spec.md`.
+Wish는 게임 허브 흐름이다. 자원 HUD 상시 노출, 오늘의 미션과 보상 수령, 퀘스트 로그·우주 도감 분리, 설정은 관측자 화면 안. 제품 규칙과 수치는 `orbit-wish-spec.md`, 디자인은 `orbit-wish-ui-design-guide.md`(둘 다 gitignore된 로컬 문서).
 
-- `apps/wish`(1안): 위시 상세 중심. 위시·성계·관측자·설정 4탭
-- `apps/wish-lab`(2안): 게임 허브 중심. 자원 HUD 상시 노출, 오늘의 미션·보상 수령, 퀘스트 로그·우주 도감 분리, 설정은 관측자 안
-- 두 앱은 코드를 공유하지 않는다. Wish Lab 작업으로 `apps/wish`를 수정하지 않는다
-- 데이터 모델·문구 의미가 갈리면 `orbit-wish-spec.md`를 기준으로 한다
+**현재 Wish 데이터는 전부 `data.ts`의 샘플 메모리 상태이고 새로고침하면 초기화된다.** Dexie 저장·Orbit 연동은 다음 단계. 승격 전 초안(위시 상세 중심 4탭, `PlanetVisual`, `orbital-wish` 스키마 선언)은 커밋 `70d9ce5`에 남아 있다.
 
 ### Orbit 컴포넌트 (`apps/orbit/src/components/`)
 
