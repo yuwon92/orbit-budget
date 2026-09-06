@@ -67,7 +67,8 @@ export default function App() {
   const [claims, setClaims] = useState<Claim[]>(SAMPLE_CLAIMS)
   const [activeId, setActiveId] = useState<string | null>(SAMPLE_WISHES[0]?.id ?? null)
   const [freeAmount, setFreeAmount] = useState(SAMPLE_FREE_AMOUNT)
-  const [carryover, setCarryover] = useState(SAMPLE_CARRYOVER)
+  // 어제 남은 예산. Orbit 연동 전까지는 고정 샘플 값
+  const carryover = SAMPLE_CARRYOVER
   const [collecting, setCollecting] = useState<Wish | null>(null)
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<Wish | null>(null)
@@ -185,7 +186,8 @@ export default function App() {
         const savedAmount = Math.min(wish.targetAmount, wish.savedAmount + carryover)
         return { ...wish, savedAmount, status: savedAmount >= wish.targetAmount ? 'ready' : wish.status }
       }))
-      setCarryover(0)
+      // 금액을 0으로 만들면 미션 줄 자체가 사라진다. 중복 수행은 이벤트 유무로 막는다
+      setFreeAmount((current) => Math.max(0, current - carryover))
       setToast(`남은 예산 ${money(carryover)}원 저금 완료`)
     }
   }
