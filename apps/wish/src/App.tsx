@@ -1,32 +1,40 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronRight, Clock3, Lock, Moon, Orbit, Plus, Sun, WalletCards } from 'lucide-react'
 import { money } from '@orbit/budget-core/format'
+import {
+  dailyShare,
+  dayStatus,
+  daysBetween,
+  keptDays,
+  orbitLevelOf,
+  progress as progressOf,
+  remainingDays,
+  stageOf,
+  vaultTotal,
+} from '@orbit/wish-core/wish'
+import {
+  UNLOCKS,
+  XP,
+  claimIdOf,
+  earnedTitles,
+  levelFromXp,
+  missionUnits,
+  observerStats,
+  pendingUnits,
+  slotCount,
+  sumXp,
+  totalXp as totalXpOf,
+} from '@orbit/wish-core/xp'
+import type { Claim, Wish, WishEvent } from '@orbit/wish-core/types'
 import { OrbitRing, PixelPlanet } from './components/PixelPlanet'
 import { PixelBar } from './components/PixelBar'
 import { OrbitMap } from './components/OrbitMap'
 import { RewardOverlay, type Reward } from './components/RewardOverlay'
 import { CollectSheet, WishSheet } from './components/Sheets'
-import { BADGES, CODEX_SLOTS, INITIAL_CODEX, INITIAL_WISHES, STATS } from './data'
-import {
-  UNLOCKS,
-  XP,
-  buildMissions,
-  claimableXp,
-  dailyShare,
-  levelOf,
-  orbitLevelOf,
-  pad2,
-  progressOf,
-  remainingDays,
-  SAMPLE_CARRYOVER,
-  slotCount,
-  stageOf,
-  STAGE_NAMES,
-  type CodexEntry,
-  type LabWish,
-  type Mission,
-  type MissionState,
-} from './game'
+import { buildMissions, type Mission } from './missions'
+import { CODEX_SLOTS, STAGE_NAMES, TITLES } from './lib/labels'
+import { formatDate, pad2, todayString } from './lib/format'
+import { SAMPLE_CARRYOVER, SAMPLE_CLAIMS, SAMPLE_EVENTS, SAMPLE_FREE_AMOUNT, SAMPLE_WISHES } from './data'
 
 type Screen = 'hub' | 'quests' | 'codex' | 'observer'
 
@@ -36,8 +44,6 @@ const NAV: { id: Screen; label: string }[] = [
   { id: 'codex', label: '도감' },
   { id: 'observer', label: '관측자' },
 ]
-
-const formatDate = (date: string) => date.replaceAll('-', '.')
 
 // index.html의 첫 페인트 스크립트와 같은 키를 쓴다.
 const THEME_KEY = 'wish-theme'
@@ -51,17 +57,20 @@ function readTheme() {
   return matchMedia('(prefers-color-scheme: dark)').matches
 }
 
+const newId = () => crypto.randomUUID()
+
 export default function App() {
+  const today = useMemo(todayString, [])
   const [screen, setScreen] = useState<Screen>('hub')
-  const [wishes, setWishes] = useState<LabWish[]>(INITIAL_WISHES)
-  const [codex, setCodex] = useState<CodexEntry[]>(INITIAL_CODEX)
-  const [activeId, setActiveId] = useState<string | null>(INITIAL_WISHES[0]?.id ?? null)
-  const [missionState, setMissionState] = useState<Record<string, MissionState>>({})
-  const [totalXp, setTotalXp] = useState(STATS.totalXp)
-  const [freeAmount, setFreeAmount] = useState(STATS.freeAmount)
-  const [vault, setVault] = useState(STATS.vaultAmount)
-  const [collecting, setCollecting] = useState<LabWish | null>(null)
+  const [wishes, setWishes] = useState<Wish[]>(SAMPLE_WISHES)
+  const [events, setEvents] = useState<WishEvent[]>(SAMPLE_EVENTS)
+  const [claims, setClaims] = useState<Claim[]>(SAMPLE_CLAIMS)
+  const [activeId, setActiveId] = useState<string | null>(SAMPLE_WISHES[0]?.id ?? null)
+  const [freeAmount, setFreeAmount] = useState(SAMPLE_FREE_AMOUNT)
+  const [carryover, setCarryover] = useState(SAMPLE_CARRYOVER)
+  const [collecting, setCollecting] = useState<Wish | null>(null)
   const [adding, setAdding] = useState(false)
+  const [editing, setEditing] = useState<Wish | null>(null)
   const [rewards, setRewards] = useState<Reward[]>([])
   const [xpPop, setXpPop] = useState<number | null>(null)
   const [toast, setToast] = useState<string | null>(null)
@@ -86,104 +95,135 @@ export default function App() {
     return () => window.clearTimeout(timer)
   }, [xpPop])
 
-  const level = levelOf(totalXp)
-  const slots = slotCount(level.level, codex.length)
-  const missions = useMemo(() => buildMissions(wishes, missionState), [wishes, missionState])
-  const pending = claimableXp(missions)
-  const active = wishes.find((wish) => wish.id === activeId) ?? wishes[0] ?? null
+  // 화면에 필요한 값은 전부 이벤트와 수령 기록에서 파생한다. 저장하는 XP는 없다.
+  const openWishes = useMemo(
+    () => wishes.filter((wish) => wish.status === 'active' || wish.status === 'ready' || wish.status === 'waiting'),
+    [wishes],
+  )
+  const doneWishes = useMemo(() => wishes.filter((wish) => wish.status === 'done'), [wishes])
+  const totalXp = useMemo(() => totalXpOf(wishes, events, claims), [wishes, events, claims])
+  const level = levelFromXp(totalXp)
+  const slots = slotCount(level.level, doneWishes.length)
+  const stats = useMemo(() => observerStats(wishes, events, today), [wishes, events, today])
+  const titles = useMemo(() => earnedTitles(wishes, events, today), [wishes, events, today])
+  const missions = useMemo(
+    () => buildMissions(openWishes, events, claims, today, carryover),
+    [openWishes, events, claims, today, carryover],
+  )
+  const pending = useMemo(
+    () => pendingUnits(missionUnits(wishes, events), claims),
+    [wishes, events, claims],
+  )
+  const pendingXp = sumXp(pending)
+  const vault = vaultTotal(wishes)
+  const active = openWishes.find((wish) => wish.id === activeId) ?? openWishes[0] ?? null
 
   const pushReward = useCallback((next: Reward) => setRewards((current) => [...current, next]), [])
 
-  /** XP는 항상 이 함수를 거친다. 레벨 문턱을 넘으면 연출을 대기열에 넣는다. */
-  const grantXp = useCallback((amount: number) => {
-    setTotalXp((current) => {
-      const next = current + amount
-      const before = levelOf(current)
-      const after = levelOf(next)
-      if (after.level > before.level) {
-        const unlock = UNLOCKS.find((item) => item.level === after.level)
-        pushReward({ kind: 'levelup', from: before.level, to: after.level, title: after.title, unlock: unlock?.name ?? null })
-      }
-      return next
+  // XP는 파생값이라 레벨업은 "지급"이 아니라 문턱을 넘었는지 감시해서 잡는다.
+  const [celebratedLevel, setCelebratedLevel] = useState(level.level)
+  useEffect(() => {
+    if (level.level <= celebratedLevel) return
+    const unlock = UNLOCKS.find((item) => item.level === level.level)
+    pushReward({
+      kind: 'levelup',
+      from: celebratedLevel,
+      to: level.level,
+      title: level.title,
+      unlock: unlock?.name ?? null,
     })
-    setXpPop(amount)
-  }, [pushReward])
+    setCelebratedLevel(level.level)
+  }, [level.level, level.title, celebratedLevel, pushReward])
+
+  const addEvent = useCallback((event: Omit<WishEvent, 'id' | 'createdAt'>) => {
+    setEvents((current) => [...current, { ...event, id: newId(), createdAt: Date.now() }])
+  }, [])
 
   function collect(amount: number) {
     if (!collecting) return
     const target = collecting
-    const share = dailyShare(target)
+    const full = amount >= dailyShare(target, events, today)
+    addEvent({ wishId: target.id, type: 'deposit', amount, date: today })
     setWishes((current) => current.map((wish) => {
       if (wish.id !== target.id) return wish
       const savedAmount = Math.min(wish.targetAmount, wish.savedAmount + amount)
-      return {
-        ...wish,
-        savedAmount,
-        keptDays: wish.keptDays + 1,
-        state: savedAmount >= wish.targetAmount ? 'ready' : wish.state,
-      }
+      return { ...wish, savedAmount, status: savedAmount >= wish.targetAmount ? 'ready' : wish.status }
     }))
     setFreeAmount((current) => Math.max(0, current - amount))
-    setVault((current) => current + amount)
-    setMissionState((current) => ({ ...current, [`share-${target.id}`]: 'done' }))
     setCollecting(null)
-    setToast(amount >= share ? '하루 몫 완료 · 보상 대기' : '부분 납입 기록 · 보상 대기')
+    setToast(full ? '하루 몫 완료 · 수령 대기' : '부분 납입 기록 · 수령 대기')
   }
 
   function skipToday() {
     if (!collecting) return
-    setMissionState((current) => ({ ...current, [`share-${collecting.id}`]: 'claimed' }))
+    addEvent({ wishId: collecting.id, type: 'skip', date: today })
     setCollecting(null)
     setToast('오늘은 쉬어감. 벌점 없음')
   }
 
-  /** 미션 종류별 수행. 하루 몫만 시트를 열고 나머지는 그 자리에서 완료 처리한다. */
+  /** 미션 수행. 하루 몫만 시트를 열고 나머지는 그 자리에서 이벤트를 남긴다 */
   function runMission(mission: Mission) {
     if (mission.kind === 'share') {
-      const wish = wishes.find((item) => item.id === mission.wishId)
+      const wish = openWishes.find((item) => item.id === mission.wishId)
       if (wish) setCollecting(wish)
       return
     }
-    if (mission.kind === 'carryover') {
-      setVault((current) => current + SAMPLE_CARRYOVER)
-      setMissionState((current) => ({ ...current, [mission.id]: 'done' }))
-      setToast(`남은 예산 ${money(SAMPLE_CARRYOVER)}원 저금 완료`)
+    if (mission.kind === 'wait' && mission.wishId) {
+      addEvent({ wishId: mission.wishId, type: 'wait', date: today })
+      setToast('오늘도 기다리기 기록')
       return
     }
-    if (mission.kind === 'wait') {
-      setMissionState((current) => ({ ...current, [mission.id]: 'done' }))
-      setToast('오늘도 기다리기 기록')
+    if (mission.kind === 'carryover') {
+      const target = active ?? openWishes[0]
+      if (!target) {
+        setToast('넣을 궤도가 없다')
+        return
+      }
+      addEvent({ wishId: target.id, type: 'deposit', amount: carryover, date: today, source: 'carryover' })
+      setWishes((current) => current.map((wish) => {
+        if (wish.id !== target.id) return wish
+        const savedAmount = Math.min(wish.targetAmount, wish.savedAmount + carryover)
+        return { ...wish, savedAmount, status: savedAmount >= wish.targetAmount ? 'ready' : wish.status }
+      }))
+      setCarryover(0)
+      setToast(`남은 예산 ${money(carryover)}원 저금 완료`)
     }
   }
 
-  function claimRewards() {
-    if (!pending) return
-    const claimed: Record<string, MissionState> = {}
-    for (const mission of missions) if (mission.state === 'done') claimed[mission.id] = 'claimed'
-    setMissionState((current) => ({ ...current, ...claimed }))
-    grantXp(pending)
+  /** 미션 하나 수령 */
+  function claimOne(mission: Mission) {
+    const unit = pending.find((item) => item.date === mission.date && item.missionId === mission.id)
+    if (!unit) return
+    setClaims((current) => [...current, { id: claimIdOf(unit.date, unit.missionId), date: unit.date, missionId: unit.missionId, createdAt: Date.now() }])
+    setXpPop(unit.xp)
   }
 
-  function completeWish(wish: LabWish) {
-    const entry: CodexEntry = {
-      id: wish.id,
+  /** 지금 받을 수 있는 것 전부 수령. 지난 날짜의 미수령분도 함께 들어온다 */
+  function claimAll() {
+    if (!pending.length) return
+    const now = Date.now()
+    setClaims((current) => [
+      ...current,
+      ...pending.map((unit) => ({ id: claimIdOf(unit.date, unit.missionId), date: unit.date, missionId: unit.missionId, createdAt: now })),
+    ])
+    setXpPop(pendingXp)
+  }
+
+  function completeWish(wish: Wish) {
+    addEvent({ wishId: wish.id, type: 'purchase', date: today })
+    setWishes((current) => current.map((item) => (item.id === wish.id ? { ...item, status: 'done' } : item)))
+    pushReward({
+      kind: 'complete',
       name: wish.name,
-      amount: wish.targetAmount,
-      days: wish.startedDays,
-      keptDays: wish.keptDays,
-      stardust: wish.keptDays * XP.share + XP.complete,
-      date: new Date().toLocaleDateString('sv-SE'),
       seed: wish.seed,
-    }
-    setWishes((current) => current.filter((item) => item.id !== wish.id))
-    setCodex((current) => [entry, ...current])
-    pushReward({ kind: 'complete', name: wish.name, seed: wish.seed, stardust: entry.stardust, date: entry.date })
-    grantXp(XP.complete)
+      stardust: keptDays(events, wish.id) * XP.share + XP.complete,
+      date: today,
+    })
     setActiveId((current) => (current === wish.id ? null : current))
   }
 
   function openAdd() {
-    if (wishes.length >= slots) {
+    if (openWishes.length >= slots) {
       setToast(`궤도 슬롯 ${slots}개를 모두 사용 중`)
       return
     }
@@ -208,8 +248,8 @@ export default function App() {
         </div>
         <ul className="hud-resources">
           <li><span className="res-icon" aria-hidden="true">🪙</span><div><strong>{money(freeAmount)}원</strong><span>남은 자유비용</span></div></li>
-          <li><span className="res-icon" aria-hidden="true">☄️</span><div><strong>{STATS.streak}일</strong><span>연속 관측</span></div></li>
-          <li><span className="res-icon" aria-hidden="true">🫙</span><div><strong>{money(vault)}원</strong><span>저금통 누적</span></div></li>
+          <li><span className="res-icon" aria-hidden="true">☄️</span><div><strong>{stats.streak}일</strong><span>연속 관측</span></div></li>
+          <li><span className="res-icon" aria-hidden="true">🫙</span><div><strong>{money(vault)}원</strong><span>저금통</span></div></li>
         </ul>
         {xpPop !== null && <span className="xp-pop">+{xpPop} XP</span>}
       </header>
@@ -217,40 +257,47 @@ export default function App() {
       <div className="wl-content">
         {screen === 'hub' && (
           <HubScreen
-            wishes={wishes}
+            wishes={openWishes}
             active={active}
+            events={events}
+            today={today}
             missions={missions}
-            pending={pending}
+            pendingXp={pendingXp}
             slots={slots}
             level={level.level}
             onSelect={setActiveId}
             onAdd={openAdd}
             onRun={runMission}
-            onClaim={claimRewards}
+            onClaimOne={claimOne}
+            onClaimAll={claimAll}
             onOpenQuests={() => setScreen('quests')}
           />
         )}
         {screen === 'quests' && (
           <QuestScreen
-            wishes={wishes}
+            wishes={openWishes}
+            events={events}
+            today={today}
             slots={slots}
-            missions={missions}
             onCollect={(wish) => setCollecting(wish)}
             onAdd={openAdd}
+            onEdit={(wish) => setEditing(wish)}
             onComplete={completeWish}
             onWait={(wish) => {
-              setWishes((current) => current.map((item) => item.id === wish.id ? { ...item, state: 'waiting' } : item))
-              setToast('기다리는 중 · 하루마다 +20 XP')
+              setWishes((current) => current.map((item) => (item.id === wish.id ? { ...item, status: 'waiting' } : item)))
+              setToast(`기다리는 중 · 하루마다 +${XP.wait} XP`)
             }}
             onFocus={(wish) => { setActiveId(wish.id); setScreen('hub') }}
           />
         )}
-        {screen === 'codex' && <CodexScreen codex={codex} />}
+        {screen === 'codex' && <CodexScreen wishes={doneWishes} events={events} />}
         {screen === 'observer' && (
           <ObserverScreen
             level={level}
             totalXp={totalXp}
-            codexCount={codex.length}
+            pendingXp={pendingXp}
+            stats={stats}
+            titles={titles}
             dark={dark}
             onThemeChange={setDark}
           />
@@ -269,7 +316,7 @@ export default function App() {
       {collecting && (
         <CollectSheet
           wishName={collecting.name}
-          dailyShare={dailyShare(collecting)}
+          dailyShare={dailyShare(collecting, events, today)}
           availableAmount={freeAmount}
           onClose={() => setCollecting(null)}
           onCollect={collect}
@@ -278,6 +325,7 @@ export default function App() {
       )}
       {adding && (
         <WishSheet
+          today={today}
           onClose={() => setAdding(false)}
           onCreate={(wish) => {
             setWishes((current) => [...current, wish])
@@ -288,23 +336,38 @@ export default function App() {
           }}
         />
       )}
+      {editing && (
+        <WishSheet
+          today={today}
+          wish={editing}
+          onClose={() => setEditing(null)}
+          onRename={(name) => {
+            setWishes((current) => current.map((item) => (item.id === editing.id ? { ...item, name } : item)))
+            setEditing(null)
+            setToast('이름을 바꿨다')
+          }}
+        />
+      )}
       {rewards[0] && <RewardOverlay reward={rewards[0]} onClose={() => setRewards((current) => current.slice(1))} />}
       {toast && <div className="wl-toast"><span aria-hidden="true">⭐</span>{toast}</div>}
     </div>
   )
 }
 
-function HubScreen({ wishes, active, missions, pending, slots, level, onSelect, onAdd, onRun, onClaim, onOpenQuests }: {
-  wishes: LabWish[]
-  active: LabWish | null
+function HubScreen({ wishes, active, events, today, missions, pendingXp, slots, level, onSelect, onAdd, onRun, onClaimOne, onClaimAll, onOpenQuests }: {
+  wishes: Wish[]
+  active: Wish | null
+  events: WishEvent[]
+  today: string
   missions: Mission[]
-  pending: number
+  pendingXp: number
   slots: number
   level: number
   onSelect: (id: string) => void
   onAdd: () => void
   onRun: (mission: Mission) => void
-  onClaim: () => void
+  onClaimOne: (mission: Mission) => void
+  onClaimAll: () => void
   onOpenQuests: () => void
 }) {
   if (!active) {
@@ -320,8 +383,8 @@ function HubScreen({ wishes, active, missions, pending, slots, level, onSelect, 
   }
 
   const progress = progressOf(active)
-  const days = remainingDays(active.targetDate)
-  const share = dailyShare(active)
+  const days = remainingDays(active, today)
+  const share = dailyShare(active, events, today)
   const done = missions.filter((mission) => mission.state !== 'todo').length
 
   return (
@@ -350,7 +413,7 @@ function HubScreen({ wishes, active, missions, pending, slots, level, onSelect, 
             <i />
             <span>{days ? `${days}일 남음` : '기간 없음'}</span>
             <i />
-            <span>지킨 날 {active.keptDays}일</span>
+            <span>지킨 날 {keptDays(events, active.id)}일</span>
           </p>
         </div>
       </section>
@@ -375,18 +438,18 @@ function HubScreen({ wishes, active, missions, pending, slots, level, onSelect, 
                   {mission.detail}
                 </span>
               </div>
-              <span className="mission-xp">+{mission.xp} XP</span>
-              {mission.state === 'todo' ? (
-                <button className="mission-go" onClick={() => onRun(mission)}>수행</button>
-              ) : (
-                <span className="mission-state">{mission.state === 'done' ? '수령 대기' : '완료'}</span>
+              <span className="mission-xp">{mission.skipped ? '—' : `+${mission.xp} XP`}</span>
+              {mission.state === 'todo' && <button className="mission-go" onClick={() => onRun(mission)}>수행</button>}
+              {mission.state === 'claimable' && (
+                <button className="mission-go claim" onClick={() => onClaimOne(mission)}>+{mission.xp} 받기</button>
               )}
+              {mission.state === 'claimed' && <span className="mission-state">{mission.skipped ? '쉬어감' : '수령 완료'}</span>}
             </li>
           ))}
         </ul>
 
-        <button className="claim-button" onClick={onClaim} disabled={!pending}>
-          {pending ? `CLAIM +${pending} XP` : '수령할 보상 없음'}
+        <button className="claim-button" onClick={onClaimAll} disabled={!pendingXp}>
+          {pendingXp ? `CLAIM +${pendingXp} XP` : '수령할 보상 없음'}
         </button>
         <p className="claim-hint">Lv.{pad2(level)} 관측자 · 궤도 슬롯 {wishes.length} / {slots}</p>
       </section>
@@ -394,15 +457,17 @@ function HubScreen({ wishes, active, missions, pending, slots, level, onSelect, 
   )
 }
 
-function QuestScreen({ wishes, slots, missions, onCollect, onAdd, onComplete, onWait, onFocus }: {
-  wishes: LabWish[]
+function QuestScreen({ wishes, events, today, slots, onCollect, onAdd, onEdit, onComplete, onWait, onFocus }: {
+  wishes: Wish[]
+  events: WishEvent[]
+  today: string
   slots: number
-  missions: Mission[]
-  onCollect: (wish: LabWish) => void
+  onCollect: (wish: Wish) => void
   onAdd: () => void
-  onComplete: (wish: LabWish) => void
-  onWait: (wish: LabWish) => void
-  onFocus: (wish: LabWish) => void
+  onEdit: (wish: Wish) => void
+  onComplete: (wish: Wish) => void
+  onWait: (wish: Wish) => void
+  onFocus: (wish: Wish) => void
 }) {
   return (
     <main className="quest-screen">
@@ -415,11 +480,11 @@ function QuestScreen({ wishes, slots, missions, onCollect, onAdd, onComplete, on
       <ul className="quest-list">
         {wishes.map((wish) => {
           const progress = progressOf(wish)
-          const share = dailyShare(wish)
-          const days = remainingDays(wish.targetDate)
-          const todayDone = missions.find((mission) => mission.id === `share-${wish.id}`)?.state !== 'todo'
+          const share = dailyShare(wish, events, today)
+          const days = remainingDays(wish, today)
+          const todayDone = dayStatus(wish, events, today) !== 'none'
           return (
-            <li key={wish.id} className={`quest-card state-${wish.state}`}>
+            <li key={wish.id} className={`quest-card state-${wish.status}`}>
               <button className="quest-planet" onClick={() => onFocus(wish)} aria-label={`${wish.name} 허브에서 보기`}>
                 <PixelPlanet progress={progress} seed={wish.seed} size={64} />
               </button>
@@ -433,9 +498,9 @@ function QuestScreen({ wishes, slots, missions, onCollect, onAdd, onComplete, on
                   <em>{progress}%</em>
                 </p>
                 <p className="quest-meta">
-                  {wish.state === 'ready' ? (
+                  {wish.status === 'ready' ? (
                     <span className="flag ready">목표 도달</span>
-                  ) : wish.state === 'waiting' ? (
+                  ) : wish.status === 'waiting' ? (
                     <span className="flag waiting">기다리는 중 · 하루 +{XP.wait} XP</span>
                   ) : (
                     <>
@@ -448,21 +513,19 @@ function QuestScreen({ wishes, slots, missions, onCollect, onAdd, onComplete, on
                   )}
                 </p>
                 <div className="quest-actions">
-                  {wish.state === 'ready' ? (
+                  {wish.status === 'ready' ? (
                     <>
                       <button className="primary-button" onClick={() => onComplete(wish)}><WalletCards size={17} /> 구매하기</button>
                       <button className="secondary-button" onClick={() => onWait(wish)}><Clock3 size={17} /> 더 기다리기</button>
                     </>
-                  ) : wish.state === 'waiting' ? (
+                  ) : wish.status === 'waiting' ? (
                     <button className="primary-button" onClick={() => onComplete(wish)}><WalletCards size={17} /> 이제 구매하기</button>
                   ) : (
-                    <>
-                      <button className="primary-button" disabled={todayDone} onClick={() => onCollect(wish)}>
-                        {todayDone ? '오늘 몫 완료' : '오늘 모으기'}
-                      </button>
-                      <button className="secondary-button"><Clock3 size={17} /> 연기</button>
-                    </>
+                    <button className="primary-button" disabled={todayDone} onClick={() => onCollect(wish)}>
+                      {todayDone ? '오늘 몫 완료' : '오늘 모으기'}
+                    </button>
                   )}
+                  <button className="secondary-button" onClick={() => onEdit(wish)}>이름 수정</button>
                 </div>
               </div>
             </li>
@@ -491,53 +554,79 @@ function QuestScreen({ wishes, slots, missions, onCollect, onAdd, onComplete, on
   )
 }
 
-function CodexScreen({ codex }: { codex: CodexEntry[] }) {
-  const [selected, setSelected] = useState(0)
-  const entry = codex[Math.min(selected, Math.max(codex.length - 1, 0))]
-  const empty = Math.max(0, CODEX_SLOTS - codex.length)
+function CodexScreen({ wishes, events }: { wishes: Wish[]; events: WishEvent[] }) {
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  const entries = useMemo(() => wishes.map((wish) => {
+    const purchase = events.find((event) => event.wishId === wish.id && event.type === 'purchase')
+    const date = purchase?.date ?? wish.targetDate ?? wish.startDate
+    const kept = keptDays(events, wish.id)
+    return {
+      wish,
+      date,
+      days: daysBetween(wish.startDate, date) + 1,
+      keptDays: kept,
+      // 그 위시에서 얻은 별먼지. 지킨 날 XP + 완주 보너스
+      stardust: kept * XP.share + XP.complete,
+    }
+  }).sort((a, b) => (a.date < b.date ? 1 : -1)), [wishes, events])
+
+  const entry = entries.find((item) => item.wish.id === selectedId) ?? entries[0]
+  const empty = Math.max(0, CODEX_SLOTS - entries.length)
 
   return (
     <main className="codex-screen">
       <header className="screen-head">
         <span className="pixel-label">UNIVERSE CODEX</span>
         <h1>우주 도감</h1>
-        <p>별 {codex.length} / {CODEX_SLOTS} 수집</p>
+        <p>별 {entries.length} / {CODEX_SLOTS} 수집</p>
       </header>
 
       <section className="constellation">
-        {codex.map((item, index) => (
+        {entries.map((item, index) => (
           <button
-            key={item.id}
-            className={`constellation-star s-${(index % 6) + 1}${entry?.id === item.id ? ' selected' : ''}`}
-            onClick={() => setSelected(index)}
-            aria-label={item.name}
+            key={item.wish.id}
+            className={`constellation-star s-${(index % 6) + 1}${entry?.wish.id === item.wish.id ? ' selected' : ''}`}
+            onClick={() => setSelectedId(item.wish.id)}
+            aria-label={item.wish.name}
           >
-            <PixelPlanet progress={100} seed={item.seed} size={40} />
+            <PixelPlanet progress={100} seed={item.wish.seed} size={40} />
           </button>
         ))}
         <span className="dust d1" /><span className="dust d2" /><span className="dust d3" /><span className="dust d4" />
       </section>
 
-      {entry && (
+      {entry ? (
         <section className="codex-detail">
           <div>
             <span className="pixel-label">ORBIT COMPLETE · {formatDate(entry.date)}</span>
-            <h2>{entry.name}</h2>
+            <h2>{entry.wish.name}</h2>
           </div>
           <dl>
             <div><dt>걸린 날</dt><dd>{entry.days}일</dd></div>
             <div><dt>지킨 날</dt><dd>{entry.keptDays}일</dd></div>
-            <div><dt>모은 금액</dt><dd>{money(entry.amount)}원</dd></div>
+            <div><dt>모은 금액</dt><dd>{money(entry.wish.targetAmount)}원</dd></div>
             <div><dt>얻은 별먼지</dt><dd>{entry.stardust.toLocaleString('ko-KR')}</dd></div>
           </dl>
+        </section>
+      ) : (
+        <section className="codex-detail">
+          <div>
+            <span className="pixel-label">EMPTY UNIVERSE</span>
+            <h2>아직 완주한 별이 없다</h2>
+          </div>
         </section>
       )}
 
       <section className="codex-grid">
-        {codex.map((item, index) => (
-          <button key={item.id} className={`codex-cell${entry?.id === item.id ? ' selected' : ''}`} onClick={() => setSelected(index)}>
-            <PixelPlanet progress={100} seed={item.seed} size={52} />
-            <strong>{item.name}</strong>
+        {entries.map((item) => (
+          <button
+            key={item.wish.id}
+            className={`codex-cell${entry?.wish.id === item.wish.id ? ' selected' : ''}`}
+            onClick={() => setSelectedId(item.wish.id)}
+          >
+            <PixelPlanet progress={100} seed={item.wish.seed} size={52} />
+            <strong>{item.wish.name}</strong>
             <span>{formatDate(item.date)}</span>
           </button>
         ))}
@@ -553,13 +642,17 @@ function CodexScreen({ codex }: { codex: CodexEntry[] }) {
   )
 }
 
-function ObserverScreen({ level, totalXp, codexCount, dark, onThemeChange }: {
-  level: ReturnType<typeof levelOf>
+function ObserverScreen({ level, totalXp, pendingXp, stats, titles, dark, onThemeChange }: {
+  level: ReturnType<typeof levelFromXp>
   totalXp: number
-  codexCount: number
+  pendingXp: number
+  stats: ReturnType<typeof observerStats>
+  titles: ReturnType<typeof earnedTitles>
   dark: boolean
   onThemeChange: (value: boolean) => void
 }) {
+  const earned = new Set(titles)
+
   return (
     <main className="observer-screen">
       <header className="screen-head">
@@ -579,7 +672,10 @@ function ObserverScreen({ level, totalXp, codexCount, dark, onThemeChange }: {
             <strong>{level.into.toLocaleString('ko-KR')}</strong>
             <span>/ {level.max ? '—' : level.need.toLocaleString('ko-KR')} STARDUST</span>
           </p>
-          <p className="observer-xp-sub">누적 {totalXp.toLocaleString('ko-KR')} · 다음 레벨까지 {level.max ? 0 : level.need - level.into}</p>
+          <p className="observer-xp-sub">
+            누적 {totalXp.toLocaleString('ko-KR')} · 다음 레벨까지 {level.max ? 0 : level.need - level.into}
+            {pendingXp > 0 && ` · 미수령 ${pendingXp}`}
+          </p>
         </div>
       </section>
 
@@ -600,20 +696,31 @@ function ObserverScreen({ level, totalXp, codexCount, dark, onThemeChange }: {
       </section>
 
       <section className="stat-grid">
-        <div><span>지킨 날</span><strong>{STATS.keptDays}일</strong><small>전체 기록</small></div>
-        <div><span>현재 연속</span><strong>{STATS.streak}일</strong><small>최장 {STATS.bestStreak}일</small></div>
-        <div><span>넘긴 예산</span><strong>{STATS.carryovers}회</strong><small>{money(STATS.carryoverAmount)}원</small></div>
-        <div><span>완주한 별</span><strong>{codexCount}개</strong><small>더 기다림 {STATS.waits}회</small></div>
+        <div><span>지킨 날</span><strong>{stats.keptDays}일</strong><small>전체 기록</small></div>
+        <div><span>현재 연속</span><strong>{stats.streak}일</strong><small>최장 {stats.bestStreak}일</small></div>
+        <div>
+          <span>넘긴 예산</span>
+          <strong>{stats.carryovers ? `${stats.carryovers}회` : '—'}</strong>
+          <small>{stats.carryovers ? `${money(stats.carryoverAmount)}원` : '아직 없음'}</small>
+        </div>
+        <div>
+          <span>누적 저금</span>
+          <strong>{money(stats.lifetimeDeposit)}원</strong>
+          <small>완주 {stats.completed}개 · 더 기다림 {stats.waits}회</small>
+        </div>
       </section>
 
       <section className="panel">
-        <div className="panel-head"><div><span className="pixel-label">TITLES</span><h2>칭호</h2></div><span className="panel-count">{BADGES.filter((badge) => badge.earned).length} / {BADGES.length}</span></div>
+        <div className="panel-head">
+          <div><span className="pixel-label">TITLES</span><h2>칭호</h2></div>
+          <span className="panel-count">{earned.size} / {TITLES.length}</span>
+        </div>
         <div className="badge-grid">
-          {BADGES.map((badge) => (
-            <div key={badge.id} className={`badge ${badge.earned ? 'earned' : 'locked'}`}>
-              <span className="badge-icon" aria-hidden="true">{badge.icon}</span>
-              <strong>{badge.name}</strong>
-              <span>{badge.detail}</span>
+          {TITLES.map((title) => (
+            <div key={title.id} className={`badge ${earned.has(title.id) ? 'earned' : 'locked'}`}>
+              <span className="badge-icon" aria-hidden="true">{title.icon}</span>
+              <strong>{title.name}</strong>
+              <span>{title.detail}</span>
             </div>
           ))}
         </div>
@@ -631,7 +738,7 @@ function ObserverScreen({ level, totalXp, codexCount, dark, onThemeChange }: {
           </div>
           <div className="setting-row">
             <div><strong>Orbit Budget</strong><span>같은 브라우저 연결</span></div>
-            <span className="connection-state"><i /> 연결됨</span>
+            <span className="connection-state"><i /> 연결 예정</span>
           </div>
           <div className="setting-row">
             <div><strong>프로토타입</strong><span>샘플 데이터 · 새로고침 시 초기화</span></div>

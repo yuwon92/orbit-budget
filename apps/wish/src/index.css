@@ -409,7 +409,7 @@ ul { padding: 0; list-style: none; }
   height: 14px;
   border: 2px solid var(--border-strong);
 }
-.mission.done .mission-mark { border-color: var(--orbit-gold); background: var(--orbit-gold); }
+.mission.claimable .mission-mark { border-color: var(--orbit-gold); background: var(--orbit-gold); }
 .mission.claimed .mission-mark { border-color: var(--border); background: var(--border); }
 
 .mission-text { min-width: 0; }
@@ -443,7 +443,14 @@ ul { padding: 0; list-style: none; }
 }
 
 .mission-state { font-size: 11px; color: var(--text-tertiary); }
-.mission.done .mission-state { color: var(--solar-orange); }
+/* 수령 가능한 미션의 받기 버튼. 보상이라 오렌지로 구분한다 */
+.mission-go.claim {
+  border-color: var(--solar-orange);
+  color: #fff8df;
+  background: var(--solar-orange);
+  font-family: var(--font-pixel);
+  font-size: 12px;
+}
 
 /* ── 퀘스트 로그 ──────────────────────────────────── */
 

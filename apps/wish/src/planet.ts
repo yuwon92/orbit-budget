@@ -1,4 +1,5 @@
-import { rng, stageOf, type PlanetStage } from './game'
+import { rng, stageOf } from '@orbit/wish-core/wish'
+import type { PlanetStage } from '@orbit/wish-core/types'
 
 // 4px 격자 위에 사각 블록만 찍는다. 그러데이션 없이 노랑 4단으로 명암을 만든다.
 const HIGHLIGHT = '#FFF1AC'

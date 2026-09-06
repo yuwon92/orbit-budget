@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react'
 import { Plus } from 'lucide-react'
 import { OrbitRing, PixelPlanet } from './PixelPlanet'
-import { progressOf, type LabWish } from '../game'
+import { progress as progressOf } from '@orbit/wish-core/wish'
+import type { Wish } from '@orbit/wish-core/types'
 
 interface OrbitMapProps {
-  wishes: LabWish[]
+  wishes: Wish[]
   activeId: string | null
   lockedSlots: number
   onSelect: (id: string) => void

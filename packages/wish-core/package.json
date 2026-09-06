@@ -1,0 +1,11 @@
+{
+  "name": "@orbit/wish-core",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./types": "./src/types.ts",
+    "./wish": "./src/wish.ts",
+    "./xp": "./src/xp.ts"
+  }
+}

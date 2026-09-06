@@ -1,6 +1,6 @@
 import { useEffect, useRef, type CSSProperties } from 'react'
 import { PixelPlanet } from './PixelPlanet'
-import { pad2 } from '../game'
+import { pad2 } from '../lib/format'
 
 export type Reward =
   | { kind: 'levelup'; from: number; to: number; title: string; unlock: string | null }

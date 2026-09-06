@@ -1,7 +1,9 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Minus, Plus, X } from 'lucide-react'
 import { money } from '@orbit/budget-core/format'
-import { XP, type LabWish } from '../game'
+import { XP } from '@orbit/wish-core/xp'
+import { addDays, daysBetween, seedFromId } from '@orbit/wish-core/wish'
+import type { Wish } from '@orbit/wish-core/types'
 
 /** 미션 수행 시트. 하루 몫이 프리필된 상태로 열린다. */
 export function CollectSheet({ wishName, dailyShare, availableAmount, onClose, onCollect, onSkip }: {
@@ -77,44 +79,58 @@ export function CollectSheet({ wishName, dailyShare, availableAmount, onClose, o
   )
 }
 
-/** 새 위시 등록. 이름 · 목표 금액 · 기간을 받아 새 행성을 만든다. */
-export function WishSheet({ onClose, onCreate }: {
+/**
+ * 새 위시 등록과 이름 수정을 겸한다.
+ * 목표 금액·기간 수정은 회수 흐름이 걸려 있어 다음 단계로 미룬다.
+ */
+export function WishSheet({ today, wish, onClose, onCreate, onRename }: {
+  today: string
+  wish?: Wish
   onClose: () => void
-  onCreate: (wish: LabWish) => void
+  onCreate?: (wish: Wish) => void
+  onRename?: (name: string) => void
 }) {
-  const [name, setName] = useState('')
-  const [amount, setAmount] = useState('')
+  const editing = Boolean(wish)
+  const [name, setName] = useState(wish?.name ?? '')
+  const [amount, setAmount] = useState(wish ? String(wish.targetAmount) : '')
   const [period, setPeriod] = useState('')
   const [unit, setUnit] = useState<'day' | 'week' | 'month'>('day')
 
   const targetDate = useMemo(() => {
+    if (wish) return wish.targetDate
     const count = Number(period)
     if (!Number.isInteger(count) || count < 1) return null
-    const date = new Date()
-    if (unit === 'month') date.setMonth(date.getMonth() + count)
-    else date.setDate(date.getDate() + count * (unit === 'week' ? 7 : 1))
-    return date.toLocaleDateString('sv-SE')
-  }, [period, unit])
+    if (unit === 'month') {
+      const date = new Date(`${today}T00:00:00`)
+      date.setMonth(date.getMonth() + count)
+      return date.toLocaleDateString('sv-SE')
+    }
+    return addDays(today, count * (unit === 'week' ? 7 : 1))
+  }, [wish, period, unit, today])
 
   const targetAmount = Number(amount)
-  const days = targetDate
-    ? Math.max(1, Math.round((new Date(`${targetDate}T00:00:00`).getTime() - Date.now()) / 86_400_000) + 1)
-    : null
+  const days = targetDate ? Math.max(1, daysBetween(today, targetDate) + 1) : null
   const preview = days && targetAmount > 0 ? Math.floor(targetAmount / days) : 0
 
   function submit(event: FormEvent) {
     event.preventDefault()
-    if (!name.trim() || targetAmount <= 0) return
-    onCreate({
-      id: crypto.randomUUID(),
+    if (!name.trim()) return
+    if (editing) {
+      onRename?.(name.trim())
+      return
+    }
+    if (targetAmount <= 0) return
+    const id = crypto.randomUUID()
+    onCreate?.({
+      id,
       name: name.trim(),
       targetAmount,
       savedAmount: 0,
+      startDate: today,
       targetDate,
-      state: 'active',
-      seed: Math.floor(Math.random() * 900) + 1,
-      startedDays: 0,
-      keptDays: 0,
+      status: 'active',
+      seed: seedFromId(id),
+      createdAt: Date.now(),
     })
   }
 
@@ -124,8 +140,8 @@ export function WishSheet({ onClose, onCreate }: {
         <div className="sheet-handle" />
         <header className="sheet-header">
           <div>
-            <span className="pixel-label">NEW WISH</span>
-            <h2>새 소원 빌기</h2>
+            <span className="pixel-label">{editing ? 'EDIT WISH' : 'NEW WISH'}</span>
+            <h2>{editing ? '이름 바꾸기' : '새 소원 빌기'}</h2>
           </div>
           <button type="button" className="icon-button" onClick={onClose} aria-label="닫기"><X size={20} /></button>
         </header>
@@ -139,6 +155,7 @@ export function WishSheet({ onClose, onCreate }: {
               value={amount ? money(Number(amount)) : ''}
               onChange={(event) => setAmount(event.target.value.replace(/[^0-9]/g, '').slice(0, 9))}
               placeholder="200,000"
+              disabled={editing}
             />
             <span>원</span>
           </div>
@@ -151,11 +168,12 @@ export function WishSheet({ onClose, onCreate }: {
               aria-label="목표 기간 숫자"
               value={period}
               onChange={(event) => setPeriod(event.target.value.replace(/[^0-9]/g, ''))}
-              placeholder="기간 없음"
+              placeholder={editing ? '수정 예정' : '기간 없음'}
+              disabled={editing}
             />
             <div className="period-unit-choice" aria-label="기간 단위">
               {([['day', '일'], ['week', '주'], ['month', '월']] as const).map(([value, label]) => (
-                <button type="button" key={value} className={unit === value ? 'active' : ''} aria-pressed={unit === value} onClick={() => setUnit(value)}>{label}</button>
+                <button type="button" key={value} className={unit === value ? 'active' : ''} aria-pressed={unit === value} disabled={editing} onClick={() => setUnit(value)}>{label}</button>
               ))}
             </div>
           </div>
@@ -164,10 +182,10 @@ export function WishSheet({ onClose, onCreate }: {
         <p className="mission-gain">
           <span className="pixel-label">DAILY SHARE</span>
           <strong>{preview ? `${money(preview)}원` : '—'}</strong>
-          <span>{days ? `${days}일 궤도` : '기간을 정하면 하루 몫이 생긴다'}</span>
+          <span>{editing ? '금액·기간 수정은 다음 단계' : days ? `${days}일 궤도` : '기간을 정하면 하루 몫이 생긴다'}</span>
         </p>
 
-        <button className="primary-button full" type="submit">궤도에 올리기</button>
+        <button className="primary-button full" type="submit">{editing ? '이름 저장' : '궤도에 올리기'}</button>
       </form>
     </div>
   )
