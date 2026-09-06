@@ -100,6 +100,12 @@ export function monthlyFreeAmount(
   today: string,
   reserveAmount: number,
   includePlannedIncome = true,
+  /**
+   * 이번 달 위시 저금 합계. 예비비와 같은 성격으로 한 번 빠진다.
+   * 월 범위 필터는 호출자가 한다 — 이 함수는 넘겨받은 값을 그대로 뺀다.
+   * 취소로 회수한 금액이 더 크면 음수가 되어 이번 달 자유비용에 더해진다.
+   */
+  wishSavedAmount = 0,
 ): number {
   const month = today.slice(0, 7)
   const totalBudget = categories.reduce((sum, category) => sum + Math.max(category.monthlyBudget, 0), 0)
@@ -137,7 +143,7 @@ export function monthlyFreeAmount(
       .reduce((sum, transaction) => sum + transaction.amount, 0)
   }
 
-  return totalIncome(transactions, month, includePlannedIncome) - totalBudget - reserveAmount + adjustment
+  return totalIncome(transactions, month, includePlannedIncome) - totalBudget - reserveAmount - wishSavedAmount + adjustment
 }
 
 /** 특정 날짜의 지출 합계 */

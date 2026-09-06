@@ -4,6 +4,7 @@
 // 빈 DB를 만나게 된다. 그때는 이 파일의 구현만 서버 조회로 바꾸면 되고
 // 화면 코드는 건드리지 않는다.
 import { getOrbitSnapshot, type OrbitBudgetSnapshot } from '@orbit/bridge'
+import { monthlyWishDeposit } from '@orbit/wish-bridge'
 
 const CACHE_KEY = 'wish-budget-snapshot'
 
@@ -35,7 +36,10 @@ function writeCache(snapshot: OrbitBudgetSnapshot) {
  */
 export async function loadBudgetView(today: string): Promise<BudgetView> {
   try {
-    const snapshot = await getOrbitSnapshot(today)
+    // 이번 달 위시 저금액을 Orbit 계산에 넣어 준다. 계산은 Orbit이 하고
+    // 우리는 재료만 넘긴다 — 여기서 직접 빼면 두 앱의 숫자가 갈라진다.
+    const saved = await monthlyWishDeposit(today.slice(0, 7))
+    const snapshot = await getOrbitSnapshot(today, undefined, saved)
     if (snapshot.connected) {
       writeCache(snapshot)
       return { snapshot, stale: false, error: null }

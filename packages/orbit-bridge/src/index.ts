@@ -13,6 +13,8 @@ export interface OrbitBudgetSnapshot {
   yearMonth: string
   freeAmount: number
   reserveAmount: number
+  /** 이번 달 위시 저금 합계. 위 freeAmount에서 이미 빠져 있다 */
+  wishSavedAmount: number
   /** 스냅샷을 만든 시각. 오프라인일 때 얼마나 오래됐는지 보여주는 데 쓴다 */
   calculatedAt: number
   /** 스냅샷 구조 버전 */
@@ -45,12 +47,13 @@ export const SNAPSHOT_VERSION = 1
  * 저장소가 분리된 환경에서는 빈 DB가 새로 만들어지기만 하므로,
  * DB 존재 여부로 판단하면 연결됐다고 잘못 말하게 된다.
  *
- * 위시 저금액을 자유비용에서 빼는 것은 다음 단계다. 그때 여기에 인자로 주입한다 —
- * 이 안에서 Wish DB를 읽으면 경계가 순환한다.
+ * 위시 저금액은 주입만 받는다. 여기서 Wish DB를 읽으면 경계가 순환한다
+ * (orbit-bridge는 wish-bridge를 몰라야 한다).
  */
 export async function getOrbitSnapshot(
   today: string,
   includePlannedIncome = readPlannedIncome(),
+  wishSavedAmount = 0,
 ): Promise<OrbitBudgetSnapshot> {
   const yearMonth = today.slice(0, 7)
   const [categories, transactions, settings, totalTransactions] = await Promise.all([
@@ -69,8 +72,9 @@ export async function getOrbitSnapshot(
 
   return {
     yearMonth,
-    freeAmount: monthlyFreeAmount(transactions, categories, today, reserveAmount, includePlannedIncome),
+    freeAmount: monthlyFreeAmount(transactions, categories, today, reserveAmount, includePlannedIncome, wishSavedAmount),
     reserveAmount,
+    wishSavedAmount,
     calculatedAt: Date.now(),
     version: SNAPSHOT_VERSION,
     connected,

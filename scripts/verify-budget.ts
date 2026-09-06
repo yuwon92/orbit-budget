@@ -391,4 +391,20 @@ assert.equal(csvLines[1], '2026-09-01,expense,,5000,"콤마,와 ""따옴표""",f
 assert.equal(csvLines[2], '2026-09-13,expense,식비,12000,점심,false')
 console.log('CSV 생성 (컬럼 순서, 정렬, 이스케이프) 통과')
 
+// --- 위시 저금 연동 ---
+// 위시에 저금한 돈은 예비비와 같은 성격으로 이번 달 자유비용에서 한 번 빠진다.
+assert.equal(monthlyFreeAmount(transactions, categories, today, 0, true, 40_000), 516_490)
+// 예비비와 나란히 빠진다
+assert.equal(monthlyFreeAmount(transactions, categories, today, 50_000, true, 40_000), 466_490)
+// 취소로 회수한 금액이 더 크면 음수가 되어 이번 달 자유비용에 더해진다
+assert.equal(monthlyFreeAmount(transactions, categories, today, 0, true, -30_000), 586_490)
+// 인자를 생략하면 예전과 같다. 위시를 한 번도 안 쓴 사용자의 숫자가 변하지 않아야 한다
+assert.equal(monthlyFreeAmount(transactions, categories, today, 0, true), 556_490)
+// 예정 수입 제외 설정과도 겹쳐서 적용된다
+assert.equal(
+  monthlyFreeAmount(transactions, categories, today, 0, false, 40_000),
+  monthlyFreeAmount(transactions, categories, today, 0, false) - 40_000,
+)
+console.log('위시 저금 차감 통과')
+
 console.log('\n모든 검산 통과')

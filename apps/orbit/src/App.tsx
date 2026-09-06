@@ -31,6 +31,7 @@ import { buildBreakdown, inQuickSlot, monthlyFreeAmount, spentByCategory, spentO
 import { db, requestPersistentStorage, setQuickSlot } from './lib/db'
 import { money } from './lib/format'
 import { readPlannedIncome, writePlannedIncome } from './lib/settings'
+import { monthlyWishDeposit } from './lib/wish'
 import { useCategories } from './lib/hooks'
 import type { Transaction } from './lib/types'
 import { buildCsv, downloadCsv } from './lib/csv'
@@ -138,7 +139,10 @@ function HomeView({ openExpense, openEdit, openPreset, goTransactions, goCategor
   const catMap = useMemo(() => new Map(categories.map(c => [c.id, c])), [categories])
   const monthTx = useLiveQuery(() => db.transactions.where('date').startsWith(month).toArray(), [month])
   const settings = useLiveQuery(() => db.monthSettings.get(month), [month])
-  const loaded = monthTx !== undefined
+  // 이번 달 위시 저금액. 위시 DB가 없거나 열리지 않으면 0으로 돌아온다.
+  // undefined(조회 중)와 0(저금 없음)을 구분해야 히어로 숫자가 번쩍이지 않는다.
+  const wishSaved = useLiveQuery(() => monthlyWishDeposit(month), [month])
+  const loaded = monthTx !== undefined && wishSaved !== undefined
   const txs = monthTx ?? []
   const [menuFor, setMenuFor] = useState<string | null>(null)
   useEffect(() => {
@@ -153,7 +157,7 @@ function HomeView({ openExpense, openEdit, openPreset, goTransactions, goCategor
   const todayTx = loaded
     ? txs.filter(t => t.date === today).sort((a, b) => a.createdAt - b.createdAt)
     : undefined
-  const freeRemaining = monthlyFreeAmount(txs, categories, today, settings?.reserveAmount ?? 0, plannedIncome)
+  const freeRemaining = monthlyFreeAmount(txs, categories, today, settings?.reserveAmount ?? 0, plannedIncome, wishSaved ?? 0)
   // 카테고리 이름이 아니라 각 카테고리에 저장된 일/주 주기 설정을 순회한다.
   const rows = buildBreakdown(categories, txs, today)
   const over = freeRemaining < 0
