@@ -43,6 +43,7 @@ import { QuickAddOrbs, type QuickPreset } from './components/QuickAddOrbs'
 import { RecurringSettings } from './components/RecurringSettings'
 import { ReserveSheet } from './components/ReserveSheet'
 import { Onboarding } from './components/Onboarding'
+import { WishPlanet } from './components/WishPlanet'
 import { WishSavings } from './components/WishSavings'
 
 type Tab = 'home' | 'calendar' | 'transactions' | 'settings'
@@ -113,7 +114,7 @@ function Header({ dark, onTheme }: { dark: boolean; onTheme: () => void }) {
         {appMenuOpen && (
           <div className="orbit-app-menu" role="menu">
             <button className="current" role="menuitem" onClick={() => setAppMenuOpen(false)}><span className="logo-orbit"><i /></span><span><strong>orbit</strong><small>현재 앱</small></span></button>
-            <a role="menuitem" href={import.meta.env.DEV ? '/apps/wish/' : '/wish/'}><span className="menu-wish-logo" aria-hidden="true" /><span><strong>wish</strong><small>위시 저금</small></span></a>
+            <a role="menuitem" href={import.meta.env.DEV ? '/apps/wish/' : '/wish/'}><span className="menu-wish-logo" aria-hidden="true"><WishPlanet size={26} /></span><span><strong>wish</strong><small>위시 저금</small></span></a>
           </div>
         )}
       </div>
