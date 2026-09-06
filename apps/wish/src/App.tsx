@@ -776,7 +776,7 @@ function ObserverScreen({ level, totalXp, pendingXp, stats, titles, budget, dark
           </div>
           <div className="setting-row">
             <div>
-              <strong>Orbit Budget</strong>
+              <strong>예산 연결</strong>
               <span>
                 {!budget
                   ? '예산 확인 중'
@@ -804,7 +804,7 @@ function ObserverScreen({ level, totalXp, pendingXp, stats, titles, budget, dark
             </div>
           )}
           <div className="setting-row">
-            <div><strong>프로토타입</strong><span>샘플 데이터 · 새로고침 시 초기화</span></div>
+            <div><strong>프로토타입</strong><span>같은 앱 안의 두 번째 화면</span></div>
             <span className="version-label">WISH 0.1</span>
           </div>
         </div>

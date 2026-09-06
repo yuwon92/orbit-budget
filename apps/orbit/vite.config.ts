@@ -3,24 +3,45 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath } from 'node:url'
 
-// Orbit은 도메인 루트에 둔다. 이미 홈 화면에 설치된 앱의 start_url이 '/'라서
-// 경로를 바꾸면 브라우저가 다른 앱으로 보고 기존 아이콘이 빈 화면을 연다.
-// Wish는 /wish/ 하위에 올린다.
+// 제품군 전체가 이 앱 하나로 설치된다. 예산은 '/', 위시는 '/wish/'.
+//
+// iOS는 홈 화면 앱마다 저장소를 나누므로 아이콘을 두 개 만들면 두 제품이 서로의
+// 데이터를 못 본다. 그래서 manifest와 서비스 워커는 여기 하나뿐이고, Wish 빌드
+// 결과물까지 이 워커가 함께 캐시한다.
+//
+// 빌드 순서 주의: Wish가 먼저 dist/wish에 결과물을 넣고, 그 다음 Orbit이
+// dist를 채우면서 wish/** 까지 프리캐시에 담는다. emptyOutDir를 켜면 앞 단계가
+// 지워지므로 꺼 둔다. dist 정리는 npm run clean이 맡는다.
 export default defineConfig({
   root: fileURLToPath(new URL('.', import.meta.url)),
   base: '/',
   build: {
-    // dist 루트를 비우므로 반드시 Orbit → Wish 순서로 빌드할 것 (npm run build가 그 순서)
     outDir: '../../dist',
-    emptyOutDir: true,
+    emptyOutDir: false,
   },
   plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      includeAssets: ['icon-192.png', 'icon-512.png', 'icon-maskable-512.png'],
       workbox: {
-        // 루트 scope 서비스 워커가 /wish/ 이동까지 가로채 Orbit 화면을 돌려주는 것을 막는다
+        // 루트 index.html로 되돌리는 것은 예산 화면에만. /wish/는 자기 문서가 있다
         navigateFallbackDenylist: [/^\/wish\//],
+        // dist 아래 두 앱의 문서·스크립트·스타일을 모두 담는다.
+        // 아이콘과 manifest는 플러그인이 따로 넣으므로 여기서 빼야 중복되지 않는다
+        globPatterns: ['**/*.{js,css,html,svg}'],
+        // 픽셀 폰트는 외부 CDN에서 온다. 한 번 받으면 캐시해 오프라인에서도 유지한다
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.origin === 'https://cdn.jsdelivr.net' || url.origin === 'https://fonts.gstatic.com',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'pixel-font',
+              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
       },
       manifest: {
         // 앱 정체성을 고정한다. 없으면 브라우저가 start_url로 식별해서

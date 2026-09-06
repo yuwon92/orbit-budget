@@ -586,7 +586,7 @@ function SettingsView({ dark, onTheme, openOnboarding, sub, setSub, plannedIncom
       icon: Sparkles,
       title: 'Orbit Wish',
       desc: '자유비용을 모아 위시 이루기',
-      // 같은 도메인의 두 번째 앱. 설치돼 있으면 그 앱이, 아니면 브라우저가 연다
+      // 같은 앱 안의 다른 화면이다. 페이지 이동이지만 설치된 앱 밖으로 나가지 않는다
       onClick: () => { window.location.href = import.meta.env.DEV ? '/apps/wish/' : '/wish/' },
     },
   ]

@@ -14,7 +14,7 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `npm run dev` | 두 앱 통합 개발 서버 (`/apps/orbit/`, `/apps/wish/`). IndexedDB 공유 검증에 필수 |
 | `npm run dev:orbit` | Orbit 단독 개발 서버 |
 | `npm run dev:wish` | Wish 단독 개발 서버 |
-| `npm run build` | Orbit, Wish 타입 검사 + vite 빌드 → `dist/`(Orbit 루트) + `dist/wish/`. **Orbit이 dist를 비우므로 순서 고정** |
+| `npm run build` | `clean → wish → orbit` 순서 고정. Orbit 빌드가 `wish/**`까지 서비스 워커에 담는다 |
 | `npm run verify` | `verify-budget.ts` + `verify-wish.ts` — 순수 계산 검산 (node가 .ts 직접 실행) |
 
 **계산 로직을 고치면 `npm run verify`를 반드시 통과시킬 것.** 테스트 프레임워크 없음, assert 스크립트 하나가 전부.
@@ -53,6 +53,8 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `scripts/verify-budget.ts` | Orbit 계산 검산 |
 | `scripts/verify-wish.ts` | Wish 계산 검산 |
 | `scripts/gen-icons.ts` | PWA 아이콘 생성 |
+
+**설치되는 PWA는 하나다.** iOS가 홈 화면 앱마다 저장소를 나누기 때문에, 아이콘을 두 개 만들면 Wish가 Orbit 예산을 읽지 못한다(기기 확인 완료). manifest·서비스 워커는 `apps/orbit`에만 있고 Wish는 같은 앱의 `/wish/` 화면이다. 코드베이스는 그대로 분리돼 있어 나중에 도메인을 나눌 때 manifest만 되살리면 된다.
 
 Wish는 게임 허브 흐름이다. 자원 HUD 상시 노출, 오늘의 미션과 보상 수령, 퀘스트 로그·우주 도감 분리, 설정은 관측자 화면 안. 제품 규칙과 수치는 `orbit-wish-spec.md`, 디자인은 `orbit-wish-ui-design-guide.md`(둘 다 gitignore된 로컬 문서).
 
