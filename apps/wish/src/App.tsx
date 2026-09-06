@@ -8,6 +8,7 @@ import {
   keptDays,
   orbitLevelOf,
   progress as progressOf,
+  totalDailyShare,
   remainingDays,
   stageOf,
   vaultTotal,
@@ -25,7 +26,20 @@ import {
   sumXp,
   totalXp as totalXpOf,
 } from '@orbit/wish-core/xp'
-import type { Claim, Wish, WishEvent } from '@orbit/wish-core/types'
+import type { Wish, WishEvent } from '@orbit/wish-core/types'
+import {
+  chooseWait,
+  ensurePlayer,
+  claimAll as claimAllWrite,
+  claimMission,
+  createWish,
+  deposit,
+  markCelebratedLevel,
+  purchaseWish,
+  recordWaitDay,
+  renameWish,
+  skipDay,
+} from '@orbit/wish-bridge'
 import { OrbitRing, PixelPlanet } from './components/PixelPlanet'
 import { PixelBar } from './components/PixelBar'
 import { OrbitMap } from './components/OrbitMap'
@@ -34,7 +48,8 @@ import { CollectSheet, WishSheet } from './components/Sheets'
 import { buildMissions, type Mission } from './missions'
 import { CODEX_SLOTS, STAGE_NAMES, TITLES } from './lib/labels'
 import { formatDate, pad2, todayString } from './lib/format'
-import { SAMPLE_CARRYOVER, SAMPLE_CLAIMS, SAMPLE_EVENTS, SAMPLE_FREE_AMOUNT, SAMPLE_WISHES } from './data'
+import { useClaims, usePlayer, useWishEvents, useWishes } from './lib/hooks'
+import { SAMPLE_CARRYOVER, SAMPLE_FREE_AMOUNT } from './data'
 
 type Screen = 'hub' | 'quests' | 'codex' | 'observer'
 
@@ -57,15 +72,22 @@ function readTheme() {
   return matchMedia('(prefers-color-scheme: dark)').matches
 }
 
-const newId = () => crypto.randomUUID()
-
 export default function App() {
   const today = useMemo(todayString, [])
   const [screen, setScreen] = useState<Screen>('hub')
-  const [wishes, setWishes] = useState<Wish[]>(SAMPLE_WISHES)
-  const [events, setEvents] = useState<WishEvent[]>(SAMPLE_EVENTS)
-  const [claims, setClaims] = useState<Claim[]>(SAMPLE_CLAIMS)
-  const [activeId, setActiveId] = useState<string | null>(SAMPLE_WISHES[0]?.id ?? null)
+
+  // 저장소 구독은 여기 한 곳뿐. 화면들은 prop으로 받는다
+  const storedWishes = useWishes()
+  const storedEvents = useWishEvents()
+  const storedClaims = useClaims()
+  const player = usePlayer()
+  const loaded =
+    storedWishes !== undefined && storedEvents !== undefined && storedClaims !== undefined && player !== undefined
+  const wishes = useMemo(() => storedWishes ?? [], [storedWishes])
+  const events = useMemo(() => storedEvents ?? [], [storedEvents])
+  const claims = useMemo(() => storedClaims ?? [], [storedClaims])
+
+  const [activeId, setActiveId] = useState<string | null>(null)
   const [freeAmount, setFreeAmount] = useState(SAMPLE_FREE_AMOUNT)
   // 어제 남은 예산. Orbit 연동 전까지는 고정 샘플 값
   const carryover = SAMPLE_CARRYOVER
@@ -96,6 +118,12 @@ export default function App() {
     return () => window.clearTimeout(timer)
   }, [xpPop])
 
+  // Player 레코드 생성과 마지막 접속일 갱신. 구독 밖에서 한다
+  useEffect(() => {
+    if (player === undefined) return
+    if (player === null || player.lastOpenedDate !== today) void ensurePlayer(today)
+  }, [player, today])
+
   // 화면에 필요한 값은 전부 이벤트와 수령 기록에서 파생한다. 저장하는 XP는 없다.
   const openWishes = useMemo(
     () => wishes.filter((wish) => wish.status === 'active' || wish.status === 'ready' || wish.status === 'waiting'),
@@ -117,60 +145,54 @@ export default function App() {
   )
   const pendingXp = sumXp(pending)
   const vault = vaultTotal(wishes)
+  // 등록할 때 무리한 계획을 경고하는 데 쓴다
+  const existingShare = totalDailyShare(openWishes, events, today)
   const active = openWishes.find((wish) => wish.id === activeId) ?? openWishes[0] ?? null
 
   const pushReward = useCallback((next: Reward) => setRewards((current) => [...current, next]), [])
 
   // XP는 파생값이라 레벨업은 "지급"이 아니라 문턱을 넘었는지 감시해서 잡는다.
-  const [celebratedLevel, setCelebratedLevel] = useState(level.level)
+  // 어디까지 연출을 봤는지는 Player에 남긴다. 안 그러면 새로고침마다 다시 뜬다.
   useEffect(() => {
-    if (level.level <= celebratedLevel) return
+    if (!loaded || !player || level.level <= player.celebratedLevel) return
     const unlock = UNLOCKS.find((item) => item.level === level.level)
     pushReward({
       kind: 'levelup',
-      from: celebratedLevel,
+      from: player.celebratedLevel,
       to: level.level,
       title: level.title,
       unlock: unlock?.name ?? null,
     })
-    setCelebratedLevel(level.level)
-  }, [level.level, level.title, celebratedLevel, pushReward])
+    void markCelebratedLevel(level.level)
+  }, [loaded, player, level.level, level.title, pushReward])
 
-  const addEvent = useCallback((event: Omit<WishEvent, 'id' | 'createdAt'>) => {
-    setEvents((current) => [...current, { ...event, id: newId(), createdAt: Date.now() }])
-  }, [])
-
-  function collect(amount: number) {
+  async function collect(amount: number) {
     if (!collecting) return
     const target = collecting
     const full = amount >= dailyShare(target, events, today)
-    addEvent({ wishId: target.id, type: 'deposit', amount, date: today })
-    setWishes((current) => current.map((wish) => {
-      if (wish.id !== target.id) return wish
-      const savedAmount = Math.min(wish.targetAmount, wish.savedAmount + amount)
-      return { ...wish, savedAmount, status: savedAmount >= wish.targetAmount ? 'ready' : wish.status }
-    }))
-    setFreeAmount((current) => Math.max(0, current - amount))
     setCollecting(null)
+    await deposit(target.id, amount, today)
+    setFreeAmount((current) => Math.max(0, current - amount))
     setToast(full ? '하루 몫 완료 · 수령 대기' : '부분 납입 기록 · 수령 대기')
   }
 
-  function skipToday() {
+  async function skipToday() {
     if (!collecting) return
-    addEvent({ wishId: collecting.id, type: 'skip', date: today })
+    const target = collecting
     setCollecting(null)
+    await skipDay(target.id, today)
     setToast('오늘은 쉬어감. 벌점 없음')
   }
 
   /** 미션 수행. 하루 몫만 시트를 열고 나머지는 그 자리에서 이벤트를 남긴다 */
-  function runMission(mission: Mission) {
+  async function runMission(mission: Mission) {
     if (mission.kind === 'share') {
       const wish = openWishes.find((item) => item.id === mission.wishId)
       if (wish) setCollecting(wish)
       return
     }
     if (mission.kind === 'wait' && mission.wishId) {
-      addEvent({ wishId: mission.wishId, type: 'wait', date: today })
+      await recordWaitDay(mission.wishId, today)
       setToast('오늘도 기다리기 기록')
       return
     }
@@ -180,40 +202,30 @@ export default function App() {
         setToast('넣을 궤도가 없다')
         return
       }
-      addEvent({ wishId: target.id, type: 'deposit', amount: carryover, date: today, source: 'carryover' })
-      setWishes((current) => current.map((wish) => {
-        if (wish.id !== target.id) return wish
-        const savedAmount = Math.min(wish.targetAmount, wish.savedAmount + carryover)
-        return { ...wish, savedAmount, status: savedAmount >= wish.targetAmount ? 'ready' : wish.status }
-      }))
       // 금액을 0으로 만들면 미션 줄 자체가 사라진다. 중복 수행은 이벤트 유무로 막는다
+      await deposit(target.id, carryover, today, 'carryover')
       setFreeAmount((current) => Math.max(0, current - carryover))
       setToast(`남은 예산 ${money(carryover)}원 저금 완료`)
     }
   }
 
   /** 미션 하나 수령 */
-  function claimOne(mission: Mission) {
+  async function claimOne(mission: Mission) {
     const unit = pending.find((item) => item.date === mission.date && item.missionId === mission.id)
     if (!unit) return
-    setClaims((current) => [...current, { id: claimIdOf(unit.date, unit.missionId), date: unit.date, missionId: unit.missionId, createdAt: Date.now() }])
     setXpPop(unit.xp)
+    await claimMission(unit.date, unit.missionId)
   }
 
   /** 지금 받을 수 있는 것 전부 수령. 지난 날짜의 미수령분도 함께 들어온다 */
-  function claimAll() {
+  async function claimAll() {
     if (!pending.length) return
-    const now = Date.now()
-    setClaims((current) => [
-      ...current,
-      ...pending.map((unit) => ({ id: claimIdOf(unit.date, unit.missionId), date: unit.date, missionId: unit.missionId, createdAt: now })),
-    ])
     setXpPop(pendingXp)
+    await claimAllWrite(pending)
   }
 
-  function completeWish(wish: Wish) {
-    addEvent({ wishId: wish.id, type: 'purchase', date: today })
-    setWishes((current) => current.map((item) => (item.id === wish.id ? { ...item, status: 'done' } : item)))
+  async function completeWish(wish: Wish) {
+    await purchaseWish(wish.id, today)
     pushReward({
       kind: 'complete',
       name: wish.name,
@@ -231,6 +243,9 @@ export default function App() {
     }
     setAdding(true)
   }
+
+  // 저장소를 읽는 동안은 화면을 그리지 않는다. 빈 궤도 화면이 한 번 번쩍이는 것을 막는다
+  if (!loaded) return <div className="wl-app loading" />
 
   return (
     <div className={`wl-app screen-${screen}`}>
@@ -285,8 +300,8 @@ export default function App() {
             onAdd={openAdd}
             onEdit={(wish) => setEditing(wish)}
             onComplete={completeWish}
-            onWait={(wish) => {
-              setWishes((current) => current.map((item) => (item.id === wish.id ? { ...item, status: 'waiting' } : item)))
+            onWait={async (wish) => {
+              await chooseWait(wish.id, today)
               setToast(`기다리는 중 · 하루마다 +${XP.wait} XP`)
             }}
             onFocus={(wish) => { setActiveId(wish.id); setScreen('hub') }}
@@ -328,11 +343,13 @@ export default function App() {
       {adding && (
         <WishSheet
           today={today}
+          existingShare={existingShare}
+          freeAmount={freeAmount}
           onClose={() => setAdding(false)}
-          onCreate={(wish) => {
-            setWishes((current) => [...current, wish])
-            setActiveId(wish.id)
+          onCreate={async (input) => {
             setAdding(false)
+            const wish = await createWish({ ...input, today })
+            setActiveId(wish.id)
             setScreen('hub')
             setToast('새 행성이 궤도에 올랐다')
           }}
@@ -342,10 +359,13 @@ export default function App() {
         <WishSheet
           today={today}
           wish={editing}
+          existingShare={existingShare}
+          freeAmount={freeAmount}
           onClose={() => setEditing(null)}
-          onRename={(name) => {
-            setWishes((current) => current.map((item) => (item.id === editing.id ? { ...item, name } : item)))
+          onRename={async (name) => {
+            const target = editing
             setEditing(null)
+            await renameWish(target.id, name)
             setToast('이름을 바꿨다')
           }}
         />

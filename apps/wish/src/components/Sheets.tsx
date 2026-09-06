@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { Minus, Plus, X } from 'lucide-react'
 import { money } from '@orbit/budget-core/format'
 import { XP } from '@orbit/wish-core/xp'
-import { addDays, daysBetween, seedFromId } from '@orbit/wish-core/wish'
+import { addDays, daysBetween } from '@orbit/wish-core/wish'
 import type { Wish } from '@orbit/wish-core/types'
 
 /** 미션 수행 시트. 하루 몫이 프리필된 상태로 열린다. */
@@ -83,11 +83,21 @@ export function CollectSheet({ wishName, dailyShare, availableAmount, onClose, o
  * 새 위시 등록과 이름 수정을 겸한다.
  * 목표 금액·기간 수정은 회수 흐름이 걸려 있어 다음 단계로 미룬다.
  */
-export function WishSheet({ today, wish, onClose, onCreate, onRename }: {
+export interface NewWishDraft {
+  name: string
+  targetAmount: number
+  targetDate: string | null
+}
+
+export function WishSheet({ today, wish, existingShare, freeAmount, onClose, onCreate, onRename }: {
   today: string
   wish?: Wish
+  /** 이미 진행 중인 위시들의 하루 몫 합계 */
+  existingShare: number
+  /** 이번 달 남은 자유비용 */
+  freeAmount: number
   onClose: () => void
-  onCreate?: (wish: Wish) => void
+  onCreate?: (draft: NewWishDraft) => void
   onRename?: (name: string) => void
 }) {
   const editing = Boolean(wish)
@@ -111,6 +121,8 @@ export function WishSheet({ today, wish, onClose, onCreate, onRename }: {
   const targetAmount = Number(amount)
   const days = targetDate ? Math.max(1, daysBetween(today, targetDate) + 1) : null
   const preview = days && targetAmount > 0 ? Math.floor(targetAmount / days) : 0
+  // 이미 진행 중인 몫 + 지금 만들 몫이 자유비용의 절반을 넘으면 기간 연장을 권한다
+  const heavy = preview > 0 && freeAmount > 0 && (existingShare + preview) / freeAmount > 0.5
 
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -120,18 +132,7 @@ export function WishSheet({ today, wish, onClose, onCreate, onRename }: {
       return
     }
     if (targetAmount <= 0) return
-    const id = crypto.randomUUID()
-    onCreate?.({
-      id,
-      name: name.trim(),
-      targetAmount,
-      savedAmount: 0,
-      startDate: today,
-      targetDate,
-      status: 'active',
-      seed: seedFromId(id),
-      createdAt: Date.now(),
-    })
+    onCreate?.({ name: name.trim(), targetAmount, targetDate })
   }
 
   return (
@@ -184,6 +185,12 @@ export function WishSheet({ today, wish, onClose, onCreate, onRename }: {
           <strong>{preview ? `${money(preview)}원` : '—'}</strong>
           <span>{editing ? '금액·기간 수정은 다음 단계' : days ? `${days}일 궤도` : '기간을 정하면 하루 몫이 생긴다'}</span>
         </p>
+
+        {!editing && heavy && (
+          <p className="sheet-warning">
+            하루 몫 합계가 {money(existingShare + preview)}원. 남은 자유비용의 절반을 넘는다. 기간을 늘리면 하루 부담이 줄어든다.
+          </p>
+        )}
 
         <button className="primary-button full" type="submit">{editing ? '이름 저장' : '궤도에 올리기'}</button>
       </form>

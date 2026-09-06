@@ -31,14 +31,17 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `apps/wish/src/App.tsx` | Wish 셸 + 화면 4개(오르빗 허브/퀘스트 로그/우주 도감/관측자) |
 | `apps/wish/src/missions.ts` | 오늘의 미션 문구·상태. 앱 고유 개념이라 wish-core에 두지 않음 |
 | `apps/wish/src/planet.ts` | 픽셀 행성 블록 생성. 진행률 → 티끌·위성·행성·고리·위성대·성계 |
-| `apps/wish/src/data.ts` | 샘플 위시·이벤트·수령 기록. **DB 연결 전까지의 임시 데이터** |
+| `apps/wish/src/data.ts` | 자유비용·남은 예산 자리표시 값. Orbit 연동 전까지만 |
 | `apps/wish/src/lib/labels.ts` | 단계 이름·칭호 문구·도감 칸 수 |
+| `apps/wish/src/lib/hooks.ts` | `useWishes`/`useWishEvents`/`useClaims`/`usePlayer`. **App에서만 구독하고 prop으로 내림** |
 | `apps/wish/src/lib/format.ts` | `todayString`·`formatDate`·`pad2` |
 | `apps/wish/src/components/` | `PixelPlanet`(행성·궤도 링), `PixelBar`, `OrbitMap`, `RewardOverlay`, `Sheets` |
 | `apps/wish/src/index.css` | Wish 전역 CSS 한 파일. 밝은 노랑 우주 |
 | `packages/wish-core/src/types.ts` | Wish·WishEvent·Claim·Player 타입 |
 | `packages/wish-core/src/wish.ts` | 하루 몫·남은 일수·하루 판정·월 저금 합계·구매 잠금. **순수 함수만** |
 | `packages/wish-core/src/xp.ts` | 배점표·레벨 곡선·미션 수령 단위·연속 기록·통계·칭호. **순수 함수만** |
+| `packages/wish-bridge/src/db.ts` | `orbital-wish` Dexie 인스턴스와 v1 스키마 |
+| `packages/wish-bridge/src/index.ts` | **위시 데이터의 유일한 쓰기 창구.** 이벤트와 savedAmount를 한 트랜잭션에서 갱신 |
 | `packages/budget-core/src/types.ts` | Orbit 도메인 타입 전부 |
 | `packages/budget-core/src/budget.ts` | **모든 계산. 순수 함수만. DB·UI 접근 금지** |
 | `packages/budget-core/src/format.ts` | 금액·요일 표시 함수 |
@@ -51,7 +54,7 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 
 Wish는 게임 허브 흐름이다. 자원 HUD 상시 노출, 오늘의 미션과 보상 수령, 퀘스트 로그·우주 도감 분리, 설정은 관측자 화면 안. 제품 규칙과 수치는 `orbit-wish-spec.md`, 디자인은 `orbit-wish-ui-design-guide.md`(둘 다 gitignore된 로컬 문서).
 
-**현재 Wish 데이터는 전부 `data.ts`의 샘플 메모리 상태이고 새로고침하면 초기화된다.** 타입은 실제 모델이라 다음 단계에서 Dexie만 얹으면 된다. Orbit 연동은 그 다음.
+**Wish 데이터는 `orbital-wish`(Dexie)에 저장된다.** 위시·이벤트·수령 기록·Player 네 스토어. 화면은 `packages/wish-bridge`를 통해서만 쓰고, 읽기는 `apps/wish/src/lib/hooks.ts`의 `useLiveQuery` 네 개가 전부다. 자유비용만 아직 자리표시 값이고 Orbit 연동은 다음 단계.
 
 **XP는 어디에도 저장하지 않는다.** `WishEvent`와 `Claim`(수령 영수증)에서 매번 다시 계산한다. 배점을 바꾸면 과거 기록도 새 배점으로 재계산된다. 미션은 행마다 개별 수령 버튼이 있고 아래 `CLAIM` 버튼이 미수령 전부를 한 번에 받는다. 승격 전 초안(위시 상세 중심 4탭, `PlanetVisual`, `orbital-wish` 스키마 선언)은 커밋 `70d9ce5`에 남아 있다.
 
