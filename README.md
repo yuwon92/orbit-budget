@@ -49,6 +49,22 @@ npm run verify       # 계산 로직 검산
 
 **빌드 순서 주의** — Orbit이 `dist` 루트를 비우므로 반드시 Orbit → Wish 순서여야 한다. `npm run build`가 그 순서다. `build:wish`만 돌린 뒤 `build:orbit`을 돌리면 `dist/wish`가 지워진다.
 
+## 배포
+
+Vercel 프로젝트 하나가 두 앱을 함께 올린다. 설정은 `vercel.json`에 고정되어 있어 대시보드 값과 무관하다.
+
+| 항목 | 값 |
+|---|---|
+| Build Command | `npm run build` |
+| Output Directory | `dist` |
+| Root Directory | 저장소 루트 |
+| Orbit | `/` |
+| Wish | `/wish/` |
+
+서비스 워커와 manifest는 캐시하지 않도록 헤더를 지정한다. 새 배포가 기존 설치 앱에 바로 반영되게 하기 위함이다.
+
+**manifest `id`를 바꾸지 말 것.** Orbit `'/'`, Wish `'/wish/'`. 바꾸면 이미 홈 화면에 설치된 앱이 다른 앱으로 인식되어 업데이트되지 않고 아이콘이 하나 더 생긴다.
+
 ## 주의사항
 
 - 데이터는 브라우저 IndexedDB에만 저장. 기기 간 동기화 없음 (PC와 폰 별개)
