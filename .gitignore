@@ -10,6 +10,7 @@ orbit-wish-spec.md
 orbit-wish-ui-design-guide.md
 wish-app-ui-guide.md
 ORBIT-WISH-HANDOFF.md
+ORBIT-WISH-DEPLOYMENT-SYNC-PLAN.md
 *.tsbuildinfo
 vite.config.d.ts
 vite.config.js
