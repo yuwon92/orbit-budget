@@ -18,6 +18,7 @@ import {
   Search,
   Settings,
   SlidersHorizontal,
+  Sparkles,
   Sun,
   Trash2,
   WalletCards,
@@ -29,6 +30,7 @@ import { ko } from 'date-fns/locale'
 import { buildBreakdown, inQuickSlot, monthlyFreeAmount, spentByCategory, spentOnDate } from './lib/budget'
 import { db, requestPersistentStorage, setQuickSlot } from './lib/db'
 import { money } from './lib/format'
+import { readPlannedIncome, writePlannedIncome } from './lib/settings'
 import { useCategories } from './lib/hooks'
 import type { Transaction } from './lib/types'
 import { buildCsv, downloadCsv } from './lib/csv'
@@ -51,16 +53,6 @@ type SettingsSub = 'categories' | 'recurring' | null
 /** 테마 저장 키. index.html의 첫 페인트 스크립트도 같은 키를 읽는다. */
 const THEME_KEY = 'orbit-theme'
 
-/** 예정 수입을 자유비용에 넣을지. 저장된 적이 없으면 포함이 기본. */
-const PLANNED_INCOME_KEY = 'orbit-planned-income'
-
-function readPlannedIncome(): boolean {
-  try {
-    return localStorage.getItem(PLANNED_INCOME_KEY) !== 'exclude'
-  } catch {
-    return true
-  }
-}
 const ONBOARDING_KEY = 'orbit-onboarding-v1'
 
 function onboardingSeen(): boolean {
@@ -590,6 +582,13 @@ function SettingsView({ dark, onTheme, openOnboarding, sub, setSub, plannedIncom
       desc: reserve > 0 ? `이번 달 예비비 ${money(reserve)}원` : '이번 달 예비비 없음',
       onClick: () => setReserveOpen(true),
     },
+    {
+      icon: Sparkles,
+      title: 'Orbit Wish',
+      desc: '자유비용을 모아 위시 이루기',
+      // 같은 도메인의 두 번째 앱. 설치돼 있으면 그 앱이, 아니면 브라우저가 연다
+      onClick: () => { window.location.href = import.meta.env.DEV ? '/apps/wish/' : '/wish/' },
+    },
   ]
   return <div className="view"><div className="page-heading"><div><p className="eyebrow">PREFERENCES</p><h1>설정</h1><p>나의 예산 행성을 관리하세요.</p></div></div><section className="settings-card">{settings.map(row=>{const Icon=row.icon;return <button className="setting-row" key={row.title} onClick={row.onClick}><span><Icon size={20}/></span><div><strong>{row.title}</strong><small>{row.desc}</small></div><ChevronRight size={18}/></button>})}<button className="setting-row" onClick={onPlannedIncome}><span><Coins size={20}/></span><div><strong>자유비용에 예정 수입 포함</strong><small>{plannedIncome?'아직 안 들어온 예정 수입도 더해서 계산':'실제로 들어온 수입만으로 계산'}</small></div><i className={`toggle ${plannedIncome?'on':''}`}><b/></i></button></section><h2 className="settings-subhead">앱 설정</h2><section className="settings-card"><button className="setting-row" onClick={openOnboarding}><span><HelpCircle size={20}/></span><div><strong>시작 안내 다시 보기</strong><small>수입·예산·예비비를 순서대로 설정</small></div><ChevronRight size={18}/></button><button className="setting-row" onClick={onTheme}><span>{dark?<Moon size={20}/>:<Sun size={20}/>}</span><div><strong>화면 테마</strong><small>{dark?'다크 모드':'라이트 모드'}</small></div><i className={`toggle ${dark?'on':''}`}><b/></i></button><button className="setting-row" onClick={exportCsv}><span><Download size={20}/></span><div><strong>데이터 내보내기</strong><small>CSV 파일로 안전하게 보관</small></div><ChevronRight size={18}/></button></section><p className="version">ORBIT BUDGET · UI PROTOTYPE 0.4</p>{reserveOpen && <ReserveSheet month={month} current={reserve} close={() => setReserveOpen(false)} />}</div>
 }
@@ -620,7 +619,7 @@ function App() {
   }, [dark])
   useEffect(() => {
     // 시크릿 모드 등에서 쓰기가 막혀도 화면은 그대로 둔다.
-    try { localStorage.setItem(PLANNED_INCOME_KEY, plannedIncome ? 'include' : 'exclude') } catch { /* 저장 불가 */ }
+    writePlannedIncome(plannedIncome)
   }, [plannedIncome])
   useEffect(() => { document.body.style.overflow = sheet ? 'hidden' : '' }, [sheet])
   const openExpense = () => setSheet({})

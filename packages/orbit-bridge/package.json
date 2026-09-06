@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./db": "./src/db.ts",
+    "./settings": "./src/settings.ts",
     "./recurring": "./src/recurring.ts"
   }
 }

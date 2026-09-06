@@ -34,6 +34,7 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `apps/wish/src/data.ts` | 자유비용·남은 예산 자리표시 값. Orbit 연동 전까지만 |
 | `apps/wish/src/lib/labels.ts` | 단계 이름·칭호 문구·도감 칸 수 |
 | `apps/wish/src/lib/hooks.ts` | `useWishes`/`useWishEvents`/`useClaims`/`usePlayer`. **App에서만 구독하고 prop으로 내림** |
+| `apps/wish/src/lib/budget.ts` | Orbit 예산 요약을 읽는 통로. 저장소가 나뉘는 환경에서는 **이 파일만 서버 조회로 교체** |
 | `apps/wish/src/lib/format.ts` | `todayString`·`formatDate`·`pad2` |
 | `apps/wish/src/components/` | `PixelPlanet`(행성·궤도 링), `PixelBar`, `OrbitMap`, `RewardOverlay`, `Sheets` |
 | `apps/wish/src/index.css` | Wish 전역 CSS 한 파일. 밝은 노랑 우주 |
@@ -47,12 +48,15 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `packages/budget-core/src/format.ts` | 금액·요일 표시 함수 |
 | `packages/orbit-bridge/src/db.ts` | Orbit Dexie 인스턴스, 스키마·마이그레이션, 쓰기 헬퍼 |
 | `packages/orbit-bridge/src/recurring.ts` | 반복 거래 생성·동기화 |
-| `packages/orbit-bridge/src/index.ts` | Wish용 읽기 전용 예산 스냅샷. 쓰기 API는 아직 없음 |
+| `packages/orbit-bridge/src/index.ts` | Wish용 읽기 전용 예산 스냅샷(`OrbitBudgetSnapshot`). 쓰기 API는 아직 없음 |
+| `packages/orbit-bridge/src/settings.ts` | 두 앱이 함께 읽는 설정(`orbit-planned-income`) |
 | `scripts/verify-budget.ts` | Orbit 계산 검산 |
 | `scripts/verify-wish.ts` | Wish 계산 검산 |
 | `scripts/gen-icons.ts` | PWA 아이콘 생성 |
 
 Wish는 게임 허브 흐름이다. 자원 HUD 상시 노출, 오늘의 미션과 보상 수령, 퀘스트 로그·우주 도감 분리, 설정은 관측자 화면 안. 제품 규칙과 수치는 `orbit-wish-spec.md`, 디자인은 `orbit-wish-ui-design-guide.md`(둘 다 gitignore된 로컬 문서).
+
+Wish는 Orbit 예산을 `getOrbitSnapshot()`으로 **읽기만** 한다. `connected`는 DB가 열리는지가 아니라 데이터가 있는지로 판단한다 — 저장소가 분리된 환경에서는 빈 DB가 새로 만들어질 뿐이라 존재 여부로는 알 수 없다. 위시 저금을 자유비용에서 실제로 빼는 것은 아직 하지 않는다.
 
 **Wish 데이터는 `orbital-wish`(Dexie)에 저장된다.** 위시·이벤트·수령 기록·Player 네 스토어. 화면은 `packages/wish-bridge`를 통해서만 쓰고, 읽기는 `apps/wish/src/lib/hooks.ts`의 `useLiveQuery` 네 개가 전부다. 자유비용만 아직 자리표시 값이고 Orbit 연동은 다음 단계.
 

@@ -49,7 +49,8 @@ import { buildMissions, type Mission } from './missions'
 import { CODEX_SLOTS, STAGE_NAMES, TITLES } from './lib/labels'
 import { formatDate, pad2, todayString } from './lib/format'
 import { useClaims, usePlayer, useWishEvents, useWishes } from './lib/hooks'
-import { SAMPLE_CARRYOVER, SAMPLE_FREE_AMOUNT } from './data'
+import { loadBudgetView, sinceLabel, type BudgetView } from './lib/budget'
+import { SAMPLE_CARRYOVER } from './data'
 
 type Screen = 'hub' | 'quests' | 'codex' | 'observer'
 
@@ -88,7 +89,12 @@ export default function App() {
   const claims = useMemo(() => storedClaims ?? [], [storedClaims])
 
   const [activeId, setActiveId] = useState<string | null>(null)
-  const [freeAmount, setFreeAmount] = useState(SAMPLE_FREE_AMOUNT)
+
+  // Orbit 예산 요약. 저금할 때마다 다시 읽어 숫자를 맞춘다
+  const [budget, setBudget] = useState<BudgetView | null>(null)
+  const refreshBudget = useCallback(() => { void loadBudgetView(today).then(setBudget) }, [today])
+  useEffect(refreshBudget, [refreshBudget])
+  const freeAmount = budget?.snapshot?.freeAmount ?? 0
   // 어제 남은 예산. Orbit 연동 전까지는 고정 샘플 값
   const carryover = SAMPLE_CARRYOVER
   const [collecting, setCollecting] = useState<Wish | null>(null)
@@ -172,7 +178,7 @@ export default function App() {
     const full = amount >= dailyShare(target, events, today)
     setCollecting(null)
     await deposit(target.id, amount, today)
-    setFreeAmount((current) => Math.max(0, current - amount))
+    refreshBudget()
     setToast(full ? '하루 몫 완료 · 수령 대기' : '부분 납입 기록 · 수령 대기')
   }
 
@@ -204,7 +210,7 @@ export default function App() {
       }
       // 금액을 0으로 만들면 미션 줄 자체가 사라진다. 중복 수행은 이벤트 유무로 막는다
       await deposit(target.id, carryover, today, 'carryover')
-      setFreeAmount((current) => Math.max(0, current - carryover))
+      refreshBudget()
       setToast(`남은 예산 ${money(carryover)}원 저금 완료`)
     }
   }
@@ -264,7 +270,13 @@ export default function App() {
           </button>
         </div>
         <ul className="hud-resources">
-          <li><span className="res-icon" aria-hidden="true">🪙</span><div><strong>{money(freeAmount)}원</strong><span>남은 자유비용</span></div></li>
+          <li>
+            <span className="res-icon" aria-hidden="true">🪙</span>
+            <div>
+              <strong>{budget?.snapshot ? `${money(freeAmount)}원` : '—'}</strong>
+              <span>{budget?.snapshot ? (budget.stale ? '자유비용 (지난 값)' : '남은 자유비용') : '연결 안 됨'}</span>
+            </div>
+          </li>
           <li><span className="res-icon" aria-hidden="true">☄️</span><div><strong>{stats.streak}일</strong><span>연속 관측</span></div></li>
           <li><span className="res-icon" aria-hidden="true">🫙</span><div><strong>{money(vault)}원</strong><span>저금통</span></div></li>
         </ul>
@@ -315,6 +327,7 @@ export default function App() {
             pendingXp={pendingXp}
             stats={stats}
             titles={titles}
+            budget={budget}
             dark={dark}
             onThemeChange={setDark}
           />
@@ -664,12 +677,13 @@ function CodexScreen({ wishes, events }: { wishes: Wish[]; events: WishEvent[] }
   )
 }
 
-function ObserverScreen({ level, totalXp, pendingXp, stats, titles, dark, onThemeChange }: {
+function ObserverScreen({ level, totalXp, pendingXp, stats, titles, budget, dark, onThemeChange }: {
   level: ReturnType<typeof levelFromXp>
   totalXp: number
   pendingXp: number
   stats: ReturnType<typeof observerStats>
   titles: ReturnType<typeof earnedTitles>
+  budget: BudgetView | null
   dark: boolean
   onThemeChange: (value: boolean) => void
 }) {
@@ -759,8 +773,21 @@ function ObserverScreen({ level, totalXp, pendingXp, stats, titles, dark, onThem
             </div>
           </div>
           <div className="setting-row">
-            <div><strong>Orbit Budget</strong><span>같은 브라우저 연결</span></div>
-            <span className="connection-state"><i /> 연결 예정</span>
+            <div>
+              <strong>Orbit Budget</strong>
+              <span>
+                {!budget
+                  ? '예산 확인 중'
+                  : budget.snapshot && !budget.stale
+                    ? `남은 자유비용 ${money(budget.snapshot.freeAmount)}원`
+                    : budget.snapshot
+                      ? `마지막 확인 ${sinceLabel(budget.snapshot.calculatedAt)} · ${money(budget.snapshot.freeAmount)}원`
+                      : 'Orbit 예산을 읽지 못했다'}
+              </span>
+            </div>
+            <span className={`connection-state${budget?.snapshot && !budget.stale ? '' : ' off'}`}>
+              <i /> {budget?.snapshot && !budget.stale ? '연결됨' : '연결 안 됨'}
+            </span>
           </div>
           <div className="setting-row">
             <div><strong>프로토타입</strong><span>샘플 데이터 · 새로고침 시 초기화</span></div>

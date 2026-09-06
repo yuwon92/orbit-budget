@@ -723,6 +723,8 @@ ul { padding: 0; list-style: none; }
 
 .connection-state { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-secondary); }
 .connection-state i { width: 7px; height: 7px; background: var(--star-yellow); }
+.connection-state.off { color: var(--text-tertiary); }
+.connection-state.off i { background: var(--border-strong); }
 .version-label { font-family: var(--font-pixel); font-size: 12px; color: var(--text-tertiary); }
 
 .orbit-link {
