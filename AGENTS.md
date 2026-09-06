@@ -14,7 +14,7 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `npm run dev` | 두 앱 통합 개발 서버 (`/apps/orbit/`, `/apps/wish/`). IndexedDB 공유 검증에 필수 |
 | `npm run dev:orbit` | Orbit 단독 개발 서버 |
 | `npm run dev:wish` | Wish 단독 개발 서버 |
-| `npm run build` | Orbit, Wish 타입 검사 + vite 빌드 → `dist/orbit/`, `dist/wish/` |
+| `npm run build` | Orbit, Wish 타입 검사 + vite 빌드 → `dist/`(Orbit 루트) + `dist/wish/`. **Orbit이 dist를 비우므로 순서 고정** |
 | `npm run verify` | `verify-budget.ts` + `verify-wish.ts` — 순수 계산 검산 (node가 .ts 직접 실행) |
 
 **계산 로직을 고치면 `npm run verify`를 반드시 통과시킬 것.** 테스트 프레임워크 없음, assert 스크립트 하나가 전부.

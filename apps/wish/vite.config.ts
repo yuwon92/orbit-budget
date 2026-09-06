@@ -15,6 +15,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
+        // Orbit(id '/')과 다른 앱임을 고정한다. 같은 도메인의 두 번째 PWA
+        id: '/wish/',
         name: 'Orbit Wish — 위시를 현실로',
         short_name: 'Orbit Wish',
         description: '자유비용을 모아 위시를 이루는 목표 관리 앱',

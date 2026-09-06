@@ -4,7 +4,7 @@
 
 ## 앱
 
-- **Orbit Budget** (`/orbit/`) — 항목별 예산, 거래, 남은 자유비용
+- **Orbit Budget** (`/`) — 항목별 예산, 거래, 남은 자유비용
 - **Orbit Wish** (`/wish/`) — 자유비용을 모아 위시를 이루는 목표 관리. 오르빗 허브·퀘스트 로그·우주 도감·관측자 4화면. 현재 샘플 데이터만 사용
 
 ## 기능
@@ -45,12 +45,15 @@ npm run verify       # 계산 로직 검산
 
 통합 개발 서버 경로: `http://localhost:5173/apps/orbit/`, `http://localhost:5173/apps/wish/`
 
-프로덕션 결과물: `dist/orbit/`, `dist/wish/`
+프로덕션 결과물: `dist/`(Orbit, 도메인 루트) + `dist/wish/`(Wish)
+
+**빌드 순서 주의** — Orbit이 `dist` 루트를 비우므로 반드시 Orbit → Wish 순서여야 한다. `npm run build`가 그 순서다. `build:wish`만 돌린 뒤 `build:orbit`을 돌리면 `dist/wish`가 지워진다.
 
 ## 주의사항
 
 - 데이터는 브라우저 IndexedDB에만 저장. 기기 간 동기화 없음 (PC와 폰 별개)
-- 두 앱 연동은 동일한 프로토콜·도메인·포트에서만 가능
+- 두 앱 연동은 동일한 프로토콜·도메인·포트에서만 가능. iOS 홈 화면 앱은 앱마다 저장소가 나뉠 수 있어 실제 기기 확인 필요
+- Orbit의 배포 경로(`/`)·`start_url`·manifest `id`를 바꾸면 이미 설치된 홈 화면 앱이 다른 앱으로 인식된다
 - 브라우저 데이터 삭제 시 함께 소실
 - iOS 사파리는 7일 미방문 시 저장소 삭제. 홈 화면 추가하면 제외
 - 백업 수단은 설정 → CSV 내보내기뿐. 주기적 백업 권장

@@ -747,7 +747,7 @@ function ObserverScreen({ level, totalXp, pendingXp, stats, titles, dark, onThem
             <span className="version-label">WISH 0.1</span>
           </div>
         </div>
-        <a className="orbit-link" href={import.meta.env.DEV ? '/apps/orbit/' : '/orbit/'}><Orbit size={18} /> Orbit Budget 열기</a>
+        <a className="orbit-link" href={import.meta.env.DEV ? '/apps/orbit/' : '/'}><Orbit size={18} /> Orbit Budget 열기</a>
       </section>
     </main>
   )
