@@ -2,7 +2,7 @@
 // XP는 어디에도 저장하지 않고 이벤트와 수령 기록에서 매번 다시 계산한다.
 // 배점을 바꾸면 과거 기록도 새 배점으로 재계산된다. 스펙 §8·§9.
 
-import { dayStatus, daysBetween, depositsOn } from './wish.ts'
+import { actionDepositsOn, dayStatus, daysBetween } from './wish.ts'
 import type { Claim, Wish, WishEvent } from './types.ts'
 
 export const XP = {
@@ -103,9 +103,9 @@ export function missionUnits(wishes: Wish[], events: WishEvent[]): MissionUnit[]
     const wish = byId.get(event.wishId)
     if (!wish) continue
 
-    if (event.type === 'deposit' && (event.amount ?? 0) > 0) {
+    if (event.type === 'deposit' && event.source !== 'transfer' && (event.amount ?? 0) > 0) {
       const key = `${event.date}:${wish.id}`
-      if (!seenShare.has(key) && depositsOn(events, wish.id, event.date) > 0) {
+      if (!seenShare.has(key) && actionDepositsOn(events, wish.id, event.date) > 0) {
         seenShare.add(key)
         const status = dayStatus(wish, events, event.date)
         units.push({
@@ -162,7 +162,7 @@ export function totalXp(wishes: Wish[], events: WishEvent[], claims: Claim[]) {
 /** 저금한 날짜를 오름차순 연속 묶음으로 나눈다 */
 function depositRuns(events: WishEvent[]): string[][] {
   const dates = [...new Set(
-    events.filter((event) => event.type === 'deposit' && (event.amount ?? 0) > 0).map((event) => event.date),
+    events.filter((event) => event.type === 'deposit' && event.source !== 'transfer' && (event.amount ?? 0) > 0).map((event) => event.date),
   )].sort()
   const runs: string[][] = []
   for (const date of dates) {
@@ -206,7 +206,7 @@ export interface ObserverStats {
 }
 
 export function observerStats(wishes: Wish[], events: WishEvent[], today: string): ObserverStats {
-  const deposits = events.filter((event) => event.type === 'deposit' && (event.amount ?? 0) > 0)
+  const deposits = events.filter((event) => event.type === 'deposit' && event.source !== 'transfer' && (event.amount ?? 0) > 0)
   const carryovers = deposits.filter((event) => event.source === 'carryover')
   const { current, best } = streak(events, today)
   return {

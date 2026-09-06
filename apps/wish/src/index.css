@@ -6,6 +6,7 @@
   --star-yellow: #ffc52e;
   --orbit-gold: #ffb126;
   --solar-orange: #ea8a00;
+  --danger: #c84f42;
   --soft-yellow: #fff1ac;
   --cream: #fff8df;
 
@@ -23,6 +24,7 @@
   --font-sans: Pretendard, SUIT, Inter, system-ui, -apple-system, "Malgun Gothic", sans-serif;
   --font-pixel: "Mona12", ui-monospace, monospace;
   --font-emoji: "Mona12 Color Emoji", "Mona12 Emoji", emoji;
+  --font-emoji-mono: "Mona12 Emoji", "Mona12", monospace;
 
   color-scheme: light;
   font-family: var(--font-sans);
@@ -66,23 +68,6 @@ ul { padding: 0; list-style: none; }
   background: var(--background);
 }
 
-/* 배경에 떠 있는 노란 픽셀 별 몇 개 */
-.wl-app::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(var(--star-yellow), var(--star-yellow)),
-    linear-gradient(var(--orbit-gold), var(--orbit-gold)),
-    linear-gradient(var(--star-yellow), var(--star-yellow)),
-    linear-gradient(var(--soft-yellow), var(--soft-yellow));
-  background-repeat: no-repeat;
-  background-position: 11% 19%, 88% 27%, 17% 76%, 79% 68%;
-  background-size: 4px 4px, 8px 8px, 4px 4px, 6px 6px;
-  opacity: .85;
-}
-
 /* ── 자원 HUD ─────────────────────────────────────── */
 
 .wl-hud {
@@ -96,6 +81,29 @@ ul { padding: 0; list-style: none; }
 }
 
 .hud-top { display: flex; align-items: center; gap: 14px; }
+
+.app-switcher { position: relative; z-index: 23; }
+.app-switcher-dismiss { position: fixed; z-index: 21; inset: 0; padding: 0; border: 0; background: transparent; }
+.wish-wordmark { min-width: 82px; padding: 0; border: 0; display: flex; align-items: center; gap: 7px; font-family: var(--font-pixel); font-size: 16px; color: var(--text-primary); background: none; cursor: pointer; }
+.wish-wordmark > span:last-child { margin: -3px 0 0 1px; font-family: var(--font-pixel); font-size: 12px; color: var(--text-tertiary); }
+.app-switcher-menu { width: 190px; position: absolute; left: 0; top: calc(100% + 10px); padding: 7px; border: 1px solid var(--border); border-radius: 16px; display: grid; gap: 3px; background: var(--surface); box-shadow: var(--shadow); }
+.app-switcher-menu button, .app-switcher-menu a { min-height: 52px; padding: 8px 10px; border: 0; border-radius: 11px; display: flex; align-items: center; gap: 10px; color: var(--text-primary); text-align: left; text-decoration: none; background: transparent; cursor: pointer; }
+.app-switcher-menu .current { background: var(--surface-sub); }
+.app-switcher-menu > * > span { display: grid; gap: 2px; }
+/* 두 줄의 로고 상자를 같은 크기로 맞춰 글자 시작점을 정렬한다 */
+.app-switcher-menu .pixel-planet, .app-switcher-menu .menu-orbit-logo { flex: 0 0 28px; width: 28px; height: 28px; }
+.app-switcher-menu strong { font-family: var(--font-pixel); font-size: 13px; }
+.app-switcher-menu small { font-size: 10px; color: var(--text-tertiary); }
+.menu-orbit-logo {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 24%, rgba(255,255,255,.82) 0 7%, rgba(255,255,255,.22) 8% 18%, transparent 19%),
+    linear-gradient(145deg, #83e4e3 0%, #8ebeff 45%, #afa2e9 76%, #ebbde8 100%);
+  box-shadow: inset -3px -3px 7px rgba(84,75,145,.16), inset 2px 2px 5px rgba(255,255,255,.28);
+}
 
 .hud-avatar {
   padding: 0;
@@ -414,7 +422,7 @@ ul { padding: 0; list-style: none; }
 
 .mission-text { min-width: 0; }
 .mission-text strong { display: block; font-size: 14px; font-weight: 700; letter-spacing: -.02em; }
-.mission-sub { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+.mission-sub { margin-top: 7px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 12px; color: var(--text-secondary); }
 
 /* 미션의 대상 위시 이름. 노란 바탕으로 한눈에 잡히게 한다 */
 .mission-wish {
@@ -460,15 +468,20 @@ ul { padding: 0; list-style: none; }
   padding: 18px;
   border: 1px solid var(--border);
   border-radius: 22px;
-  display: grid;
-  grid-template-columns: 64px 1fr;
-  gap: 16px;
+  position: relative;
+  display: block;
   background: var(--surface);
 }
 .quest-card.state-ready { border-color: var(--star-yellow); }
 
-.quest-planet { padding: 0; border: 0; background: none; cursor: pointer; align-self: start; }
-.quest-body h2 { margin: 8px 0 14px; }
+.quest-body { min-width: 0; text-align: left; }
+.quest-card-head { display: grid; grid-template-columns: minmax(0, 1fr) 64px; align-items: end; gap: 12px; margin-bottom: 10px; }
+.quest-heading { min-width: 0; }
+.quest-planet { width: 64px; height: 64px; padding: 0; border: 0; display: grid; place-items: center; background: none; cursor: pointer; }
+.quest-title-row { min-height: 34px; margin: 8px 0 0; display: flex; align-items: center; gap: 8px; }
+.quest-title-row h2 { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.quest-edit { flex: 0 0 auto; width: 28px; height: 28px; padding: 0; border: 1px solid var(--border); border-radius: 8px; display: grid; place-items: center; font-family: var(--font-emoji-mono); font-size: 16px; line-height: 1; color: var(--text-secondary); background: var(--surface-sub); cursor: pointer; }
+.quest-edit span { width: 16px; height: 16px; display: grid; place-items: center; line-height: 16px; transform: translate(1px, 1px); }
 
 .quest-numbers { margin-top: 10px; display: flex; align-items: baseline; gap: 7px; font-variant-numeric: tabular-nums; }
 .quest-numbers strong { font-size: 16px; }
@@ -611,10 +624,11 @@ ul { padding: 0; list-style: none; }
   align-items: center;
   gap: 20px;
   background: linear-gradient(135deg, var(--cream), var(--background));
+  overflow: hidden;
 }
 :root.dark .observer-card { background: var(--surface); }
 
-.observer-planet { position: relative; display: grid; place-items: center; }
+.observer-planet { position: relative; width: 150px; height: 150px; display: grid; place-items: center; }
 .observer-planet .orbit-ring { position: absolute; }
 
 .observer-xp-numbers { margin-top: 10px; display: flex; align-items: baseline; gap: 7px; }
@@ -726,22 +740,6 @@ ul { padding: 0; list-style: none; }
 .connection-state.off { color: var(--text-tertiary); }
 .connection-state.off i { background: var(--border-strong); }
 .version-label { font-family: var(--font-pixel); font-size: 12px; color: var(--text-tertiary); }
-
-.orbit-link {
-  margin-top: 16px;
-  min-height: 48px;
-  border: 1px solid var(--border-strong);
-  border-radius: 15px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-primary);
-  text-decoration: none;
-  background: var(--surface);
-}
 
 /* ── 하단 내비 ────────────────────────────────────── */
 
@@ -891,6 +889,46 @@ ul { padding: 0; list-style: none; }
   color: var(--text-secondary);
 }
 
+.edit-wish-danger { padding-top: 2px; border-top: 1px solid var(--border); }
+.delete-wish-button { min-height: 42px; padding: 0; border: 0; display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--danger); background: none; cursor: pointer; }
+.edit-wish-danger > p { display: grid; gap: 4px; font-size: 12px; }
+.edit-wish-danger > p span { color: var(--text-secondary); }
+.edit-wish-danger > div { margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.danger-button { min-height: 42px; padding: 0 16px; border: 1px solid var(--danger); border-radius: 14px; color: white; background: var(--danger); cursor: pointer; }
+
+/* 목표 도달 3분기: 구매·기다리기·정리와 구매 잠금을 한 시트에서 다룬다 */
+.resolve-sheet { gap: 16px; }
+.resolve-summary { margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-secondary); }
+.resolve-summary strong { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.resolve-option { padding: 16px; border: 1px solid var(--border-strong); border-radius: 18px; display: grid; gap: 13px; background: var(--surface-sub); }
+.resolve-option > div { display: flex; align-items: flex-start; gap: 10px; }
+.resolve-option > div > svg { flex: 0 0 auto; margin-top: 1px; color: var(--solar-orange); }
+.resolve-option p { margin: 0; display: grid; gap: 4px; }
+.resolve-option p strong { font-size: 14px; }
+.resolve-option p span { font-size: 11px; line-height: 1.45; color: var(--text-secondary); }
+.resolve-option label { gap: 6px; }
+.resolve-option label em { margin-left: 5px; font-size: 10px; font-style: normal; color: var(--text-tertiary); }
+.resolve-option select { min-height: 44px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 12px; color: var(--text-primary); background: var(--surface); }
+.resolve-lock { text-align: center; font-size: 10px; line-height: 1.45; color: var(--text-tertiary); }
+.resolve-choice { width: 100%; min-height: 64px; padding: 12px 15px; border: 1px solid var(--border); border-radius: 16px; display: flex; align-items: flex-start; gap: 11px; text-align: left; color: var(--text-primary); background: var(--surface); cursor: pointer; }
+.resolve-choice > svg { flex: 0 0 auto; margin-top: 2px; color: var(--orbit-gold); }
+.resolve-choice > span { display: grid; gap: 4px; }
+.resolve-choice strong { font-size: 13px; }
+.resolve-choice small { font-size: 11px; line-height: 1.45; color: var(--text-secondary); }
+.resolve-choice.danger-choice > svg { color: var(--danger); }
+.resolve-cancel { display: grid; gap: 9px; }
+.resolve-cancel > div { margin-bottom: 5px; }
+.resolve-cancel h3 { margin: 8px 0 4px; font-size: 17px; }
+.resolve-cancel p { margin: 0; font-size: 11px; color: var(--text-secondary); }
+.resolve-cancel > button:not(.quiet-button) { width: 100%; min-height: 60px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 15px; display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left; color: var(--text-primary); background: var(--surface); cursor: pointer; }
+.resolve-cancel > button span { display: grid; gap: 4px; }
+.resolve-cancel > button strong { font-size: 13px; }
+.resolve-cancel > button small { font-size: 10px; color: var(--text-secondary); }
+.resolve-cancel > button b { white-space: nowrap; font-size: 12px; font-variant-numeric: tabular-nums; }
+.resolve-cancel > button:disabled { opacity: .45; cursor: default; }
+.resolve-cancel .resolve-to-free { border-color: color-mix(in srgb, var(--solar-orange) 45%, var(--border)); }
+.resolve-cancel .resolve-to-free b { color: var(--solar-orange); }
+
 .mission-gain {
   padding: 12px 14px;
   border: 1px solid var(--border);
@@ -994,7 +1032,7 @@ ul { padding: 0; list-style: none; }
   .observer-card { grid-template-columns: 1fr; justify-items: center; text-align: center; }
   .observer-xp { width: 100%; }
   .codex-detail dl { grid-template-columns: repeat(2, 1fr); }
-  .quest-card { grid-template-columns: 52px 1fr; gap: 12px; padding: 16px; }
+  .quest-card { padding: 16px; }
   .mission { grid-template-columns: 16px 1fr auto; row-gap: 6px; }
   .mission-go, .mission-state { grid-column: 3; }
 }

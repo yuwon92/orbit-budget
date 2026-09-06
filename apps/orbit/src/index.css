@@ -549,3 +549,78 @@ button.transaction-name,.history-row .row-open{border:0;background:none;padding:
    글자 단위 줄바꿈이라 '시작하 / 기'로 잘렸다(iOS Safari). 한 줄로 고정한다. */
 .onboarding-brand{min-width:0}
 .onboarding-brand strong{white-space:nowrap;word-break:keep-all}
+
+/* Orbit 홈 위시 저금: 게임 HUD 대신 기존 카드·진행바 문법으로만 보여준다 */
+.wish-savings-section{margin-top:32px}
+.wish-savings-head{display:flex;align-items:end;justify-content:space-between;margin:0 2px 14px}
+.wish-savings-head .eyebrow{margin-bottom:7px}
+.wish-savings-head h2{margin:0;font-size:18px;letter-spacing:-.035em}
+.wish-savings-head>p{display:flex;align-items:center;gap:8px;margin:0;color:var(--text-secondary);font-size:10px;font-variant-numeric:tabular-nums}
+.wish-savings-head>p i{width:3px;height:3px;border-radius:50%;background:var(--text-tertiary)}
+.wish-savings-row{display:flex;gap:10px;overflow-x:auto;padding:1px 1px 5px;scrollbar-width:none}
+.wish-savings-row::-webkit-scrollbar{display:none}
+.wish-saving-card{position:relative;flex:1 0 220px;min-width:0;max-width:340px;min-height:76px;padding:15px 16px 19px;border:1px solid var(--border);border-radius:15px;background:var(--surface);display:flex;align-items:center;gap:12px;text-align:left;cursor:pointer;box-shadow:0 3px 14px rgba(30,40,70,.025)}
+.wish-saving-card:hover{border-color:color-mix(in srgb,var(--planet-blue) 45%,var(--border))}
+.wish-saving-copy{min-width:0;display:grid;gap:5px;flex:1}
+.wish-saving-copy strong,.wish-saving-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wish-saving-copy strong{font-size:13px}
+.wish-saving-copy small{font-size:10px;color:var(--text-secondary)}
+.wish-saving-number{font-size:11px;font-weight:700;color:var(--text-secondary);font-variant-numeric:tabular-nums}
+.wish-saving-progress{position:absolute;left:16px;right:16px;bottom:10px;height:3px;border-radius:5px;background:var(--surface-secondary);overflow:hidden}
+.wish-saving-progress i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--planet-blue),var(--orbit-lavender))}
+.wish-saving-sheet{display:flex;flex-direction:column}
+.wish-saving-stepper{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:end;gap:10px;margin-top:38px}
+.wish-saving-stepper>button{width:44px;height:44px;border:1px solid var(--border);border-radius:12px;background:var(--surface-secondary);display:grid;place-items:center;cursor:pointer}
+.wish-saving-stepper label>span{display:block;margin-bottom:8px;font-size:10px;font-weight:650;color:var(--text-secondary)}
+.wish-saving-stepper label>div{display:flex;align-items:center;border-bottom:1px solid var(--border);padding:0 3px 10px}
+.wish-saving-stepper input{min-width:0;width:100%;border:0;outline:0;background:none;color:var(--text-primary);font-size:31px;font-weight:700;letter-spacing:-.04em;text-align:center;font-variant-numeric:tabular-nums}
+.wish-saving-stepper strong{font-size:13px}
+.wish-saving-meta{display:grid;gap:9px;margin-top:22px;padding:15px 16px;border-radius:13px;background:var(--surface-secondary);font-size:11px;color:var(--text-secondary)}
+.wish-saving-meta span{display:flex;justify-content:space-between}
+.wish-saving-meta strong{color:var(--text-primary);font-variant-numeric:tabular-nums}
+.wish-saving-sheet .save-button{margin-top:auto}
+.wish-skip-button{width:100%;height:42px;border:0;background:none;color:var(--text-secondary);font-size:11px;cursor:pointer}
+.wish-skip-button:disabled{opacity:.5}
+
+@media(max-width:680px){
+  .wish-savings-section{margin-top:27px}
+  .wish-savings-head{align-items:start}
+  .wish-savings-head>p{display:grid;justify-items:end;gap:3px}
+  .wish-savings-head>p i{display:none}
+  .wish-saving-card{flex-basis:205px;min-height:74px}
+  .wish-saving-sheet{min-height:430px}
+  .wish-saving-stepper{margin-top:28px;grid-template-columns:42px minmax(0,1fr) 42px;gap:7px}
+  .wish-saving-stepper>button{width:42px;height:42px}
+  .wish-saving-stepper input{font-size:27px!important}
+}
+
+/* Orbit · Wish 앱 전환 메뉴 */
+.orbit-app-switcher{position:relative;z-index:23}
+.orbit-app-dismiss{position:fixed;z-index:21;inset:0;padding:0;border:0;background:transparent}
+.orbit-app-switcher>.wordmark{padding:0;border:0;color:var(--text-primary);background:none;cursor:pointer}
+.orbit-app-switcher>.wordmark small{margin:-3px 0 0 1px;font-size:11px;color:var(--text-tertiary)}
+.orbit-app-menu{width:190px;position:absolute;left:0;top:calc(100% + 12px);padding:7px;border:1px solid var(--border);border-radius:16px;display:grid;gap:3px;background:var(--surface);box-shadow:var(--shadow)}
+.orbit-app-menu button,.orbit-app-menu a{min-height:52px;padding:8px 10px;border:0;border-radius:11px;display:flex;align-items:center;gap:11px;color:var(--text-primary);text-align:left;text-decoration:none;background:transparent;cursor:pointer}
+.orbit-app-menu .current{background:var(--surface-secondary)}
+/* 두 줄의 로고 상자를 같은 크기로 맞춰 글자 시작점을 정렬한다.
+   오빗 로고는 34px 격자에 맞춰 그려져 있어 상자를 줄이면 그림이 어긋난다 */
+.orbit-app-menu .logo-orbit{width:34px;height:34px;flex:0 0 34px;transform:none}
+.orbit-app-menu .menu-wish-logo{width:34px;height:34px;flex:0 0 34px}
+.orbit-app-menu .menu-wish-logo:before{inset:5px}
+.orbit-app-menu>* >span:last-child{display:grid;gap:2px}
+.orbit-app-menu strong{font-size:13px}
+.orbit-app-menu small{font-size:10px;color:var(--text-tertiary)}
+.menu-wish-logo{
+  width:28px;
+  height:28px;
+  flex:0 0 28px;
+  position:relative;
+}
+.menu-wish-logo:before{
+  content:"";
+  position:absolute;
+  inset:2px;
+  background:linear-gradient(145deg,#fff1ac 0 24%,#ffd43b 25% 66%,#ea8a00 67% 100%);
+  clip-path:polygon(25% 0,75% 0,75% 8.33%,91.67% 8.33%,91.67% 25%,100% 25%,100% 75%,91.67% 75%,91.67% 91.67%,75% 91.67%,75% 100%,25% 100%,25% 91.67%,8.33% 91.67%,8.33% 75%,0 75%,0 25%,8.33% 25%,8.33% 8.33%,25% 8.33%);
+  box-shadow:inset -3px -3px 0 rgba(182,109,0,.22);
+}

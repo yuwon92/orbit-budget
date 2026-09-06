@@ -7,16 +7,21 @@ interface PixelPlanetProps {
   size?: number
   dim?: boolean
   float?: boolean
+  /**
+   * 행성 몸통에 맞춰 여백을 잘라낸다. 기본 격자는 고리·위성 자리를 비워 둬서
+   * 몸통이 상자의 절반만 채운다 — 로고처럼 작게 놓을 때 옆 아이콘보다 작아 보인다.
+   */
+  crop?: boolean
 }
 
-export function PixelPlanet({ progress, seed, size = 160, dim = false, float = false }: PixelPlanetProps) {
+export function PixelPlanet({ progress, seed, size = 160, dim = false, float = false, crop = false }: PixelPlanetProps) {
   const blocks = useMemo(() => buildBlocks(progress, seed), [progress, seed])
   return (
     <svg
       className={`pixel-planet${float ? ' floating' : ''}${dim ? ' dim' : ''}`}
       width={size}
       height={size}
-      viewBox={`0 0 ${GRID} ${GRID}`}
+      viewBox={crop ? '7 7 18 18' : `0 0 ${GRID} ${GRID}`}
       shapeRendering="crispEdges"
       role="img"
       aria-label={`행성 진행률 ${Math.round(progress)}%`}

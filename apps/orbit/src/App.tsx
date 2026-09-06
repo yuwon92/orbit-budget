@@ -18,7 +18,6 @@ import {
   Search,
   Settings,
   SlidersHorizontal,
-  Sparkles,
   Sun,
   Trash2,
   WalletCards,
@@ -44,6 +43,7 @@ import { QuickAddOrbs, type QuickPreset } from './components/QuickAddOrbs'
 import { RecurringSettings } from './components/RecurringSettings'
 import { ReserveSheet } from './components/ReserveSheet'
 import { Onboarding } from './components/Onboarding'
+import { WishSavings } from './components/WishSavings'
 
 type Tab = 'home' | 'calendar' | 'transactions' | 'settings'
 
@@ -104,9 +104,19 @@ function Planet({ small = false }: { small?: boolean }) {
 }
 
 function Header({ dark, onTheme }: { dark: boolean; onTheme: () => void }) {
+  const [appMenuOpen, setAppMenuOpen] = useState(false)
   return (
     <header className="topbar">
-      <div className="wordmark"><span className="logo-orbit"><i /></span><strong>orbit</strong></div>
+      {appMenuOpen && <button className="orbit-app-dismiss" aria-label="앱 메뉴 닫기" onClick={() => setAppMenuOpen(false)} />}
+      <div className="orbit-app-switcher">
+        <button className="wordmark" onClick={() => setAppMenuOpen((open) => !open)} aria-expanded={appMenuOpen} aria-haspopup="menu"><span className="logo-orbit"><i /></span><strong>orbit</strong><small aria-hidden="true">⌄</small></button>
+        {appMenuOpen && (
+          <div className="orbit-app-menu" role="menu">
+            <button className="current" role="menuitem" onClick={() => setAppMenuOpen(false)}><span className="logo-orbit"><i /></span><span><strong>orbit</strong><small>현재 앱</small></span></button>
+            <a role="menuitem" href={import.meta.env.DEV ? '/apps/wish/' : '/wish/'}><span className="menu-wish-logo" aria-hidden="true" /><span><strong>wish</strong><small>위시 저금</small></span></a>
+          </div>
+        )}
+      </div>
       <div className="header-actions">
         <button className="icon-button desktop-search" aria-label="검색"><Search size={19} /></button>
         <button className="icon-button" onClick={onTheme} aria-label="테마 전환">{dark ? <Sun size={19} /> : <Moon size={19} />}</button>
@@ -182,6 +192,8 @@ function HomeView({ openExpense, openEdit, openPreset, goTransactions, goCategor
     </section>
 
     <QuickAddOrbs openPreset={openPreset} goCategories={goCategories} />
+
+    {loaded && <WishSavings today={today} availableAmount={freeRemaining} monthSaved={wishSaved ?? 0} />}
 
     <div className="section-heading"><div><p className="eyebrow">MONTHLY PLAN</p><h2>이번 달 예산</h2></div><button className="text-button" onClick={goCategories}>편집 <ChevronRight size={16}/></button></div>
     {categories.length === 0 && loaded && <section className="transaction-card">
@@ -585,13 +597,6 @@ function SettingsView({ dark, onTheme, openOnboarding, sub, setSub, plannedIncom
       title: '예비비 설정',
       desc: reserve > 0 ? `이번 달 예비비 ${money(reserve)}원` : '이번 달 예비비 없음',
       onClick: () => setReserveOpen(true),
-    },
-    {
-      icon: Sparkles,
-      title: 'Orbit Wish',
-      desc: '자유비용을 모아 위시 이루기',
-      // 같은 앱 안의 다른 화면이다. 페이지 이동이지만 설치된 앱 밖으로 나가지 않는다
-      onClick: () => { window.location.href = import.meta.env.DEV ? '/apps/wish/' : '/wish/' },
     },
   ]
   return <div className="view"><div className="page-heading"><div><p className="eyebrow">PREFERENCES</p><h1>설정</h1><p>나의 예산 행성을 관리하세요.</p></div></div><section className="settings-card">{settings.map(row=>{const Icon=row.icon;return <button className="setting-row" key={row.title} onClick={row.onClick}><span><Icon size={20}/></span><div><strong>{row.title}</strong><small>{row.desc}</small></div><ChevronRight size={18}/></button>})}<button className="setting-row" onClick={onPlannedIncome}><span><Coins size={20}/></span><div><strong>자유비용에 예정 수입 포함</strong><small>{plannedIncome?'아직 안 들어온 예정 수입도 더해서 계산':'실제로 들어온 수입만으로 계산'}</small></div><i className={`toggle ${plannedIncome?'on':''}`}><b/></i></button></section><h2 className="settings-subhead">앱 설정</h2><section className="settings-card"><button className="setting-row" onClick={openOnboarding}><span><HelpCircle size={20}/></span><div><strong>시작 안내 다시 보기</strong><small>수입·예산·예비비를 순서대로 설정</small></div><ChevronRight size={18}/></button><button className="setting-row" onClick={onTheme}><span>{dark?<Moon size={20}/>:<Sun size={20}/>}</span><div><strong>화면 테마</strong><small>{dark?'다크 모드':'라이트 모드'}</small></div><i className={`toggle ${dark?'on':''}`}><b/></i></button><button className="setting-row" onClick={exportCsv}><span><Download size={20}/></span><div><strong>데이터 내보내기</strong><small>CSV 파일로 안전하게 보관</small></div><ChevronRight size={18}/></button></section><p className="version">ORBIT BUDGET · UI PROTOTYPE 0.4</p>{reserveOpen && <ReserveSheet month={month} current={reserve} close={() => setReserveOpen(false)} />}</div>

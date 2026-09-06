@@ -37,6 +37,8 @@ export interface Transaction {
   isPlanned: boolean // 예정 거래인지 실제 발생인지
   createdAt: number // 입력 시각 (epoch ms). 같은 날짜 안에서의 정렬과 시간 표시용
   recurringRuleId?: string // 반복 규칙이 자동 생성한 거래면 그 규칙의 id
+  /** 위시 저금으로 이미 자유비용에서 빠진 구매. 거래·카테고리 통계에는 보이되 자유비용에서는 다시 빼지 않는다 */
+  excludedFromFreeAmount?: boolean
 }
 
 export interface RecurringRule {

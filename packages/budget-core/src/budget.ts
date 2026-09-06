@@ -109,7 +109,13 @@ export function monthlyFreeAmount(
 ): number {
   const month = today.slice(0, 7)
   const totalBudget = categories.reduce((sum, category) => sum + Math.max(category.monthlyBudget, 0), 0)
-  const expenses = transactions.filter((transaction) => inMonth(transaction, month) && transaction.type === 'expense')
+  // 위시 구매는 저금할 때 이미 자유비용에서 빠졌다. 거래와 카테고리 통계에는 남기지만
+  // 이 계산에서는 완전히 제외해 미분류 지출·기간 초과로 두 번 차감되지 않게 한다.
+  const expenses = transactions.filter(
+    (transaction) => inMonth(transaction, month)
+      && transaction.type === 'expense'
+      && !transaction.excludedFromFreeAmount,
+  )
   const categoriesById = new Map(categories.map((category) => [category.id, category]))
   let adjustment = 0
 

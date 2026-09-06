@@ -1,8 +1,9 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { Minus, Plus, X } from 'lucide-react'
+import { Clock3, Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react'
 import { money } from '@orbit/budget-core/format'
+import type { Category } from '@orbit/budget-core/types'
 import { XP } from '@orbit/wish-core/xp'
-import { addDays, daysBetween } from '@orbit/wish-core/wish'
+import { addDays, canPurchase, daysBetween, purchaseUnlockDate, remainingDays } from '@orbit/wish-core/wish'
 import type { Wish } from '@orbit/wish-core/types'
 
 /** 미션 수행 시트. 하루 몫이 프리필된 상태로 열린다. */
@@ -79,17 +80,92 @@ export function CollectSheet({ wishName, dailyShare, availableAmount, onClose, o
   )
 }
 
-/**
- * 새 위시 등록과 이름 수정을 겸한다.
- * 목표 금액·기간 수정은 회수 흐름이 걸려 있어 다음 단계로 미룬다.
- */
+/** 목표 도달 뒤 구매·기다리기·정리를 한 자리에서 고르는 시트. */
+export function ResolveWishSheet({ wish, today, categories, transferTargets, onClose, onPurchase, onWait, onCancel }: {
+  wish: Wish
+  today: string
+  categories: Category[]
+  transferTargets: Wish[]
+  onClose: () => void
+  onPurchase: (categoryId: string | null) => Promise<void>
+  onWait: () => Promise<void>
+  onCancel: (targetWishId: string | null) => Promise<void>
+}) {
+  const [categoryId, setCategoryId] = useState('')
+  const [cancelMode, setCancelMode] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const unlocked = canPurchase(wish, today)
+  const unlockDate = purchaseUnlockDate(wish)
+  const daysLeft = Math.max(0, daysBetween(today, unlockDate))
+
+  const run = async (action: () => Promise<void>) => {
+    if (saving) return
+    setSaving(true)
+    try { await action() } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="sheet-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <section className="wl-sheet resolve-sheet" role="dialog" aria-modal="true" aria-labelledby="resolve-title">
+        <div className="sheet-handle" />
+        <header className="sheet-header">
+          <div><span className="pixel-label">ORBIT COMPLETE</span><h2 id="resolve-title">{wish.name}</h2></div>
+          <button className="icon-button" onClick={onClose} aria-label="닫기"><X size={20} /></button>
+        </header>
+        <p className="resolve-summary"><strong>{money(wish.savedAmount)}원</strong>을 모두 모았다. 이제 어디로 보낼지 고르자.</p>
+
+        {!cancelMode ? (
+          <>
+            <section className="resolve-option">
+              <div><ShoppingBag size={19} /><p><strong>구매하기</strong><span>Orbit에 지출을 남기고 이 궤도를 완주한다.</span></p></div>
+              <label>통계 카테고리 <em>선택 안 함이 기본</em>
+                <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+                  <option value="">미분류</option>
+                  {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                </select>
+              </label>
+              <button className="primary-button full" disabled={!unlocked || saving} onClick={() => run(() => onPurchase(categoryId || null))}>
+                {unlocked ? '구매하고 완주하기' : `${daysLeft}일 뒤 구매 가능`}
+              </button>
+              {!unlocked && <small className="resolve-lock">등록일로부터 3일 동안 구매가 잠긴다 · {unlockDate} 해제</small>}
+            </section>
+
+            {wish.status === 'ready' && (
+              <button className="resolve-choice" disabled={saving} onClick={() => run(onWait)}>
+                <Clock3 size={19} /><span><strong>더 기다리기</strong><small>저금은 멈추고, 기다린 하루마다 미션을 이어간다.</small></span>
+              </button>
+            )}
+            <button className="resolve-choice danger-choice" disabled={saving} onClick={() => setCancelMode(true)}>
+              <Trash2 size={19} /><span><strong>이 위시 정리하기</strong><small>모은 금액을 다른 위시나 자유비용으로 보낸다.</small></span>
+            </button>
+          </>
+        ) : (
+          <section className="resolve-cancel">
+            <div><button className="quiet-button" onClick={() => setCancelMode(false)}>← 돌아가기</button><h3>모은 금액을 어디로 보낼까?</h3><p>정리해도 지금까지의 XP는 그대로 남는다.</p></div>
+            {transferTargets.map((target) => {
+              const room = Math.max(0, target.targetAmount - target.savedAmount)
+              return <button key={target.id} disabled={saving || room <= 0} onClick={() => run(() => onCancel(target.id))}>
+                <span><strong>{target.name}</strong><small>최대 {money(room)}원 이전</small></span><b>{money(Math.min(room, wish.savedAmount))}원</b>
+              </button>
+            })}
+            <button className="resolve-to-free" disabled={saving} onClick={() => run(() => onCancel(null))}>
+              <span><strong>남은 자유비용으로 회수</strong><small>이번 달 자유비용에 전액 더한다.</small></span><b>+{money(wish.savedAmount)}원</b>
+            </button>
+          </section>
+        )}
+      </section>
+    </div>
+  )
+}
+
+/** 새 위시 등록과 이름·금액·기간 수정을 겸한다. */
 export interface NewWishDraft {
   name: string
   targetAmount: number
   targetDate: string | null
 }
 
-export function WishSheet({ today, wish, existingShare, freeAmount, onClose, onCreate, onRename }: {
+export function WishSheet({ today, wish, existingShare, freeAmount, onClose, onCreate, onUpdate, onDelete }: {
   today: string
   wish?: Wish
   /** 이미 진행 중인 위시들의 하루 몫 합계 */
@@ -98,41 +174,46 @@ export function WishSheet({ today, wish, existingShare, freeAmount, onClose, onC
   freeAmount: number
   onClose: () => void
   onCreate?: (draft: NewWishDraft) => void
-  onRename?: (name: string) => void
+  onUpdate?: (draft: NewWishDraft) => void
+  onDelete?: () => void
 }) {
   const editing = Boolean(wish)
   const [name, setName] = useState(wish?.name ?? '')
   const [amount, setAmount] = useState(wish ? String(wish.targetAmount) : '')
-  const [period, setPeriod] = useState('')
+  const [period, setPeriod] = useState(wish?.targetDate ? String(remainingDays(wish, today) ?? '') : '')
   const [unit, setUnit] = useState<'day' | 'week' | 'month'>('day')
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   const targetDate = useMemo(() => {
-    if (wish) return wish.targetDate
     const count = Number(period)
     if (!Number.isInteger(count) || count < 1) return null
+    if (!editing && unit === 'day' && count < 3) return null
     if (unit === 'month') {
       const date = new Date(`${today}T00:00:00`)
       date.setMonth(date.getMonth() + count)
+      date.setDate(date.getDate() - 1)
       return date.toLocaleDateString('sv-SE')
     }
-    return addDays(today, count * (unit === 'week' ? 7 : 1))
-  }, [wish, period, unit, today])
+    // 오늘을 1일째로 센다. 3일이면 오늘·내일·모레의 정확히 세 칸이다.
+    return addDays(today, count * (unit === 'week' ? 7 : 1) - 1)
+  }, [editing, period, unit, today])
 
   const targetAmount = Number(amount)
   const days = targetDate ? Math.max(1, daysBetween(today, targetDate) + 1) : null
-  const preview = days && targetAmount > 0 ? Math.floor(targetAmount / days) : 0
+  const remainingAmount = Math.max(0, targetAmount - (wish?.savedAmount ?? 0))
+  const preview = days && targetAmount > 0 ? Math.floor(remainingAmount / days) : 0
   // 이미 진행 중인 몫 + 지금 만들 몫이 자유비용의 절반을 넘으면 기간 연장을 권한다
   const heavy = preview > 0 && freeAmount > 0 && (existingShare + preview) / freeAmount > 0.5
 
   function submit(event: FormEvent) {
     event.preventDefault()
     if (!name.trim()) return
-    if (editing) {
-      onRename?.(name.trim())
-      return
-    }
     if (targetAmount <= 0) return
-    onCreate?.({ name: name.trim(), targetAmount, targetDate })
+    if (wish && targetAmount < wish.savedAmount) return
+    if (period && !targetDate) return
+    const draft = { name: name.trim(), targetAmount, targetDate }
+    if (editing) onUpdate?.(draft)
+    else onCreate?.(draft)
   }
 
   return (
@@ -142,7 +223,7 @@ export function WishSheet({ today, wish, existingShare, freeAmount, onClose, onC
         <header className="sheet-header">
           <div>
             <span className="pixel-label">{editing ? 'EDIT WISH' : 'NEW WISH'}</span>
-            <h2>{editing ? '이름 바꾸기' : '새 소원 빌기'}</h2>
+            <h2>{editing ? '수정하기' : '새 소원 빌기'}</h2>
           </div>
           <button type="button" className="icon-button" onClick={onClose} aria-label="닫기"><X size={20} /></button>
         </header>
@@ -156,7 +237,6 @@ export function WishSheet({ today, wish, existingShare, freeAmount, onClose, onC
               value={amount ? money(Number(amount)) : ''}
               onChange={(event) => setAmount(event.target.value.replace(/[^0-9]/g, '').slice(0, 9))}
               placeholder="200,000"
-              disabled={editing}
             />
             <span>원</span>
           </div>
@@ -169,12 +249,11 @@ export function WishSheet({ today, wish, existingShare, freeAmount, onClose, onC
               aria-label="목표 기간 숫자"
               value={period}
               onChange={(event) => setPeriod(event.target.value.replace(/[^0-9]/g, ''))}
-              placeholder={editing ? '수정 예정' : '기간 없음'}
-              disabled={editing}
+              placeholder="기간 없음"
             />
             <div className="period-unit-choice" aria-label="기간 단위">
               {([['day', '일'], ['week', '주'], ['month', '월']] as const).map(([value, label]) => (
-                <button type="button" key={value} className={unit === value ? 'active' : ''} aria-pressed={unit === value} disabled={editing} onClick={() => setUnit(value)}>{label}</button>
+                <button type="button" key={value} className={unit === value ? 'active' : ''} aria-pressed={unit === value} onClick={() => setUnit(value)}>{label}</button>
               ))}
             </div>
           </div>
@@ -183,7 +262,7 @@ export function WishSheet({ today, wish, existingShare, freeAmount, onClose, onC
         <p className="mission-gain">
           <span className="pixel-label">DAILY SHARE</span>
           <strong>{preview ? `${money(preview)}원` : '—'}</strong>
-          <span>{editing ? '금액·기간 수정은 다음 단계' : days ? `${days}일 궤도` : '기간을 정하면 하루 몫이 생긴다'}</span>
+          {days && <span>{days}일 궤도</span>}
         </p>
 
         {!editing && heavy && (
@@ -192,7 +271,22 @@ export function WishSheet({ today, wish, existingShare, freeAmount, onClose, onC
           </p>
         )}
 
-        <button className="primary-button full" type="submit">{editing ? '이름 저장' : '궤도에 올리기'}</button>
+        {!editing && period && !targetDate && <p className="sheet-warning">목표 기간은 최소 3일로 정해 주세요.</p>}
+        {wish && targetAmount < wish.savedAmount && <p className="sheet-warning">목표 금액은 지금까지 모은 {money(wish.savedAmount)}원 이상이어야 합니다.</p>}
+
+        <button className="primary-button full" type="submit" disabled={targetAmount <= 0 || Boolean(period) && !targetDate || Boolean(wish && targetAmount < wish.savedAmount)}>{editing ? '변경사항 저장' : '궤도에 올리기'}</button>
+        {editing && (
+          <section className="edit-wish-danger">
+            {confirmingDelete ? (
+              <>
+                <p><strong>이 위시를 삭제할까요?</strong><span>모은 금액은 남은 자유비용으로 돌아갑니다.</span></p>
+                <div><button type="button" className="secondary-button" onClick={() => setConfirmingDelete(false)}>취소</button><button type="button" className="danger-button" onClick={onDelete}>삭제하기</button></div>
+              </>
+            ) : (
+              <button type="button" className="delete-wish-button" onClick={() => setConfirmingDelete(true)}><Trash2 size={16} /> 위시 삭제</button>
+            )}
+          </section>
+        )}
       </form>
     </div>
   )

@@ -386,9 +386,9 @@ const csv = buildCsv(
   categories,
 )
 const csvLines = csv.split('\n')
-assert.equal(csvLines[0], 'date,type,category,amount,memo,is_planned')
-assert.equal(csvLines[1], '2026-09-01,expense,,5000,"콤마,와 ""따옴표""",false') // 날짜순 정렬 + 이스케이프
-assert.equal(csvLines[2], '2026-09-13,expense,식비,12000,점심,false')
+assert.equal(csvLines[0], 'date,type,category,amount,memo,is_planned,excluded_from_free_amount')
+assert.equal(csvLines[1], '2026-09-01,expense,,5000,"콤마,와 ""따옴표""",false,false') // 날짜순 정렬 + 이스케이프
+assert.equal(csvLines[2], '2026-09-13,expense,식비,12000,점심,false,false')
 console.log('CSV 생성 (컬럼 순서, 정렬, 이스케이프) 통과')
 
 // --- 위시 저금 연동 ---
@@ -406,5 +406,20 @@ assert.equal(
   monthlyFreeAmount(transactions, categories, today, 0, false) - 40_000,
 )
 console.log('위시 저금 차감 통과')
+
+// 위시 구매 거래는 목록·통계에는 남지만 자유비용에서는 이미 저금한 돈을 다시 빼지 않는다.
+const wishPurchase = {
+  ...tx(today, 40_000, 'expense', null, 'Wish · 헤드폰'),
+  excludedFromFreeAmount: true,
+}
+assert.equal(monthlyFreeAmount([...transactions, wishPurchase], categories, today, 0, true, 40_000), 516_490)
+// 카테고리를 지정해도 자유비용 계산에서는 제외한다. spentByCategory 통계에는 포함된다.
+const categorizedWishPurchase = { ...wishPurchase, categoryId: 'food' }
+assert.equal(monthlyFreeAmount([...transactions, categorizedWishPurchase], categories, today, 0, true, 40_000), 516_490)
+assert.equal(
+  spentByCategory([...transactions, categorizedWishPurchase], month).get('food'),
+  (spentByCategory(transactions, month).get('food') ?? 0) + wishPurchase.amount,
+)
+console.log('위시 구매 거래 자유비용 이중 차감 방지 통과')
 
 console.log('\n모든 검산 통과')

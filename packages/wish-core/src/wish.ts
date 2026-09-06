@@ -43,6 +43,17 @@ export function depositsOn(events: WishEvent[], wishId: string, date: string) {
   return sum
 }
 
+/** XP·하루 판정에 쓰는 실제 행동 납입. 다른 위시에서 옮긴 돈은 새 저금 행동이 아니다 */
+export function actionDepositsOn(events: WishEvent[], wishId: string, date: string) {
+  let sum = 0
+  for (const event of events) {
+    if (event.wishId !== wishId || event.date !== date) continue
+    if (event.type === 'deposit' && event.source !== 'transfer') sum += event.amount ?? 0
+    if (event.type === 'withdraw') sum -= event.amount ?? 0
+  }
+  return sum
+}
+
 /**
  * 하루 몫 = 남은 금액 / 남은 일수, 내림.
  * 오늘 넣은 돈은 빼고 계산한다. 그러지 않으면 조금 넣을 때마다 목표가 내려가
@@ -76,7 +87,7 @@ export function stageOf(progressPercent: number): PlanetStage {
   return 'seed'
 }
 
-/** 위시 하나의 궤도 단계. 화면에는 ORBIT 04처럼 두 자리로 쓴다 */
+/** 위시 하나의 진행 단계. 화면에는 4단계처럼 쓴다 */
 export const orbitLevelOf = (progressPercent: number) => Math.min(5, Math.floor(progressPercent / 20) + 1)
 
 /** 하루 판정 네 갈래. 건너뜀은 명시적으로 누른 날이고 무응답은 아무것도 안 한 날이다 */
@@ -84,7 +95,7 @@ export function dayStatus(wish: Wish, events: WishEvent[], today: string): DaySt
   const skipped = events.some(
     (event) => event.wishId === wish.id && event.date === today && event.type === 'skip',
   )
-  const net = depositsOn(events, wish.id, today)
+  const net = actionDepositsOn(events, wish.id, today)
   if (net <= 0) return skipped ? 'skip' : 'none'
   const share = dailyShare(wish, events, today)
   return share > 0 && net < share ? 'partial' : 'full'
@@ -94,7 +105,7 @@ export function dayStatus(wish: Wish, events: WishEvent[], today: string): DaySt
 export function keptDays(events: WishEvent[], wishId: string) {
   const dates = new Set<string>()
   for (const event of eventsOf(events, wishId)) {
-    if (event.type === 'deposit' && (event.amount ?? 0) > 0) dates.add(event.date)
+    if (event.type === 'deposit' && event.source !== 'transfer' && (event.amount ?? 0) > 0) dates.add(event.date)
   }
   return dates.size
 }
@@ -119,7 +130,10 @@ export function vaultTotal(wishes: Wish[]) {
 
 /** 지금까지 넣은 총액. 구매·취소한 위시까지 포함하는 평생 누적 */
 export function lifetimeDeposit(events: WishEvent[]) {
-  return events.reduce((sum, event) => (event.type === 'deposit' ? sum + (event.amount ?? 0) : sum), 0)
+  return events.reduce(
+    (sum, event) => (event.type === 'deposit' && event.source !== 'transfer' ? sum + (event.amount ?? 0) : sum),
+    0,
+  )
 }
 
 /** 기간 미선택 위시의 예상 달성일. 지금까지의 하루 평균 납입 속도로 민다 */
@@ -149,6 +163,11 @@ export function needsExtension(wish: Wish, events: WishEvent[], today: string) {
 /** 등록 3일이 지나야 구매할 수 있다. 목표를 낮춰 최소 기간을 우회하는 것을 막는다 */
 export function canPurchase(wish: Pick<Wish, 'startDate'>, today: string) {
   return daysBetween(wish.startDate, today) >= 3
+}
+
+/** 구매 잠금이 풀리는 날짜. 등록일은 0일째라 3일 뒤부터 열린다 */
+export function purchaseUnlockDate(wish: Pick<Wish, 'startDate'>) {
+  return addDays(wish.startDate, 3)
 }
 
 /** 위시 id에서 행성 무늬 시드를 만든다. 같은 위시는 항상 같은 얼굴 */

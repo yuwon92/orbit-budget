@@ -146,6 +146,17 @@ const claim = (date: string, missionId: string): Claim => ({
   const cancel = [deposit('2026-09-02', 30_000), ev({ type: 'withdraw', date: '2026-09-20', amount: 90_000 })]
   assert.equal(monthlyDeposit(cancel, '2026-09'), -60_000)
 
+  // 위시 간 이전은 출발 withdraw와 도착 deposit이 상쇄된다. 새 저금·지킨 날로 세지 않는다.
+  const transfer = [
+    ev({ wishId: 'w1', type: 'withdraw', date: '2026-09-20', amount: 30_000 }),
+    deposit('2026-09-20', 30_000, { wishId: 'w2', source: 'transfer' }),
+  ]
+  assert.equal(monthlyDeposit(transfer, '2026-09'), 0)
+  assert.equal(keptDays(transfer, 'w2'), 0)
+  assert.equal(lifetimeDeposit(transfer), 0)
+  assert.equal(dayStatus(wish({ id: 'w2', savedAmount: 30_000 }), transfer, '2026-09-20'), 'none')
+  assert.equal(missionUnits([wish({ id: 'w2', savedAmount: 30_000 })], transfer).length, 0)
+
   // 08-28, 09-02 두 날. 같은 날 두 번 넣은 것은 하루로 센다
   assert.equal(keptDays(events, 'w1'), 2)
   assert.equal(lifetimeDeposit(events), 55_000)

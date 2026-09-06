@@ -35,9 +35,11 @@ export interface WishEvent {
   date: string
   createdAt: number
   /** deposit 전용. 남은 예산 넘기기(30 XP)와 평범한 저금을 가른다 */
-  source?: 'manual' | 'carryover'
+  source?: 'manual' | 'carryover' | 'transfer'
   /** purchase 전용. Orbit 거래와의 연결 */
   transactionId?: string
+  /** cancel 전용. 모은 돈을 옮긴 대상 위시 */
+  targetWishId?: string
 }
 
 /** 미션 수령 영수증. XP 값은 담지 않는다 — 배점표에서 매번 계산한다 */

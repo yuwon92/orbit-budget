@@ -31,7 +31,7 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `apps/wish/src/App.tsx` | Wish 셸 + 화면 4개(오르빗 허브/퀘스트 로그/우주 도감/관측자) |
 | `apps/wish/src/missions.ts` | 오늘의 미션 문구·상태. 앱 고유 개념이라 wish-core에 두지 않음 |
 | `apps/wish/src/planet.ts` | 픽셀 행성 블록 생성. 진행률 → 티끌·위성·행성·고리·위성대·성계 |
-| `apps/wish/src/data.ts` | 자유비용·남은 예산 자리표시 값. Orbit 연동 전까지만 |
+| `apps/wish/src/data.ts` | 남은 예산 제안용 자리표시 값. 실제 기간 잔액 연동 전까지만 |
 | `apps/wish/src/lib/labels.ts` | 단계 이름·칭호 문구·도감 칸 수 |
 | `apps/wish/src/lib/hooks.ts` | `useWishes`/`useWishEvents`/`useClaims`/`usePlayer`. **App에서만 구독하고 prop으로 내림** |
 | `apps/wish/src/lib/budget.ts` | Orbit 예산 요약을 읽는 통로. 저장소가 나뉘는 환경에서는 **이 파일만 서버 조회로 교체** |
@@ -48,7 +48,7 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `packages/budget-core/src/format.ts` | 금액·요일 표시 함수 |
 | `packages/orbit-bridge/src/db.ts` | Orbit Dexie 인스턴스, 스키마·마이그레이션, 쓰기 헬퍼 |
 | `packages/orbit-bridge/src/recurring.ts` | 반복 거래 생성·동기화 |
-| `packages/orbit-bridge/src/index.ts` | Wish용 읽기 전용 예산 스냅샷(`OrbitBudgetSnapshot`). 쓰기 API는 아직 없음 |
+| `packages/orbit-bridge/src/index.ts` | Wish용 예산 스냅샷(`OrbitBudgetSnapshot`) + 자유비용 제외 위시 구매 거래 쓰기 |
 | `packages/orbit-bridge/src/settings.ts` | 두 앱이 함께 읽는 설정(`orbit-planned-income`) |
 | `scripts/verify-budget.ts` | Orbit 계산 검산 |
 | `scripts/verify-wish.ts` | Wish 계산 검산 |
@@ -58,9 +58,9 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 
 Wish는 게임 허브 흐름이다. 자원 HUD 상시 노출, 오늘의 미션과 보상 수령, 퀘스트 로그·우주 도감 분리, 설정은 관측자 화면 안. 제품 규칙과 수치는 `orbit-wish-spec.md`, 디자인은 `orbit-wish-ui-design-guide.md`(둘 다 gitignore된 로컬 문서).
 
-Wish는 Orbit 예산을 `getOrbitSnapshot()`으로 **읽기만** 한다. `connected`는 DB가 열리는지가 아니라 데이터가 있는지로 판단한다 — 저장소가 분리된 환경에서는 빈 DB가 새로 만들어질 뿐이라 존재 여부로는 알 수 없다. 위시 저금을 자유비용에서 실제로 빼는 것은 아직 하지 않는다.
+Wish는 Orbit 예산을 `getOrbitSnapshot()`으로 읽고, 구매 확정 때만 `createWishPurchaseTransaction()`으로 거래를 쓴다. `connected`는 DB가 열리는지가 아니라 데이터가 있는지로 판단한다 — 저장소가 분리된 환경에서는 빈 DB가 새로 만들어질 뿐이라 존재 여부로는 알 수 없다. 위시 저금은 이번 달 순저금 합계로 자유비용에서 실제 차감한다.
 
-**Wish 데이터는 `orbital-wish`(Dexie)에 저장된다.** 위시·이벤트·수령 기록·Player 네 스토어. 화면은 `packages/wish-bridge`를 통해서만 쓰고, 읽기는 `apps/wish/src/lib/hooks.ts`의 `useLiveQuery` 네 개가 전부다. 자유비용만 아직 자리표시 값이고 Orbit 연동은 다음 단계.
+**Wish 데이터는 `orbital-wish`(Dexie)에 저장된다.** 위시·이벤트·수령 기록·Player 네 스토어. 화면은 `packages/wish-bridge`를 통해서만 쓰고, Wish 앱 읽기는 `apps/wish/src/lib/hooks.ts`의 `useLiveQuery` 네 개가 전부다. Orbit 홈은 `listWishes()`·`listWishEvents()`를 live query로 읽어 기간이 있는 active 위시만 표시한다.
 
 **XP는 어디에도 저장하지 않는다.** `WishEvent`와 `Claim`(수령 영수증)에서 매번 다시 계산한다. 배점을 바꾸면 과거 기록도 새 배점으로 재계산된다. 미션은 행마다 개별 수령 버튼이 있고 아래 `CLAIM` 버튼이 미수령 전부를 한 번에 받는다. 승격 전 초안(위시 상세 중심 4탭, `PlanetVisual`, `orbital-wish` 스키마 선언)은 커밋 `70d9ce5`에 남아 있다.
 
@@ -73,6 +73,7 @@ Wish는 Orbit 예산을 `getOrbitSnapshot()`으로 **읽기만** 한다. `connec
 | `RecurringSettings.tsx` | 반복 거래 목록 + 폼 |
 | `ReserveSheet.tsx` | 월 예비비 입력 |
 | `QuickAddOrbs.tsx` | 홈 퀵 슬롯 구슬 줄 + 편집(표시 토글·순서 이동) + 실행 취소 알림 |
+| `WishSavings.tsx` | 홈 위시 저금 줄 + 금액 조정·못 모아요 전용 시트 |
 | `DailyBreakdown.tsx` | 홈 히어로 예산 행 목록. **계산 안 함, 그리기만** |
 | `CategoryPlanet.tsx` | 카테고리 색 구슬 (9줄) |
 
@@ -82,7 +83,7 @@ Wish는 Orbit 예산을 `getOrbitSnapshot()`으로 **읽기만** 한다. `connec
 Category        id, name, monthlyBudget, color, isFixed, sortOrder,
                 budgetRule?, hiddenOnHome?, quickSlot?, quickOrder?
 Transaction     id, date('yyyy-MM-dd'), amount(항상 양수), type, categoryId|null,
-                memo, isPlanned, createdAt, recurringRuleId?
+                memo, isPlanned, createdAt, recurringRuleId?, excludedFromFreeAmount?
 RecurringRule   id, name, amount, type, categoryId, interval?('monthly'|'weekly'),
                 dayOfMonth, weekdays?(0=일…6=토, 여러 개),
                 startDate, endDate|null, lastGeneratedMonth|null
@@ -102,6 +103,7 @@ BudgetRule = { kind:'manual' }
 
 - `interval`이 없으면 월 단위(예전 규칙). 주 단위는 `weekdays`(여러 요일 가능)를 쓰고 `dayOfMonth`는 안 씀(주기를 되돌릴 때를 위해 값은 남겨둠)
 - `isPlanned`는 저장 시 `date > 오늘`로 자동 결정. `materializeRecurring`이 앱을 열 때 오늘 이하 날짜를 전부 `false`로 확정
+- `excludedFromFreeAmount`는 위시 구매 거래 전용. 거래·카테고리 통계에는 포함하지만 `monthlyFreeAmount`에서는 완전히 제외
 - `hiddenOnHome`은 히어로 예산 행 **표시만** 숨김. 계산에는 그대로 들어감
 - `isFixed`는 현재 **라벨 전용**(목록의 `고정비` 칩). 계산에서 안 씀
 - `quickOrder`는 퀵 슬롯 줄에서의 순서. 없으면 `sortOrder` 순으로 뒤에 붙음
@@ -135,7 +137,7 @@ Dexie `'orbital-budget'`. 스토어: `categories`(id) / `transactions`(id, **dat
 - **이미 끝난** 일/주 기간의 미사용액 → 자유비용으로 환급. 진행 중·미래 기간의 잔액은 카테고리에 남겨둠
 - 어떤 예산 기간에도 안 걸치는 날의 지출(요일 지정 카테고리의 비지정 요일 등) → 전액 차감
 
-`monthlyFreeAmount(txs, categories, today, reserve, includePlannedIncome = true)` — 마지막 인자가 false면 `isPlanned` 수입을 빼고 센다(설정 첫 카드의 `자유비용에 예정 수입 포함` 토글). **수입에만 걸린다.** 예정 지출은 어차피 나갈 돈이라 늘 차감한다.
+`monthlyFreeAmount(txs, categories, today, reserve, includePlannedIncome = true, wishSavedAmount = 0)` — `includePlannedIncome`이 false면 `isPlanned` 수입을 빼고 센다(설정 첫 카드의 `자유비용에 예정 수입 포함` 토글). **수입에만 걸린다.** 예정 지출은 어차피 나갈 돈이라 늘 차감한다. `wishSavedAmount`는 이번 달 순저금으로 예비비처럼 한 번 차감한다.
 
 **기간 배분**(내부 `categoryBudgetPeriods`) — 횟수·교통 카테고리의 월 예산을 실제 달력 주/요일 기간에 앞에서부터 채운다. 달을 걸치는 주는 월 경계에서 자르고, 배분 총합은 월 예산을 넘지 않는다.
 
@@ -170,14 +172,14 @@ dark:        boolean → <html class="dark">
 plannedIncome: boolean  // 자유비용에 예정 수입을 넣을지. 기본 true
 ```
 
-`plannedIncome`은 `localStorage['orbit-planned-income']`(`'include'`|`'exclude'`)에 저장하고, 값이 없으면 포함이 기본이다. `monthlyFreeAmount`의 마지막 인자로만 흘러간다 — 사이드바 사용률·거래 목록 같은 다른 화면은 예정 수입을 늘 포함한다.
+`plannedIncome`은 `localStorage['orbit-planned-income']`(`'include'`|`'exclude'`)에 저장하고, 값이 없으면 포함이 기본이다. `monthlyFreeAmount`의 `includePlannedIncome` 인자로만 흘러간다 — 사이드바 사용률·거래 목록 같은 다른 화면은 예정 수입을 늘 포함한다.
 
 테마는 `localStorage['orbit-theme']`에 저장하고, 고른 적이 없으면 `prefers-color-scheme`를 따른다. `index.html`의 인라인 스크립트가 첫 페인트 전에 같은 키를 읽어 `.dark`를 붙인다(키를 바꾸면 양쪽 다 고칠 것).
 
 `useToday()`가 1분마다 날짜를 확인해 자정을 넘기면 화면과 동기화를 다시 돌린다.
 날짜가 바뀔 때마다 `materializeRecurring()` → `syncRuleBudgets()`, 최초 1회 `requestPersistentStorage()`.
 
-**HomeView** — 히어로(`남은 자유비용` 큰 숫자 · 오늘 사용액 · `DailyBreakdown`) → `QuickAddOrbs`(**카드 밖**) → 이번 달 예산 카드 그리드 → 오늘 내역.
+**HomeView** — 히어로(`남은 자유비용` 큰 숫자 · 오늘 사용액 · `DailyBreakdown`) → `QuickAddOrbs`(**카드 밖**) → `WishSavings`(대상 있을 때만) → 이번 달 예산 카드 그리드 → 오늘 내역.
 카드 그리드는 **모든 카테고리**를 낸다. `monthlyBudget > 0`이면 진행률·남은 금액·진행바, 아니면 사용액과 `예산 미설정` 한 줄만. 섹션 헤더 `편집` → 카테고리 설정.
 카드 제목은 버튼(`.category-title`) — 누르면 거래 내역으로 이동하며 그 카테고리 · 이번 달 1일~말일 필터가 걸린다(`TxFocus`).
 카드 ⋯ 메뉴: `홈에서 숨기기`(횟수·교통만) / `퀵 슬롯에서 숨기기·추가하기`(전 카테고리). `menuFor` state 하나로 한 번에 하나만 열림.

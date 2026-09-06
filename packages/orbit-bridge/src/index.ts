@@ -1,4 +1,5 @@
 import { monthlyFreeAmount } from '@orbit/budget-core/budget'
+import type { Category, Transaction } from '@orbit/budget-core/types'
 import { db } from './db'
 import { readPlannedIncome } from './settings'
 
@@ -21,6 +22,8 @@ export interface OrbitBudgetSnapshot {
   version: number
   /** Orbit을 실제로 쓴 흔적이 있는지. 새로 만들어진 빈 DB와 구분한다 */
   connected: boolean
+  /** 위시 구매에서 선택할 수 있는 Orbit 카테고리 */
+  categories: Category[]
   /** 무엇을 읽었는지 그대로 보여주는 진단값. 연결 문제를 눈으로 가릴 수 있게 한다 */
   probe: SnapshotProbe
 }
@@ -38,7 +41,7 @@ export interface SnapshotProbe {
   includePlannedIncome: boolean
 }
 
-export const SNAPSHOT_VERSION = 1
+export const SNAPSHOT_VERSION = 2
 
 /**
  * Orbit 예산을 읽어 요약을 만든다.
@@ -78,6 +81,7 @@ export async function getOrbitSnapshot(
     calculatedAt: Date.now(),
     version: SNAPSHOT_VERSION,
     connected,
+    categories: [...categories].sort((a, b) => a.sortOrder - b.sortOrder),
     probe: {
       transactions: totalTransactions,
       monthTransactions: transactions.length,
@@ -87,6 +91,34 @@ export async function getOrbitSnapshot(
       includePlannedIncome,
     },
   }
+}
+
+export interface WishPurchaseInput {
+  id: string
+  wishName: string
+  amount: number
+  date: string
+  categoryId: string | null
+}
+
+/**
+ * 위시 구매를 Orbit 거래로 기록한다. id를 호출자가 정하고 put을 써서,
+ * 두 DB 사이 저장이 중간에 끊겨도 같은 id로 안전하게 다시 시도할 수 있다.
+ */
+export async function createWishPurchaseTransaction(input: WishPurchaseInput): Promise<Transaction> {
+  const transaction: Transaction = {
+    id: input.id,
+    date: input.date,
+    amount: input.amount,
+    type: 'expense',
+    categoryId: input.categoryId,
+    memo: `Wish · ${input.wishName}`,
+    isPlanned: false,
+    createdAt: Date.now(),
+    excludedFromFreeAmount: true,
+  }
+  await db.transactions.put(transaction)
+  return transaction
 }
 
 export { readPlannedIncome, writePlannedIncome, PLANNED_INCOME_KEY } from './settings'

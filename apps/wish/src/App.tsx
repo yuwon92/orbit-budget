@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronRight, Clock3, Lock, Moon, Orbit, Plus, Sun, WalletCards } from 'lucide-react'
+import { ChevronRight, Lock, Moon, Plus, Sun, WalletCards } from 'lucide-react'
 import { money } from '@orbit/budget-core/format'
 import {
   dailyShare,
+  canPurchase,
   dayStatus,
   daysBetween,
   keptDays,
@@ -29,6 +30,7 @@ import {
 import type { Wish, WishEvent } from '@orbit/wish-core/types'
 import {
   chooseWait,
+  cancelWish,
   ensurePlayer,
   claimAll as claimAllWrite,
   claimMission,
@@ -37,14 +39,15 @@ import {
   markCelebratedLevel,
   purchaseWish,
   recordWaitDay,
-  renameWish,
   skipDay,
+  updateWish,
 } from '@orbit/wish-bridge'
+import { createWishPurchaseTransaction } from '@orbit/bridge'
 import { OrbitRing, PixelPlanet } from './components/PixelPlanet'
 import { PixelBar } from './components/PixelBar'
 import { OrbitMap } from './components/OrbitMap'
 import { RewardOverlay, type Reward } from './components/RewardOverlay'
-import { CollectSheet, WishSheet } from './components/Sheets'
+import { CollectSheet, ResolveWishSheet, WishSheet } from './components/Sheets'
 import { buildMissions, type Mission } from './missions'
 import { CODEX_SLOTS, STAGE_NAMES, TITLES } from './lib/labels'
 import { formatDate, pad2, todayString } from './lib/format'
@@ -100,10 +103,12 @@ export default function App() {
   const [collecting, setCollecting] = useState<Wish | null>(null)
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<Wish | null>(null)
+  const [resolving, setResolving] = useState<Wish | null>(null)
   const [rewards, setRewards] = useState<Reward[]>([])
   const [xpPop, setXpPop] = useState<number | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [dark, setDark] = useState(readTheme)
+  const [switcherOpen, setSwitcherOpen] = useState(false)
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
@@ -133,6 +138,14 @@ export default function App() {
   // 화면에 필요한 값은 전부 이벤트와 수령 기록에서 파생한다. 저장하는 XP는 없다.
   const openWishes = useMemo(
     () => wishes.filter((wish) => wish.status === 'active' || wish.status === 'ready' || wish.status === 'waiting'),
+    [wishes],
+  )
+  const orbitNumbers = useMemo(
+    () => new Map(
+      [...wishes]
+        .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id))
+        .map((wish, index) => [wish.id, index + 1]),
+    ),
     [wishes],
   )
   const doneWishes = useMemo(() => wishes.filter((wish) => wish.status === 'done'), [wishes])
@@ -230,8 +243,19 @@ export default function App() {
     await claimAllWrite(pending)
   }
 
-  async function completeWish(wish: Wish) {
-    await purchaseWish(wish.id, today)
+  async function completeWish(wish: Wish, categoryId: string | null) {
+    if (!canPurchase(wish, today)) return
+    // 결정적인 id + Orbit의 put 조합으로 두 DB 저장 도중 재시도해도 거래가 중복되지 않는다.
+    const transactionId = `wish-purchase-${wish.id}`
+    await createWishPurchaseTransaction({
+      id: transactionId,
+      wishName: wish.name,
+      amount: wish.targetAmount,
+      date: today,
+      categoryId,
+    })
+    await purchaseWish(wish.id, today, transactionId)
+    setResolving(null)
     pushReward({
       kind: 'complete',
       name: wish.name,
@@ -240,6 +264,14 @@ export default function App() {
       date: today,
     })
     setActiveId((current) => (current === wish.id ? null : current))
+  }
+
+  async function cancelOpenWish(wish: Wish, targetWishId: string | null) {
+    await cancelWish(wish.id, today, targetWishId)
+    setResolving(null)
+    setActiveId((current) => (current === wish.id ? targetWishId : current))
+    refreshBudget()
+    setToast(targetWishId ? '모은 금액을 다른 궤도로 옮겼다' : '모은 금액을 자유비용으로 회수했다')
   }
 
   function openAdd() {
@@ -257,13 +289,23 @@ export default function App() {
     <div className={`wl-app screen-${screen}`}>
       <header className="wl-hud">
         <div className="hud-top">
-          <button className="hud-avatar" onClick={() => setScreen('observer')} aria-label="관측자 화면">
-            <PixelPlanet progress={Math.min(99, level.level * 14)} seed={7} size={36} />
-            <span className="pixel-label">LV. {pad2(level.level)}</span>
-          </button>
+          {switcherOpen && <button className="app-switcher-dismiss" aria-label="앱 메뉴 닫기" onClick={() => setSwitcherOpen(false)} />}
+          <div className="app-switcher">
+            <button className="wish-wordmark" onClick={() => setSwitcherOpen((open) => !open)} aria-expanded={switcherOpen} aria-haspopup="menu">
+              <PixelPlanet progress={38} seed={7} size={32} />
+              <strong>wish</strong>
+              <span aria-hidden="true">⌄</span>
+            </button>
+            {switcherOpen && (
+              <div className="app-switcher-menu" role="menu">
+                <button className="current" role="menuitem" onClick={() => setSwitcherOpen(false)}><PixelPlanet progress={38} seed={7} size={28} crop /><span><strong>wish</strong><small>현재 앱</small></span></button>
+                <a role="menuitem" href={import.meta.env.DEV ? '/apps/orbit/' : '/'}><span className="menu-orbit-logo" aria-hidden="true" /><span><strong>orbit</strong><small>예산 관리</small></span></a>
+              </div>
+            )}
+          </div>
           <div className="hud-xp">
-            <PixelBar ratio={level.ratio} segments={14} label={`별먼지 ${level.into} / ${level.need}`} />
-            <p><span>{level.into.toLocaleString('ko-KR')} / {level.max ? '—' : level.need.toLocaleString('ko-KR')} STARDUST</span></p>
+            <PixelBar ratio={level.ratio} segments={14} label={`레벨 ${level.level} 진행률 ${Math.round(level.ratio * 100)}%`} />
+            <p><span>LV. {pad2(level.level)}</span></p>
           </div>
           <button className="icon-button" onClick={() => setDark((value) => !value)} aria-label={dark ? '라이트 테마' : '다크 테마'}>
             {dark ? <Sun size={18} /> : <Moon size={18} />}
@@ -305,17 +347,14 @@ export default function App() {
         {screen === 'quests' && (
           <QuestScreen
             wishes={openWishes}
+            orbitNumbers={orbitNumbers}
             events={events}
             today={today}
             slots={slots}
             onCollect={(wish) => setCollecting(wish)}
             onAdd={openAdd}
             onEdit={(wish) => setEditing(wish)}
-            onComplete={completeWish}
-            onWait={async (wish) => {
-              await chooseWait(wish.id, today)
-              setToast(`기다리는 중 · 하루마다 +${XP.wait} XP`)
-            }}
+            onResolve={setResolving}
             onFocus={(wish) => { setActiveId(wish.id); setScreen('hub') }}
           />
         )}
@@ -375,12 +414,36 @@ export default function App() {
           existingShare={existingShare}
           freeAmount={freeAmount}
           onClose={() => setEditing(null)}
-          onRename={async (name) => {
+          onUpdate={async (input) => {
             const target = editing
             setEditing(null)
-            await renameWish(target.id, name)
-            setToast('이름을 바꿨다')
+            await updateWish(target.id, { ...input, today })
+            setToast('위시를 수정했다')
           }}
+          onDelete={async () => {
+            const target = editing
+            setEditing(null)
+            await cancelWish(target.id, today, null)
+            setActiveId((current) => current === target.id ? null : current)
+            refreshBudget()
+            setToast(target.savedAmount > 0 ? '위시를 삭제하고 모은 금액을 회수했다' : '위시를 삭제했다')
+          }}
+        />
+      )}
+      {resolving && (
+        <ResolveWishSheet
+          wish={resolving}
+          today={today}
+          categories={budget?.snapshot?.categories ?? []}
+          transferTargets={openWishes.filter((wish) => wish.id !== resolving.id && wish.status === 'active')}
+          onClose={() => setResolving(null)}
+          onPurchase={(categoryId) => completeWish(resolving, categoryId)}
+          onWait={async () => {
+            await chooseWait(resolving.id, today)
+            setResolving(null)
+            setToast(`기다리는 중 · 하루마다 +${XP.wait} XP`)
+          }}
+          onCancel={(targetWishId) => cancelOpenWish(resolving, targetWishId)}
         />
       )}
       {rewards[0] && <RewardOverlay reward={rewards[0]} onClose={() => setRewards((current) => current.slice(1))} />}
@@ -437,7 +500,7 @@ function HubScreen({ wishes, active, events, today, missions, pendingXp, slots, 
           onAdd={onAdd}
         />
         <div className="stage-caption">
-          <span className="pixel-label">ORBIT {pad2(orbitLevelOf(progress))} · {STAGE_NAMES[stageOf(progress)]}</span>
+          <span className="pixel-label">{orbitLevelOf(progress)}단계 · {STAGE_NAMES[stageOf(progress)]}</span>
           <h2>{active.name}</h2>
           <p className="stage-numbers">
             <strong>{progress}%</strong>
@@ -492,16 +555,16 @@ function HubScreen({ wishes, active, events, today, missions, pendingXp, slots, 
   )
 }
 
-function QuestScreen({ wishes, events, today, slots, onCollect, onAdd, onEdit, onComplete, onWait, onFocus }: {
+function QuestScreen({ wishes, orbitNumbers, events, today, slots, onCollect, onAdd, onEdit, onResolve, onFocus }: {
   wishes: Wish[]
+  orbitNumbers: ReadonlyMap<string, number>
   events: WishEvent[]
   today: string
   slots: number
   onCollect: (wish: Wish) => void
   onAdd: () => void
   onEdit: (wish: Wish) => void
-  onComplete: (wish: Wish) => void
-  onWait: (wish: Wish) => void
+  onResolve: (wish: Wish) => void
   onFocus: (wish: Wish) => void
 }) {
   return (
@@ -520,12 +583,19 @@ function QuestScreen({ wishes, events, today, slots, onCollect, onAdd, onEdit, o
           const todayDone = dayStatus(wish, events, today) !== 'none'
           return (
             <li key={wish.id} className={`quest-card state-${wish.status}`}>
-              <button className="quest-planet" onClick={() => onFocus(wish)} aria-label={`${wish.name} 허브에서 보기`}>
-                <PixelPlanet progress={progress} seed={wish.seed} size={64} />
-              </button>
               <div className="quest-body">
-                <span className="pixel-label">ORBIT {pad2(orbitLevelOf(progress))}</span>
-                <h2>{wish.name}</h2>
+                <div className="quest-card-head">
+                  <div className="quest-heading">
+                    <span className="pixel-label">ORBIT {pad2(orbitNumbers.get(wish.id) ?? 1)}</span>
+                    <div className="quest-title-row">
+                      <h2>{wish.name}</h2>
+                      <button className="quest-edit" onClick={() => onEdit(wish)} aria-label={`${wish.name} 수정하기`}><span aria-hidden="true">✎</span></button>
+                    </div>
+                  </div>
+                  <button className="quest-planet" onClick={() => onFocus(wish)} aria-label={`${wish.name} 허브에서 보기`}>
+                    <PixelPlanet progress={progress} seed={wish.seed} size={64} />
+                  </button>
+                </div>
                 <PixelBar ratio={progress / 100} segments={12} />
                 <p className="quest-numbers">
                   <strong>{money(wish.savedAmount)}</strong>
@@ -548,19 +618,13 @@ function QuestScreen({ wishes, events, today, slots, onCollect, onAdd, onEdit, o
                   )}
                 </p>
                 <div className="quest-actions">
-                  {wish.status === 'ready' ? (
-                    <>
-                      <button className="primary-button" onClick={() => onComplete(wish)}><WalletCards size={17} /> 구매하기</button>
-                      <button className="secondary-button" onClick={() => onWait(wish)}><Clock3 size={17} /> 더 기다리기</button>
-                    </>
-                  ) : wish.status === 'waiting' ? (
-                    <button className="primary-button" onClick={() => onComplete(wish)}><WalletCards size={17} /> 이제 구매하기</button>
+                  {wish.status === 'ready' || wish.status === 'waiting' ? (
+                    <button className="primary-button" onClick={() => onResolve(wish)}><WalletCards size={17} /> {wish.status === 'ready' ? '다음 선택하기' : '구매·정리 선택'}</button>
                   ) : (
                     <button className="primary-button" disabled={todayDone} onClick={() => onCollect(wish)}>
                       {todayDone ? '오늘 몫 완료' : '오늘 모으기'}
                     </button>
                   )}
-                  <button className="secondary-button" onClick={() => onEdit(wish)}>이름 수정</button>
                 </div>
               </div>
             </li>
@@ -688,15 +752,12 @@ function ObserverScreen({ level, totalXp, pendingXp, stats, titles, budget, dark
   onThemeChange: (value: boolean) => void
 }) {
   const earned = new Set(titles)
-  // 두 앱이 같은 저장소를 보는지 눈으로 확인하는 진단값
-  const probe = budget?.snapshot?.probe
 
   return (
     <main className="observer-screen">
       <header className="screen-head">
         <span className="pixel-label">OBSERVER</span>
         <h1>관측자 Lv.{pad2(level.level)}</h1>
-        <p>{level.title}</p>
       </header>
 
       <section className="observer-card">
@@ -791,24 +852,11 @@ function ObserverScreen({ level, totalXp, pendingXp, stats, titles, budget, dark
               <i /> {budget?.snapshot && !budget.stale ? '연결됨' : '연결 안 됨'}
             </span>
           </div>
-          {probe && (
-            <div className="setting-row">
-              <div>
-                <strong>읽은 내용</strong>
-                <span>
-                  거래 {probe.transactions}건(이번 달 {probe.monthTransactions}건) · 카테고리 {probe.categories}개
-                  (예산 있는 것 {probe.budgetedCategories}개) · 예비비 {probe.hasMonthSettings ? '설정됨' : '없음'} ·
-                  예정 수입 {probe.includePlannedIncome ? '포함' : '제외'}
-                </span>
-              </div>
-            </div>
-          )}
           <div className="setting-row">
-            <div><strong>프로토타입</strong><span>같은 앱 안의 두 번째 화면</span></div>
+            <div><strong>프로토타입</strong></div>
             <span className="version-label">WISH 0.1</span>
           </div>
         </div>
-        <a className="orbit-link" href={import.meta.env.DEV ? '/apps/orbit/' : '/'}><Orbit size={18} /> Orbit Budget 열기</a>
       </section>
     </main>
   )
