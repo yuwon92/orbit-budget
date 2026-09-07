@@ -43,12 +43,16 @@ export function depositsOn(events: WishEvent[], wishId: string, date: string) {
   return sum
 }
 
-/** XP·하루 판정에 쓰는 실제 행동 납입. 다른 위시에서 옮긴 돈은 새 저금 행동이 아니다 */
+/**
+ * 하루 몫 판정에 쓰는 납입. 직접 저금(`manual`)만 센다.
+ * 다른 위시에서 옮긴 돈(`transfer`)은 새 저금 행동이 아니고,
+ * 남은 예산 넘기기(`carryover`)는 자기 미션이 따로 있어 하루 몫과 별개로 친다.
+ */
 export function actionDepositsOn(events: WishEvent[], wishId: string, date: string) {
   let sum = 0
   for (const event of events) {
     if (event.wishId !== wishId || event.date !== date) continue
-    if (event.type === 'deposit' && event.source !== 'transfer') sum += event.amount ?? 0
+    if (event.type === 'deposit' && (event.source ?? 'manual') === 'manual') sum += event.amount ?? 0
     if (event.type === 'withdraw') sum -= event.amount ?? 0
   }
   return sum

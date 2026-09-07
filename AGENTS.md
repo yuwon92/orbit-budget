@@ -61,6 +61,8 @@ Wish는 Orbit 예산을 `getOrbitSnapshot()`으로 읽고, 구매 확정 때만 
 
 **Wish 데이터는 `orbital-wish`(Dexie)에 저장된다.** 위시·이벤트·수령 기록·Player 네 스토어. 화면은 `packages/wish-bridge`를 통해서만 쓰고, Wish 앱 읽기는 `apps/wish/src/lib/hooks.ts`의 `useLiveQuery` 네 개가 전부다. Orbit 홈은 `listWishes()`·`listWishEvents()`를 live query로 읽어 기간이 있는 active 위시만 표시한다.
 
+**하루 몫과 남은 예산 넘기기는 별개 미션이다.** `deposit`의 `source`가 갈라준다 — `manual`만 하루 몫 판정(`actionDepositsOn`·`dayStatus`)에 들어가고, `carryover`는 자기 미션만, `transfer`는 어느 쪽도 아니다. 넘기기로 하루 몫이 채워지면 안 된다.
+
 **XP는 어디에도 저장하지 않는다.** `WishEvent`와 `Claim`(수령 영수증)에서 매번 다시 계산한다. 배점을 바꾸면 과거 기록도 새 배점으로 재계산된다. 미션은 행마다 개별 수령 버튼이 있고 아래 `CLAIM` 버튼이 미수령 전부를 한 번에 받는다. 승격 전 초안(위시 상세 중심 4탭, `PlanetVisual`, `orbital-wish` 스키마 선언)은 커밋 `70d9ce5`에 남아 있다.
 
 ### Orbit 컴포넌트 (`apps/orbit/src/components/`)

@@ -92,7 +92,8 @@ export const claimIdOf = (date: string, missionId: string) => `${date}:${mission
 
 /**
  * 이벤트에서 수령 가능한 미션을 전부 만든다. 수령 여부는 claims로 따로 대조한다.
- * 남은 예산을 넘긴 날은 하루 몫과 넘기기 두 건이 함께 잡힌다 — 가장 어려운 행동이라 겹쳐 준다.
+ * 하루 몫과 남은 예산 넘기기는 서로 다른 행동이라 각각 따로 잡는다 —
+ * 남은 예산을 넘겼다고 그 날 하루 몫이 채워지지는 않는다.
  */
 export function missionUnits(wishes: Wish[], events: WishEvent[]): MissionUnit[] {
   const units: MissionUnit[] = []
@@ -103,18 +104,21 @@ export function missionUnits(wishes: Wish[], events: WishEvent[]): MissionUnit[]
     const wish = byId.get(event.wishId)
     if (!wish) continue
 
-    if (event.type === 'deposit' && event.source !== 'transfer' && (event.amount ?? 0) > 0) {
-      const key = `${event.date}:${wish.id}`
-      if (!seenShare.has(key) && actionDepositsOn(events, wish.id, event.date) > 0) {
-        seenShare.add(key)
-        const status = dayStatus(wish, events, event.date)
-        units.push({
-          missionId: `share-${wish.id}`,
-          date: event.date,
-          kind: 'share',
-          xp: status === 'partial' ? XP.partial : XP.share,
-          wishId: wish.id,
-        })
+    if (event.type === 'deposit' && (event.amount ?? 0) > 0) {
+      // 하루 몫은 직접 저금한 날만. 넘기기·이전은 여기서 세지 않는다
+      if ((event.source ?? 'manual') === 'manual') {
+        const key = `${event.date}:${wish.id}`
+        if (!seenShare.has(key) && actionDepositsOn(events, wish.id, event.date) > 0) {
+          seenShare.add(key)
+          const status = dayStatus(wish, events, event.date)
+          units.push({
+            missionId: `share-${wish.id}`,
+            date: event.date,
+            kind: 'share',
+            xp: status === 'partial' ? XP.partial : XP.share,
+            wishId: wish.id,
+          })
+        }
       }
       if (event.source === 'carryover') {
         units.push({ missionId: 'carryover', date: event.date, kind: 'carryover', xp: XP.carryover, wishId: wish.id })

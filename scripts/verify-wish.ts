@@ -261,10 +261,26 @@ const claim = (date: string, missionId: string): Claim => ({
   const twice = [claim('2026-09-01', 'share-w1'), claim('2026-09-01', 'share-w1')]
   assert.equal(claimedXp(units, twice), XP.share)
 
-  // 남은 예산 넘기기는 하루 몫과 함께 잡힌다. 가장 어려운 행동이라 겹쳐 준다
+  // 남은 예산 넘기기는 하루 몫과 별개다. 넘겼다고 그 날 하루 몫이 채워지지 않는다
   const carryEvents = [deposit('2026-09-04', 30_000, { source: 'carryover' })]
   const carry = missionUnits([wish({ savedAmount: 30_000 })], carryEvents)
-  assert.equal(sumXp(carry), XP.share + XP.carryover)
+  assert.deepEqual(carry.map((unit) => unit.missionId), ['carryover'])
+  assert.equal(sumXp(carry), XP.carryover)
+
+  // 같은 날 직접 저금까지 하면 두 건이 따로 잡힌다
+  const bothEvents = [
+    deposit('2026-09-04', 30_000, { source: 'carryover' }),
+    deposit('2026-09-04', 10_000),
+  ]
+  const both = missionUnits([wish({ savedAmount: 40_000 })], bothEvents)
+  assert.deepEqual(both.map((unit) => unit.missionId).sort(), ['carryover', 'share-w1'])
+
+  // 이전받은 돈은 어느 쪽도 아니다
+  const transferred = missionUnits(
+    [wish({ savedAmount: 30_000 })],
+    [deposit('2026-09-04', 30_000, { source: 'transfer' })],
+  )
+  assert.deepEqual(transferred, [])
   console.log('미션 수령 통과')
 }
 
