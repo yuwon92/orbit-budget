@@ -84,10 +84,9 @@ export function CollectSheet({ wishName, dailyShare, availableAmount, onClose, o
 /**
  * 어제 남은 예산을 어느 궤도에 넣을지 고르는 시트.
  *
- * 금액이 어디서 왔는지 카테고리별로 먼저 보여준다 — 어제(주 단위면 지난주)
- * 예산에서 안 쓰고 넘어온 돈이라는 게 줄마다 보여야 옮길 마음이 생긴다.
- * 남은 자리(목표 − 모은 금액)보다 많이는 못 넣으므로 궤도마다 실제로 들어갈
- * 금액도 미리 보여준다. 자리가 남은 진행 중 위시만 후보다.
+ * 궤도를 고르는 것과 넣는 것을 나눈다 — 한 번 누르면 바로 확정되던 흐름은
+ * 되돌릴 수단이 없어 잘못 누르면 그대로 들어간다.
+ * 남은 자리(목표 − 모은 금액)보다 많이는 못 넣으므로 궤도마다 실제로 들어갈 금액을 함께 보여준다.
  */
 export function CarryoverSheet({ amount, rows, wishes, onClose, onDeposit }: {
   amount: number
@@ -97,14 +96,16 @@ export function CarryoverSheet({ amount, rows, wishes, onClose, onDeposit }: {
   onDeposit: (wishId: string, amount: number) => Promise<void>
 }) {
   const [saving, setSaving] = useState(false)
+  const [picked, setPicked] = useState<string | null>(null)
   const targets = wishes
     .filter((wish) => wish.status === 'active')
     .map((wish) => ({ wish, accepted: Math.min(amount, Math.max(0, wish.targetAmount - wish.savedAmount)) }))
+  const chosen = targets.find((target) => target.wish.id === picked && target.accepted > 0)
 
-  const run = async (wishId: string, accepted: number) => {
-    if (saving) return
+  const submit = async () => {
+    if (saving || !chosen) return
     setSaving(true)
-    try { await onDeposit(wishId, accepted) } finally { setSaving(false) }
+    try { await onDeposit(chosen.wish.id, chosen.accepted) } finally { setSaving(false) }
   }
 
   return (
@@ -118,16 +119,13 @@ export function CarryoverSheet({ amount, rows, wishes, onClose, onDeposit }: {
           </div>
           <button className="icon-button" onClick={onClose} aria-label="닫기"><X size={20} /></button>
         </header>
-        <p className="resolve-summary">
-          어제 예산 기간이 끝나면서 자유비용으로 넘어온 돈이다. 어느 궤도에 넣을지 고르자.
-        </p>
 
         {rows.length > 0 && (
           <ul className="carryover-source">
             {rows.map((row) => (
               <li key={`${row.categoryId}-${row.to}`}>
                 <span>{row.categoryName}</span>
-                <small>{row.scope === 'week' ? `${row.from} ~ ${row.to} 주간` : row.to}</small>
+                <small>{row.scope === 'week' ? `${row.from} ~ ${row.to}` : row.to}</small>
                 <b>{money(row.leftover)}원</b>
               </li>
             ))}
@@ -138,23 +136,31 @@ export function CarryoverSheet({ amount, rows, wishes, onClose, onDeposit }: {
           </ul>
         )}
 
-        <section className="resolve-cancel">
-          {targets.length === 0 && <p>넣을 수 있는 궤도가 없다. 진행 중인 위시를 먼저 만들자.</p>}
+        <section className="resolve-cancel carryover-targets">
           {targets.map(({ wish, accepted }) => (
-            <button key={wish.id} disabled={saving || accepted <= 0} onClick={() => run(wish.id, accepted)}>
+            <button
+              key={wish.id}
+              className={picked === wish.id ? 'picked' : ''}
+              aria-pressed={picked === wish.id}
+              disabled={saving || accepted <= 0}
+              onClick={() => setPicked(wish.id)}
+            >
               <span>
                 <strong>{wish.name}</strong>
-                <small>{accepted <= 0 ? '남은 자리 없음' : `${money(wish.savedAmount)} / ${money(wish.targetAmount)}원`}</small>
+                <small>{accepted <= 0 ? '자리 없음' : `${money(wish.savedAmount)} / ${money(wish.targetAmount)}원`}</small>
               </span>
               <b>+{money(accepted)}원</b>
             </button>
           ))}
         </section>
 
+        <button className="primary-button full" disabled={!chosen || saving} onClick={submit}>
+          {chosen ? `${money(chosen.accepted)}원 저금하기` : '궤도 선택'}
+        </button>
+
         <p className="mission-gain">
           <span className="pixel-label">REWARD</span>
           <strong>+{XP.carryover} XP</strong>
-          <span>그냥 써도 되는 돈을 옮긴다</span>
         </p>
       </section>
     </div>

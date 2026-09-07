@@ -932,6 +932,8 @@ ul { padding: 0; list-style: none; }
 .resolve-cancel > button:disabled { opacity: .45; cursor: default; }
 .resolve-cancel .resolve-to-free { border-color: color-mix(in srgb, var(--solar-orange) 45%, var(--border)); }
 .resolve-cancel .resolve-to-free b { color: var(--solar-orange); }
+.carryover-targets > button.picked { border-color: var(--solar-orange); background: color-mix(in srgb, var(--solar-orange) 10%, var(--surface)); }
+.carryover-targets > button.picked b { color: var(--solar-orange); }
 
 .mission-gain {
   padding: 12px 14px;
