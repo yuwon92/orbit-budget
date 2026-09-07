@@ -36,6 +36,11 @@ export async function markCelebratedLevel(level: number) {
   await wishDb.player.update(PLAYER_ID, { celebratedLevel: level })
 }
 
+/** 연출을 이미 본 칭호. 레벨과 달리 순서가 없어 id 목록으로 남긴다 */
+export async function markCelebratedTitles(titleIds: string[]) {
+  await wishDb.player.update(PLAYER_ID, { celebratedTitles: [...new Set(titleIds)] })
+}
+
 export interface NewWishInput {
   name: string
   targetAmount: number

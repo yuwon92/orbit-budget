@@ -345,9 +345,14 @@ const claim = (date: string, missionId: string): Claim => ({
   assert.equal(titles.includes('first'), true)
   // 2026-09-01 등록 → 2026-10-05 구매. 34일이라 장기 관측
   assert.equal(titles.includes('long'), true)
-  assert.equal(titles.includes('letgo'), true)
   assert.equal(titles.includes('thrift'), false)
   assert.equal(titles.includes('constellation'), false)
+  // 정리 칭호는 목표까지 모은 뒤 놓아준 것만. 중간에 지운 위시는 안 쳐준다
+  assert.equal(titles.includes('letgo'), false)
+  const letgoEvent = ev({ type: 'cancel', date: '2026-09-03', wishId: 'w2', amount: 300_000 })
+  assert.equal(earnedTitles(wishes, [...events, letgoEvent], '2026-09-03').includes('letgo'), true)
+  const partial = ev({ type: 'cancel', date: '2026-09-03', wishId: 'w2', amount: 120_000 })
+  assert.equal(earnedTitles(wishes, [...events, partial], '2026-09-03').includes('letgo'), false)
   console.log('통계·칭호 통과')
 }
 

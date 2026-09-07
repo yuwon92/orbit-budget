@@ -22,5 +22,5 @@ export const TITLES: { id: TitleId; name: string; detail: string; icon: string }
   { id: 'patience', name: '인내', detail: '더 기다리기 5회', icon: '⌛' },
   { id: 'habit', name: '관측 습관', detail: '연속 14일', icon: '📡' },
   { id: 'constellation', name: '성계 형성', detail: '완주한 위시 5개', icon: '✨' },
-  { id: 'letgo', name: '정리', detail: '위시를 잘 놓아주기', icon: '📦' },
+  { id: 'letgo', name: '정리', detail: '목표 도달 뒤 놓아주기', icon: '📦' },
 ]

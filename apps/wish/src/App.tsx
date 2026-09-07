@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronRight, Lock, Moon, Plus, Sun, WalletCards } from 'lucide-react'
 import { money } from '@orbit/budget-core/format'
 import {
@@ -37,6 +37,7 @@ import {
   createWish,
   deposit,
   markCelebratedLevel,
+  markCelebratedTitles,
   purchaseWish,
   recordWaitDay,
   skipDay,
@@ -57,8 +58,8 @@ import { loadBudgetView, sinceLabel, type BudgetView } from './lib/budget'
 type Screen = 'hub' | 'quests' | 'codex' | 'observer'
 
 const NAV: { id: Screen; label: string }[] = [
-  { id: 'hub', label: '오르빗' },
-  { id: 'quests', label: '퀘스트' },
+  { id: 'hub', label: '궤도' },
+  { id: 'quests', label: '위시' },
   { id: 'codex', label: '도감' },
   { id: 'observer', label: '관측자' },
 ]
@@ -189,6 +190,29 @@ export default function App() {
     })
     void markCelebratedLevel(level.level)
   }, [loaded, player, level.level, level.title, pushReward])
+
+  // 칭호도 같은 방식으로 감시한다. 첫 계산에서 이미 달성한 것은 연출 없이 기록만 해
+  // 업데이트 직후 밀린 연출이 한꺼번에 쏟아지지 않게 한다. shown은 저장이 끝나기 전에
+  // 이펙트가 한 번 더 돌아 같은 칭호를 두 번 띄우는 것을 막는다.
+  const shownTitles = useRef<Set<string> | null>(null)
+  useEffect(() => {
+    if (!loaded || !player) return
+    // 이 필드가 없던 때 만들어진 Player 레코드도 있다
+    const celebrated = player.celebratedTitles ?? []
+    if (!shownTitles.current) {
+      shownTitles.current = new Set(titles)
+      if (titles.some((id) => !celebrated.includes(id))) void markCelebratedTitles([...celebrated, ...titles])
+      return
+    }
+    const fresh = titles.filter((id) => !shownTitles.current!.has(id) && !celebrated.includes(id))
+    if (!fresh.length) return
+    for (const id of fresh) {
+      shownTitles.current.add(id)
+      const title = TITLES.find((item) => item.id === id)
+      if (title) pushReward({ kind: 'title', name: title.name, detail: title.detail, icon: title.icon })
+    }
+    void markCelebratedTitles([...celebrated, ...fresh])
+  }, [loaded, player, titles, pushReward])
 
   async function collect(amount: number) {
     if (!collecting) return
@@ -591,7 +615,7 @@ function QuestScreen({ wishes, slotsUsed, orbitNumbers, events, today, slots, on
       <header className="screen-head">
         <span className="pixel-label">QUEST LOG</span>
         <h1>진행 중인 궤도</h1>
-        <p>{slotsUsed} / {slots} 슬롯 사용 중 · 기간 없는 위시는 슬롯을 쓰지 않는다</p>
+        <p>{slotsUsed} / {slots} 슬롯 사용 중</p>
       </header>
 
       <ul className="quest-list">

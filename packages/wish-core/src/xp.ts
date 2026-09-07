@@ -245,7 +245,12 @@ export function earnedTitles(wishes: Wish[], events: WishEvent[], today: string)
   if (stats.waits >= 5) earned.push('patience')
   if (stats.bestStreak >= 14) earned.push('habit')
   if (done.length >= 5) earned.push('constellation')
-  if (stats.cancelled >= 1) earned.push('letgo')
+  // 목표까지 모은 뒤 사지 않고 놓아준 것만 센다. 중간에 지운 위시는 해당 없음.
+  // cancel 이벤트의 amount가 정리 시점까지 모은 금액이다.
+  const letGo = wishes.some((wish) => wish.status === 'cancelled' && events.some(
+    (event) => event.wishId === wish.id && event.type === 'cancel' && (event.amount ?? 0) >= wish.targetAmount,
+  ))
+  if (letGo) earned.push('letgo')
 
   return earned
 }

@@ -5,6 +5,7 @@ import { pad2 } from '../lib/format'
 export type Reward =
   | { kind: 'levelup'; from: number; to: number; title: string; unlock: string | null }
   | { kind: 'complete'; name: string; seed: number; stardust: number; date: string }
+  | { kind: 'title'; name: string; detail: string; icon: string }
 
 /** 레벨업·완주 연출. 픽셀 버스트 → 문구 → 보상 순으로 짧게 끝낸다. (가이드 12장) */
 export function RewardOverlay({ reward, onClose }: { reward: Reward; onClose: () => void }) {
@@ -13,7 +14,7 @@ export function RewardOverlay({ reward, onClose }: { reward: Reward; onClose: ()
 
   // 연출 하나당 타이머 하나. 부모가 다시 그려져도 다시 시작하지 않는다.
   useEffect(() => {
-    const timer = window.setTimeout(() => close.current(), reward.kind === 'levelup' ? 3400 : 4400)
+    const timer = window.setTimeout(() => close.current(), reward.kind === 'complete' ? 4400 : 3400)
     return () => window.clearTimeout(timer)
   }, [reward])
 
@@ -34,6 +35,14 @@ export function RewardOverlay({ reward, onClose }: { reward: Reward; onClose: ()
           </p>
           <p className="reward-name">{reward.title}</p>
           {reward.unlock && <p className="reward-unlock">NEW ORBIT UNLOCKED · {reward.unlock}</p>}
+        </div>
+      ) : reward.kind === 'title' ? (
+        <div className="reward-body">
+          <span className="reward-icon" aria-hidden="true">{reward.icon}</span>
+          <p className="reward-title compact">TITLE EARNED</p>
+          <p className="reward-jump"><span className="to">{reward.name}</span></p>
+          <p className="reward-sub">{reward.detail}</p>
+          <p className="reward-unlock">관측자 화면에 칭호 추가</p>
         </div>
       ) : (
         <div className="reward-body">

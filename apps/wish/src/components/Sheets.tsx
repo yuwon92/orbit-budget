@@ -349,7 +349,7 @@ export function WishSheet({ today, wish, existingShare, freeAmount, canSchedule,
               ))}
             </div>
           </div>
-          {!canSchedule && <p className="sheet-warning">궤도 슬롯을 다 썼다. 기간 없이 담아 두었다가 슬롯이 나면 기간을 정하자.</p>}
+          {!canSchedule && <p className="sheet-warning">궤도 슬롯 없음 · 기간 없이 저장</p>}
         </fieldset>
 
         <p className="mission-gain">
@@ -360,12 +360,12 @@ export function WishSheet({ today, wish, existingShare, freeAmount, canSchedule,
 
         {!editing && heavy && (
           <p className="sheet-warning">
-            하루 몫 합계가 {money(existingShare + preview)}원. 남은 자유비용의 절반을 넘는다. 기간을 늘리면 하루 부담이 줄어든다.
+            하루 몫 합계 {money(existingShare + preview)}원 · 남은 자유비용의 절반 초과 · 기간 연장 권장
           </p>
         )}
 
-        {!editing && period && !targetDate && <p className="sheet-warning">목표 기간은 최소 3일로 정해 주세요.</p>}
-        {wish && targetAmount < wish.savedAmount && <p className="sheet-warning">목표 금액은 지금까지 모은 {money(wish.savedAmount)}원 이상이어야 합니다.</p>}
+        {!editing && period && !targetDate && <p className="sheet-warning">목표 기간 최소 3일</p>}
+        {wish && targetAmount < wish.savedAmount && <p className="sheet-warning">목표 금액 최소 {money(wish.savedAmount)}원 (지금까지 모은 금액)</p>}
 
         <button className="primary-button full" type="submit" disabled={targetAmount <= 0 || Boolean(period) && !targetDate || Boolean(wish && targetAmount < wish.savedAmount)}>{editing ? '변경사항 저장' : '궤도에 올리기'}</button>
         {editing && (
