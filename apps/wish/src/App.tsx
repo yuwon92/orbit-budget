@@ -201,7 +201,7 @@ export default function App() {
     const target = collecting
     setCollecting(null)
     await skipDay(target.id, today)
-    setToast('오늘은 쉬어감. 벌점 없음')
+    setToast('오늘은 쉬어감')
   }
 
   /** 미션 수행. 하루 몫만 시트를 열고 나머지는 그 자리에서 이벤트를 남긴다 */
@@ -213,7 +213,7 @@ export default function App() {
     }
     if (mission.kind === 'wait' && mission.wishId) {
       await recordWaitDay(mission.wishId, today)
-      setToast('오늘도 기다리기 기록')
+      setToast('하루 더 기다리기')
       return
     }
     if (mission.kind === 'carryover') {
@@ -274,7 +274,7 @@ export default function App() {
     setResolving(null)
     setActiveId((current) => (current === wish.id ? targetWishId : current))
     refreshBudget()
-    setToast(targetWishId ? '모은 금액을 다른 궤도로 옮겼다' : '모은 금액을 자유비용으로 회수했다')
+    setToast(targetWishId ? '모은 금액을 다른 궤도로 이동' : '모은 금액을 자유비용으로 회수')
   }
 
   function openAdd() {
@@ -415,7 +415,7 @@ export default function App() {
             const wish = await createWish({ ...input, today })
             setActiveId(wish.id)
             setScreen('hub')
-            setToast('새 행성이 궤도에 올랐다')
+            setToast('새 행성이 궤도에 도착')
           }}
         />
       )}
@@ -430,7 +430,7 @@ export default function App() {
             const target = editing
             setEditing(null)
             await updateWish(target.id, { ...input, today })
-            setToast('위시를 수정했다')
+            setToast('위시 수정 완료')
           }}
           onDelete={async () => {
             const target = editing
@@ -438,7 +438,7 @@ export default function App() {
             await cancelWish(target.id, today, null)
             setActiveId((current) => current === target.id ? null : current)
             refreshBudget()
-            setToast(target.savedAmount > 0 ? '위시를 삭제하고 모은 금액을 회수했다' : '위시를 삭제했다')
+            setToast(target.savedAmount > 0 ? '위시 삭제 후 모은 금액 회수' : '위시 삭제 완료')
           }}
         />
       )}
