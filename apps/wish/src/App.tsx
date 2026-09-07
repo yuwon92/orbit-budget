@@ -99,7 +99,7 @@ export default function App() {
   const freeAmount = budget?.snapshot?.freeAmount ?? 0
   // 어제 쓰고 남은 자유비용. Orbit이 계산해 스냅샷으로 넘겨준다
   const carryover = budget?.snapshot?.carryoverAmount ?? 0
-  const carryoverDate = budget?.snapshot?.carryoverDate ?? null
+  const carryoverRows = useMemo(() => budget?.snapshot?.carryoverRows ?? [], [budget])
   const [collecting, setCollecting] = useState<Wish | null>(null)
   const [carrying, setCarrying] = useState(false)
   const [adding, setAdding] = useState(false)
@@ -398,7 +398,7 @@ export default function App() {
       {carrying && (
         <CarryoverSheet
           amount={carryover}
-          date={carryoverDate}
+          rows={carryoverRows}
           wishes={openWishes}
           onClose={() => setCarrying(false)}
           onDeposit={carryOver}

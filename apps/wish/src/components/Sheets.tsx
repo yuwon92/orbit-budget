@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Clock3, Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react'
 import { money } from '@orbit/budget-core/format'
+import type { ReleasedLeftover } from '@orbit/budget-core/budget'
 import type { Category } from '@orbit/budget-core/types'
 import { XP } from '@orbit/wish-core/xp'
 import { addDays, canPurchase, daysBetween, purchaseUnlockDate, remainingDays } from '@orbit/wish-core/wish'
@@ -83,12 +84,14 @@ export function CollectSheet({ wishName, dailyShare, availableAmount, onClose, o
 /**
  * 어제 남은 예산을 어느 궤도에 넣을지 고르는 시트.
  *
+ * 금액이 어디서 왔는지 카테고리별로 먼저 보여준다 — 어제(주 단위면 지난주)
+ * 예산에서 안 쓰고 넘어온 돈이라는 게 줄마다 보여야 옮길 마음이 생긴다.
  * 남은 자리(목표 − 모은 금액)보다 많이는 못 넣으므로 궤도마다 실제로 들어갈
- * 금액을 미리 보여준다. 자리가 남은 진행 중 위시만 후보다.
+ * 금액도 미리 보여준다. 자리가 남은 진행 중 위시만 후보다.
  */
-export function CarryoverSheet({ amount, date, wishes, onClose, onDeposit }: {
+export function CarryoverSheet({ amount, rows, wishes, onClose, onDeposit }: {
   amount: number
-  date: string | null
+  rows: ReleasedLeftover[]
   wishes: Wish[]
   onClose: () => void
   onDeposit: (wishId: string, amount: number) => Promise<void>
@@ -116,8 +119,24 @@ export function CarryoverSheet({ amount, date, wishes, onClose, onDeposit }: {
           <button className="icon-button" onClick={onClose} aria-label="닫기"><X size={20} /></button>
         </header>
         <p className="resolve-summary">
-          {date ? `${date}에 ` : '어제 '}쓰고 남은 자유비용이다. 어느 궤도에 넣을지 고르자.
+          어제 예산 기간이 끝나면서 자유비용으로 넘어온 돈이다. 어느 궤도에 넣을지 고르자.
         </p>
+
+        {rows.length > 0 && (
+          <ul className="carryover-source">
+            {rows.map((row) => (
+              <li key={`${row.categoryId}-${row.to}`}>
+                <span>{row.categoryName}</span>
+                <small>{row.scope === 'week' ? `${row.from} ~ ${row.to} 주간` : row.to}</small>
+                <b>{money(row.leftover)}원</b>
+              </li>
+            ))}
+            <li className="carryover-total">
+              <span>합계</span>
+              <b>{money(rows.reduce((sum, row) => sum + row.leftover, 0))}원</b>
+            </li>
+          </ul>
+        )}
 
         <section className="resolve-cancel">
           {targets.length === 0 && <p>넣을 수 있는 궤도가 없다. 진행 중인 위시를 먼저 만들자.</p>}

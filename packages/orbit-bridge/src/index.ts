@@ -1,4 +1,5 @@
-import { dailyLeftover, monthlyFreeAmount } from '@orbit/budget-core/budget'
+import { monthlyFreeAmount, releasedLeftovers } from '@orbit/budget-core/budget'
+import type { ReleasedLeftover } from '@orbit/budget-core/budget'
 import type { Category, Transaction } from '@orbit/budget-core/types'
 import { db } from './db'
 import { readPlannedIncome } from './settings'
@@ -25,10 +26,13 @@ export interface OrbitBudgetSnapshot {
   /** 이번 달 위시 저금 합계. 위 freeAmount에서 이미 빠져 있다 */
   wishSavedAmount: number
   /**
-   * 어제 쓰고 남은 자유비용. Wish의 '남은 예산 저금하기' 미션 금액이다.
-   * 남은 자유비용을 넘지 않게 자르고, 어제가 지난달이면 0 (자유비용 풀이 달마다 끊긴다).
+   * 어제 끝난 예산 기간에서 남아 자유비용으로 넘어온 금액 합계.
+   * Wish의 '남은 예산 저금하기' 미션 금액이다. 남은 자유비용을 넘지 않게 자르고,
+   * 어제가 지난달이면 0 (자유비용 풀이 달마다 끊긴다).
    */
   carryoverAmount: number
+  /** 그 합계를 만든 카테고리별 잔액. 자르기 전 원래 금액이다 */
+  carryoverRows: ReleasedLeftover[]
   /** carryoverAmount의 기준일. 'yyyy-MM-dd', 지난달이면 null */
   carryoverDate: string | null
   /** 스냅샷을 만든 시각. 오프라인일 때 얼마나 오래됐는지 보여주는 데 쓴다 */
@@ -84,15 +88,15 @@ export async function getOrbitSnapshot(
   const budgetedCategories = categories.filter((category) => category.monthlyBudget > 0).length
   const freeAmount = monthlyFreeAmount(transactions, categories, today, reserveAmount, includePlannedIncome, wishSavedAmount)
 
-  // 어제 남은 자유비용. 이번 달 거래만 읽어 두므로 1일에는 기준일이 지난달이라 계산하지 않는다.
+  // 어제 기간이 끝나면서 자유비용으로 넘어온 잔액.
+  // 이번 달 거래만 읽어 두므로 1일에는 기준일이 지난달이라 계산하지 않는다.
   const yesterday = previousDate(today)
   const carryoverDate = yesterday.startsWith(yearMonth) ? yesterday : null
-  const carryoverAmount = carryoverDate
-    ? Math.min(
-        dailyLeftover(transactions, categories, carryoverDate, { reserveAmount, includePlannedIncome, wishSavedAmount }),
-        Math.max(0, freeAmount),
-      )
-    : 0
+  const carryoverRows = carryoverDate ? releasedLeftovers(categories, transactions, carryoverDate) : []
+  const carryoverAmount = Math.min(
+    carryoverRows.reduce((sum, row) => sum + row.leftover, 0),
+    Math.max(0, freeAmount),
+  )
 
   // 카테고리 존재만으로는 판단할 수 없다. 처음 열리는 DB에 기본 카테고리 4개가
   // 자동으로 심어지기 때문에(db.on('populate')), 저장소가 분리된 환경에서도
@@ -105,6 +109,7 @@ export async function getOrbitSnapshot(
     reserveAmount,
     wishSavedAmount,
     carryoverAmount,
+    carryoverRows,
     carryoverDate,
     calculatedAt: Date.now(),
     version: SNAPSHOT_VERSION,

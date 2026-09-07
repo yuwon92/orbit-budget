@@ -7,9 +7,6 @@ import {
   buildBreakdown,
   categoryProgress,
   countExpenses,
-  dailyFreeShare,
-  dailyLeftover,
-  freeSpentOnDate,
   inQuickSlot,
   monthlyAmountForRule,
   monthlyOccurrences,
@@ -19,6 +16,8 @@ import {
   quickAddAmount,
   quickSlotCategories,
   recurringSumForCategory,
+  releasedLeftoverTotal,
+  releasedLeftovers,
   spentByCategory,
   spentOnDate,
   totalIncome,
@@ -395,35 +394,54 @@ assert.equal(csvLines[1], '2026-09-01,expense,,5000,"콤마,와 ""따옴표""",f
 assert.equal(csvLines[2], '2026-09-13,expense,식비,12000,점심,false,false')
 console.log('CSV 생성 (컬럼 순서, 정렬, 이스케이프) 통과')
 
-// --- 하루 몫과 남은 예산 (위시 '남은 예산 저금하기'가 가져가는 값) ---
-// 9월 한 달, 수입 300,000원에 예산 잡힌 카테고리 하나(주 2회 x 5,000원 = 45,000원).
-const dayCats = [homeCat('cafe2', 45_000, { kind: 'perUse', unitAmount: 5_000, freq: { mode: 'perWeek', timesPerWeek: 2 } })]
+// --- 끝난 기간이 자유비용에 돌려주는 잔액 (위시 '남은 예산 저금하기'가 가져가는 값) ---
+// 2026-09: 1일이 화요일 → 주 기간은 1~6, 7~13, 14~20, 21~27, 28~30.
+// 식비는 월·수·금 하루 20,000원(10,000 x 2회), 카페는 주 2회 x 5,000 = 주 10,000원.
+const dayFood = homeCat('food2', 260_000, {
+  kind: 'perUse', unitAmount: 10_000, freq: { mode: 'weekdays', weekdays: [1, 3, 5], timesPerDay: 2 },
+})
+const weekCafe = homeCat('cafe2', 45_000, {
+  kind: 'perUse', unitAmount: 5_000, freq: { mode: 'perWeek', timesPerWeek: 2 },
+})
+const leftoverCats = [dayFood, weekCafe]
 const dayIncome = tx('2026-09-01', 300_000, 'income', null, '')
 
-// 예산 안에서 쓴 돈은 자유비용을 깎지 않는다. 미분류 지출만 그대로 나간다.
-assert.equal(freeSpentOnDate([dayIncome, tx(MON, 8_000, 'expense', 'cafe2', '')], dayCats, MON, { reserveAmount: 0 }), 0)
-assert.equal(freeSpentOnDate([dayIncome, tx(MON, 8_000, 'expense', null, '')], dayCats, MON, { reserveAmount: 0 }), 8_000)
-// 주 몫 10,000원을 3,000원 넘겨 쓰면 초과분만 자유비용에서 빠진다
-assert.equal(freeSpentOnDate([dayIncome, tx(MON, 13_000, 'expense', 'cafe2', '')], dayCats, MON, { reserveAmount: 0 }), 3_000)
-
-// 하루 몫: 그날 아침의 자유비용 265,000원(끝난 첫 주 몫 10,000원 환급 포함)을 9/7~9/30 24일로 나눈다
-assert.equal(dailyFreeShare([dayIncome], dayCats, MON, { reserveAmount: 0 }), 11_041)
-// 아무것도 안 썼으면 하루 몫이 그대로 남는다
-assert.equal(dailyLeftover([dayIncome], dayCats, MON, { reserveAmount: 0 }), 11_041)
-// 미분류로 4,000원 쓰면 그만큼 줄어든다 (아침 기준 하루 몫은 그대로)
-assert.equal(dailyLeftover([dayIncome, tx(MON, 4_000, 'expense', null, '')], dayCats, MON, { reserveAmount: 0 }), 7_041)
-// 하루 몫을 넘겨 쓴 날은 남은 예산이 0. 음수로 내려가지 않는다
-assert.equal(dailyLeftover([dayIncome, tx(MON, 40_000, 'expense', null, '')], dayCats, MON, { reserveAmount: 0 }), 0)
-// 카테고리 예산 안에서만 쓴 날은 자유비용을 안 건드리므로 하루 몫이 온전히 남는다
-assert.equal(dailyLeftover([dayIncome, tx(MON, 8_000, 'expense', 'cafe2', '')], dayCats, MON, { reserveAmount: 0 }), 11_041)
-// 위시에 이미 저금한 돈은 풀에서 빠져 하루 몫도 함께 줄어든다
-assert.equal(dailyFreeShare([dayIncome], dayCats, MON, { reserveAmount: 0, wishSavedAmount: 24_000 }), 10_041)
-// 월 마지막 날은 남은 날이 하루뿐이라 남은 자유비용 전액이 하루 몫이다
-assert.equal(
-  dailyFreeShare([dayIncome], dayCats, '2026-09-30', { reserveAmount: 0 }),
-  monthlyFreeAmount([dayIncome], dayCats, '2026-09-30', 0),
+// 요일 카테고리는 그 날이 끝나면서 남은 몫을 돌려준다 (20,000 중 18,000 사용 → 2,000)
+const foodSpent = [dayIncome, tx(MON, 18_000, 'expense', 'food2', '')]
+assert.deepEqual(
+  releasedLeftovers(leftoverCats, foodSpent, MON).map((row) => [row.categoryId, row.scope, row.leftover]),
+  [['food2', 'day', 2_000]],
 )
-console.log('하루 몫·남은 예산 (자유 지출만 차감, 음수 없음) 통과')
+// 사용일이 아닌 화요일에는 끝나는 기간이 없다
+assert.deepEqual(releasedLeftovers(leftoverCats, foodSpent, TUE), [])
+
+// 주 카테고리는 주가 끝나는 일요일에만 돌려준다 (9/13 일요일)
+const cafeSpent = [dayIncome, tx('2026-09-09', 7_000, 'expense', 'cafe2', '')]
+assert.deepEqual(releasedLeftovers([weekCafe], cafeSpent, '2026-09-12'), []) // 토요일엔 아직 안 끝남
+assert.deepEqual(
+  releasedLeftovers([weekCafe], cafeSpent, '2026-09-13').map((row) => [row.scope, row.from, row.to, row.leftover]),
+  [['week', '2026-09-07', '2026-09-13', 3_000]],
+)
+// 예산을 넘긴 기간은 돌려줄 것이 없다. 초과분은 쓴 날 이미 자유비용에서 빠졌다
+assert.deepEqual(releasedLeftovers([weekCafe], [dayIncome, tx('2026-09-09', 12_000, 'expense', 'cafe2', '')], '2026-09-13'), [])
+
+// 같은 날 끝나는 기간이 여럿이면 전부 합친다. 9/30은 수요일이자 잘린 마지막 주의 끝
+assert.deepEqual(
+  releasedLeftovers(leftoverCats, [dayIncome], '2026-09-30').map((row) => [row.categoryId, row.scope, row.leftover]),
+  [['food2', 'day', 20_000], ['cafe2', 'week', 5_000]],
+)
+assert.equal(releasedLeftoverTotal(leftoverCats, [dayIncome], '2026-09-30'), 25_000)
+
+// 이 값이 곧 다음 날 자유비용에 더해지는 금액이다 — 두 계산이 갈라지면 안 된다
+for (const [date, next] of [['2026-09-07', '2026-09-08'], ['2026-09-13', '2026-09-14'], ['2026-09-20', '2026-09-21']]) {
+  const ledger = [dayIncome, tx(MON, 18_000, 'expense', 'food2', ''), tx('2026-09-09', 7_000, 'expense', 'cafe2', '')]
+  assert.equal(
+    monthlyFreeAmount(ledger, leftoverCats, next, 0) - monthlyFreeAmount(ledger, leftoverCats, date, 0),
+    releasedLeftoverTotal(leftoverCats, ledger, date),
+    `${date} → ${next} 환급액 불일치`,
+  )
+}
+console.log('끝난 기간의 잔액 환급 (요일은 그 날, 주는 일요일, 초과는 0) 통과')
 
 // --- 위시 저금 연동 ---
 // 위시에 저금한 돈은 예비비와 같은 성격으로 이번 달 자유비용에서 한 번 빠진다.
