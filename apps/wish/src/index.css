@@ -21,7 +21,8 @@
   --pixel-ink: #b66d00;
   --shadow: 0 14px 36px rgba(101, 77, 25, .07);
 
-  --font-sans: Pretendard, SUIT, Inter, system-ui, -apple-system, "Malgun Gothic", sans-serif;
+  /* Pretendard 웹폰트는 index.html에서 받는다 (Orbit과 같은 CDN·같은 파일) */
+  --font-sans: Pretendard, system-ui, -apple-system, "Malgun Gothic", sans-serif;
   --font-pixel: "Mona12", ui-monospace, monospace;
   --font-emoji: "Mona12 Color Emoji", "Mona12 Emoji", emoji;
   --font-emoji-mono: "Mona12 Emoji", "Mona12", monospace;
