@@ -1060,3 +1060,89 @@ ul { padding: 0; list-style: none; }
 @media (prefers-reduced-motion: reduce) {
   .pixel-planet.floating, .burst i, .xp-pop { animation: none; }
 }
+
+/* ── 모바일 키보드가 열린 시트 ────────────────────── */
+
+@media (max-width: 680px) {
+  .sheet-backdrop {
+    inset: auto 0 auto;
+    top: var(--sheet-top, 0px);
+    height: var(--sheet-vh, 100dvh);
+    overscroll-behavior: none;
+  }
+
+  .wl-sheet {
+    max-height: calc(var(--sheet-vh, 100dvh) - 8px);
+    overscroll-behavior: contain;
+  }
+}
+
+/* ── 기간 없는 위시 목록 ──────────────────────────── */
+
+.wish-list-section { margin-top: 34px; }
+.wish-list-head { margin-bottom: 12px; display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.wish-list-head h2 { margin: 6px 0 0; font-size: 20px; }
+.wish-list-head > button {
+  min-height: 38px;
+  padding: 0 13px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.plain-wish-list {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.plain-wish-list li + li { border-top: 1px solid var(--border); }
+.plain-wish-list button {
+  width: 100%;
+  min-height: 70px;
+  padding: 13px 16px;
+  border: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  background: none;
+  cursor: pointer;
+}
+.plain-wish-list button > span { min-width: 0; flex: 1; display: grid; gap: 5px; }
+.plain-wish-list strong { overflow-wrap: anywhere; font-size: 14px; }
+.plain-wish-list small { font-size: 11px; font-weight: 400; color: var(--text-tertiary); }
+.plain-wish-list b { flex: 0 0 auto; font-size: 13px; font-variant-numeric: tabular-nums; }
+.plain-wish-list svg { flex: 0 0 auto; color: var(--text-tertiary); }
+
+.empty-wish-list {
+  width: 100%;
+  min-height: 70px;
+  border: 2px dashed var(--border-strong);
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: none;
+  cursor: pointer;
+}
+
+.wish-to-orbit { justify-content: center; }
+
+/* 잠긴 궤도는 선형 SVG 대신 Mona의 컬러 픽셀 글리프를 쓴다. */
+.pixel-lock-icon {
+  font-family: var(--font-emoji);
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1;
+}
+.slot-mark .pixel-lock-icon { font-size: 16px; }

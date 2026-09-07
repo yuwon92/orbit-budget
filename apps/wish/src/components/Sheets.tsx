@@ -6,6 +6,7 @@ import type { Category } from '@orbit/budget-core/types'
 import { XP } from '@orbit/wish-core/xp'
 import { addDays, canPurchase, daysBetween, purchaseUnlockDate, remainingDays } from '@orbit/wish-core/wish'
 import type { Wish } from '@orbit/wish-core/types'
+import { useSheetFocus, useSheetViewport } from '../lib/sheet'
 
 /** 미션 수행 시트. 하루 몫이 프리필된 상태로 열린다. */
 export function CollectSheet({ wishName, dailyShare, availableAmount, onClose, onCollect, onSkip }: {
@@ -16,6 +17,7 @@ export function CollectSheet({ wishName, dailyShare, availableAmount, onClose, o
   onCollect: (amount: number) => void
   onSkip: () => void
 }) {
+  useSheetViewport()
   const [amount, setAmount] = useState(dailyShare || 5_000)
   const step = 1_000
   const full = dailyShare > 0 && amount >= dailyShare
@@ -95,6 +97,7 @@ export function CarryoverSheet({ amount, rows, wishes, onClose, onDeposit }: {
   onClose: () => void
   onDeposit: (wishId: string, amount: number) => Promise<void>
 }) {
+  useSheetViewport()
   const [saving, setSaving] = useState(false)
   const [picked, setPicked] = useState<string | null>(null)
   const targets = wishes
@@ -177,6 +180,7 @@ export function ResolveWishSheet({ wish, today, categories, transferTargets, onC
   onWait: () => Promise<void>
   onCancel: (targetWishId: string | null) => Promise<void>
 }) {
+  useSheetViewport()
   const [categoryId, setCategoryId] = useState('')
   const [cancelMode, setCancelMode] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -251,9 +255,10 @@ export interface NewWishDraft {
   targetDate: string | null
 }
 
-export function WishSheet({ today, wish, existingShare, freeAmount, canSchedule, onClose, onCreate, onUpdate, onDelete }: {
+export function WishSheet({ today, wish, creationMode = 'list', existingShare, freeAmount, canSchedule, onClose, onCreate, onUpdate, onDelete }: {
   today: string
   wish?: Wish
+  creationMode?: 'orbit' | 'list'
   /** 이미 진행 중인 위시들의 하루 몫 합계 */
   existingShare: number
   /** 이번 달 남은 자유비용 */
@@ -265,16 +270,20 @@ export function WishSheet({ today, wish, existingShare, freeAmount, canSchedule,
   onUpdate?: (draft: NewWishDraft) => void
   onDelete?: () => void
 }) {
+  useSheetViewport()
   const editing = Boolean(wish)
+  const nameInputRef = useSheetFocus<HTMLInputElement>()
   const [name, setName] = useState(wish?.name ?? '')
   const [amount, setAmount] = useState(wish ? String(wish.targetAmount) : '')
   const [period, setPeriod] = useState(wish?.targetDate ? String(remainingDays(wish, today) ?? '') : '')
   const [unit, setUnit] = useState<'day' | 'week' | 'month'>('day')
+  const [scheduling, setScheduling] = useState(Boolean(wish?.targetDate) || creationMode === 'orbit')
 
   const targetDate = useMemo(() => {
+    if (!scheduling) return null
     const count = Number(period)
     if (!Number.isInteger(count) || count < 1) return null
-    if (!editing && unit === 'day' && count < 3) return null
+    if (!wish?.targetDate && unit === 'day' && count < 3) return null
     if (unit === 'month') {
       const date = new Date(`${today}T00:00:00`)
       date.setMonth(date.getMonth() + count)
@@ -283,7 +292,7 @@ export function WishSheet({ today, wish, existingShare, freeAmount, canSchedule,
     }
     // 오늘을 1일째로 센다. 3일이면 오늘·내일·모레의 정확히 세 칸이다.
     return addDays(today, count * (unit === 'week' ? 7 : 1) - 1)
-  }, [editing, period, unit, today])
+  }, [period, scheduling, today, unit, wish?.targetDate])
 
   const targetAmount = Number(amount)
   const days = targetDate ? Math.max(1, daysBetween(today, targetDate) + 1) : null
@@ -297,7 +306,7 @@ export function WishSheet({ today, wish, existingShare, freeAmount, canSchedule,
     if (!name.trim()) return
     if (targetAmount <= 0) return
     if (wish && targetAmount < wish.savedAmount) return
-    if (period && !targetDate) return
+    if (scheduling && !targetDate) return
     const draft = { name: name.trim(), targetAmount, targetDate }
     if (editing) onUpdate?.(draft)
     else onCreate?.(draft)
@@ -320,7 +329,7 @@ export function WishSheet({ today, wish, existingShare, freeAmount, canSchedule,
           <button type="button" className="icon-button" onClick={onClose} aria-label="닫기"><X size={20} /></button>
         </header>
 
-        <label>소원 이름<input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="오래 생각해 본 것" /></label>
+        <label>소원 이름<input ref={nameInputRef} value={name} onChange={(event) => setName(event.target.value)} placeholder="오래 생각해 본 것" /></label>
         <label>목표 금액
           <div className="input-with-unit">
             <input
@@ -333,41 +342,69 @@ export function WishSheet({ today, wish, existingShare, freeAmount, canSchedule,
             <span>원</span>
           </div>
         </label>
-        <fieldset disabled={!canSchedule}>
-          <legend>목표 기간</legend>
-          <div className="period-editor">
-            <input
-              inputMode="numeric"
-              aria-label="목표 기간 숫자"
-              value={period}
-              onChange={(event) => setPeriod(event.target.value.replace(/[^0-9]/g, ''))}
-              placeholder="기간 없음"
-            />
-            <div className="period-unit-choice" aria-label="기간 단위">
-              {([['day', '일'], ['week', '주'], ['month', '월']] as const).map(([value, label]) => (
-                <button type="button" key={value} className={unit === value ? 'active' : ''} aria-pressed={unit === value} onClick={() => setUnit(value)}>{label}</button>
-              ))}
-            </div>
-          </div>
-          {!canSchedule && <p className="sheet-warning">궤도 슬롯 없음 · 기간 없이 저장</p>}
-        </fieldset>
+        {!scheduling && editing && (
+          <button
+            type="button"
+            className="secondary-button full wish-to-orbit"
+            disabled={!canSchedule}
+            onClick={() => setScheduling(true)}
+          >
+            {canSchedule ? '궤도에 올리기' : '열린 궤도 슬롯 없음'}
+          </button>
+        )}
 
-        <p className="mission-gain">
-          <span className="pixel-label">DAILY SHARE</span>
-          <strong>{preview ? `${money(preview)}원` : '—'}</strong>
-          {days && <span>{days}일 궤도</span>}
-        </p>
+        {scheduling && (
+          <>
+            <fieldset>
+              <legend>목표 기간</legend>
+              <div className="period-editor">
+                <input
+                  inputMode="numeric"
+                  aria-label="목표 기간 숫자"
+                  value={period}
+                  onChange={(event) => setPeriod(event.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="3일 이상"
+                />
+                <div className="period-unit-choice" aria-label="기간 단위">
+                  {([['day', '일'], ['week', '주'], ['month', '월']] as const).map(([value, label]) => (
+                    <button type="button" key={value} className={unit === value ? 'active' : ''} aria-pressed={unit === value} onClick={() => setUnit(value)}>{label}</button>
+                  ))}
+                </div>
+              </div>
+            </fieldset>
 
-        {!editing && heavy && (
+            <p className="mission-gain">
+              <span className="pixel-label">DAILY SHARE</span>
+              <strong>{preview ? `${money(preview)}원` : '—'}</strong>
+              {days && <span>{days}일 궤도</span>}
+            </p>
+
+            {editing && !wish?.targetDate && (
+              <button type="button" className="quiet-button full" onClick={() => { setScheduling(false); setPeriod('') }}>
+                기간 없이 두기
+              </button>
+            )}
+          </>
+        )}
+
+        {scheduling && !editing && heavy && (
           <p className="sheet-warning">
             하루 몫 합계 {money(existingShare + preview)}원 · 남은 자유비용의 절반 초과 · 기간 연장 권장
           </p>
         )}
 
-        {!editing && period && !targetDate && <p className="sheet-warning">목표 기간 최소 3일</p>}
+        {scheduling && !wish?.targetDate && period && !targetDate && <p className="sheet-warning">목표 기간 최소 3일</p>}
         {wish && targetAmount < wish.savedAmount && <p className="sheet-warning">목표 금액 최소 {money(wish.savedAmount)}원 (지금까지 모은 금액)</p>}
 
-        <button className="primary-button full" type="submit" disabled={targetAmount <= 0 || Boolean(period) && !targetDate || Boolean(wish && targetAmount < wish.savedAmount)}>{editing ? '변경사항 저장' : '궤도에 올리기'}</button>
+        <button
+          className="primary-button full"
+          type="submit"
+          disabled={targetAmount <= 0 || scheduling && !targetDate || Boolean(wish && targetAmount < wish.savedAmount)}
+        >
+          {editing
+            ? scheduling && !wish?.targetDate ? '궤도에 올리기' : '변경사항 저장'
+            : creationMode === 'orbit' ? '궤도에 올리기' : '위시에 추가'}
+        </button>
         {editing && (
           <section className="edit-wish-danger">
             <button type="button" className="delete-wish-button" onClick={remove}><Trash2 size={16} /> 위시 삭제</button>

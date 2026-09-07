@@ -9,10 +9,11 @@ interface OrbitMapProps {
   activeId: string | null
   onSelect: (id: string) => void
   onAdd: () => void
+  slots: number
 }
 
 /** 허브 중앙의 행성 맵. 가운데가 지금 보는 위시, 바깥 궤도가 나머지 슬롯. */
-export function OrbitMap({ wishes, activeId, onSelect, onAdd }: OrbitMapProps) {
+export function OrbitMap({ wishes, activeId, onSelect, onAdd, slots }: OrbitMapProps) {
   const active = wishes.find((wish) => wish.id === activeId) ?? wishes[0]
   const others = wishes.filter((wish) => wish.id !== active?.id)
   const satellites: { key: string; node: ReactNode; onClick?: () => void; locked?: boolean }[] = [
@@ -27,16 +28,16 @@ export function OrbitMap({ wishes, activeId, onSelect, onAdd }: OrbitMapProps) {
       ),
     })),
   ]
-  // 기간 없는 위시는 슬롯과 무관하게 담을 수 있으므로 추가는 늘 열려 있다.
-  // 슬롯 잠금 안내는 퀘스트 로그의 빈 슬롯 줄이 맡는다.
   if (wishes.length < 3) {
+    const locked = wishes.length >= slots
     satellites.push({
       key: 'add',
-      onClick: onAdd,
+      onClick: locked ? undefined : onAdd,
+      locked,
       node: (
         <>
-          <span className="slot-mark"><Plus size={18} /></span>
-          <span>빈 궤도</span>
+          <span className="slot-mark">{locked ? <span className="pixel-lock-icon" aria-hidden="true">🔒</span> : <Plus size={18} />}</span>
+          <span>{locked ? '잠긴 슬롯' : '빈 궤도'}</span>
         </>
       ),
     })

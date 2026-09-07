@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronRight, Lock, Moon, Plus, Sun, WalletCards } from 'lucide-react'
+import { ChevronRight, Moon, Plus, Sun, WalletCards } from 'lucide-react'
 import { money } from '@orbit/budget-core/format'
 import {
   dailyShare,
@@ -103,7 +103,7 @@ export default function App() {
   const carryoverRows = useMemo(() => budget?.snapshot?.carryoverRows ?? [], [budget])
   const [collecting, setCollecting] = useState<Wish | null>(null)
   const [carrying, setCarrying] = useState(false)
-  const [adding, setAdding] = useState(false)
+  const [adding, setAdding] = useState<'orbit' | 'list' | null>(null)
   const [editing, setEditing] = useState<Wish | null>(null)
   const [resolving, setResolving] = useState<Wish | null>(null)
   const [rewards, setRewards] = useState<Reward[]>([])
@@ -158,6 +158,7 @@ export default function App() {
   // 만들지 않으므로(missions.ts) 몇 개를 담아 두든 관측 부담이 늘지 않는다.
   const slotsUsed = useMemo(() => openWishes.filter((wish) => wish.targetDate).length, [openWishes])
   const canSchedule = slotsUsed < slots
+  const orbitWishes = useMemo(() => openWishes.filter((wish) => wish.targetDate), [openWishes])
   const stats = useMemo(() => observerStats(wishes, events, today), [wishes, events, today])
   const titles = useMemo(() => earnedTitles(wishes, events, today), [wishes, events, today])
   const missions = useMemo(
@@ -172,7 +173,7 @@ export default function App() {
   const vault = vaultTotal(wishes)
   // 등록할 때 무리한 계획을 경고하는 데 쓴다
   const existingShare = totalDailyShare(openWishes, events, today)
-  const active = openWishes.find((wish) => wish.id === activeId) ?? openWishes[0] ?? null
+  const active = orbitWishes.find((wish) => wish.id === activeId) ?? orbitWishes[0] ?? null
 
   const pushReward = useCallback((next: Reward) => setRewards((current) => [...current, next]), [])
 
@@ -305,12 +306,6 @@ export default function App() {
     setToast(targetWishId ? '모은 금액을 다른 궤도로 이동' : '모은 금액을 자유비용으로 회수')
   }
 
-  // 기간 없는 위시는 언제든 담을 수 있으므로 여는 것 자체는 막지 않는다.
-  // 슬롯이 없으면 시트 안에서 기간 입력만 잠근다.
-  function openAdd() {
-    setAdding(true)
-  }
-
   // 저장소를 읽는 동안은 화면을 그리지 않는다. 빈 궤도 화면이 한 번 번쩍이는 것을 막는다
   if (!loaded) return <div className="wl-app loading" />
 
@@ -357,7 +352,7 @@ export default function App() {
       <div className="wl-content">
         {screen === 'hub' && (
           <HubScreen
-            wishes={openWishes}
+            wishes={orbitWishes}
             active={active}
             events={events}
             today={today}
@@ -367,7 +362,7 @@ export default function App() {
             slotsUsed={slotsUsed}
             level={level.level}
             onSelect={setActiveId}
-            onAdd={openAdd}
+            onAdd={() => setAdding('orbit')}
             onRun={runMission}
             onClaimOne={claimOne}
             onClaimAll={claimAll}
@@ -383,7 +378,8 @@ export default function App() {
             today={today}
             slots={slots}
             onCollect={(wish) => setCollecting(wish)}
-            onAdd={openAdd}
+            onAddOrbit={() => setAdding('orbit')}
+            onAddList={() => setAdding('list')}
             onEdit={(wish) => setEditing(wish)}
             onResolve={setResolving}
             onFocus={(wish) => { setActiveId(wish.id); setScreen('hub') }}
@@ -427,7 +423,7 @@ export default function App() {
         <CarryoverSheet
           amount={carryover}
           rows={carryoverRows}
-          wishes={openWishes}
+          wishes={orbitWishes}
           onClose={() => setCarrying(false)}
           onDeposit={carryOver}
         />
@@ -435,16 +431,23 @@ export default function App() {
       {adding && (
         <WishSheet
           today={today}
+          creationMode={adding}
           existingShare={existingShare}
           freeAmount={freeAmount}
           canSchedule={canSchedule}
-          onClose={() => setAdding(false)}
+          onClose={() => setAdding(null)}
           onCreate={async (input) => {
-            setAdding(false)
+            const mode = adding
+            setAdding(null)
             const wish = await createWish({ ...input, today })
-            setActiveId(wish.id)
-            setScreen('hub')
-            setToast('새 행성이 궤도에 도착')
+            if (mode === 'orbit') {
+              setActiveId(wish.id)
+              setScreen('hub')
+              setToast('새 행성이 궤도에 도착')
+            } else {
+              setScreen('quests')
+              setToast('기간 없는 위시에 추가')
+            }
           }}
         />
       )}
@@ -460,7 +463,12 @@ export default function App() {
             const target = editing
             setEditing(null)
             await updateWish(target.id, { ...input, today })
-            setToast('위시 수정 완료')
+            if (!target.targetDate && input.targetDate) {
+              setActiveId(target.id)
+              setToast('위시를 궤도에 올림')
+            } else {
+              setToast('위시 수정 완료')
+            }
           }}
           onDelete={async () => {
             const target = editing
@@ -477,7 +485,7 @@ export default function App() {
           wish={resolving}
           today={today}
           categories={budget?.snapshot?.categories ?? []}
-          transferTargets={openWishes.filter((wish) => wish.id !== resolving.id && wish.status === 'active')}
+          transferTargets={orbitWishes.filter((wish) => wish.id !== resolving.id && wish.status === 'active')}
           onClose={() => setResolving(null)}
           onPurchase={(categoryId) => completeWish(resolving, categoryId)}
           onWait={async () => {
@@ -540,6 +548,7 @@ function HubScreen({ wishes, active, events, today, missions, pendingXp, slots, 
           activeId={active.id}
           onSelect={onSelect}
           onAdd={onAdd}
+          slots={slots}
         />
         <div className="stage-caption">
           <span className="pixel-label">{orbitLevelOf(progress)}단계 · {STAGE_NAMES[stageOf(progress)]}</span>
@@ -597,7 +606,7 @@ function HubScreen({ wishes, active, events, today, missions, pendingXp, slots, 
   )
 }
 
-function QuestScreen({ wishes, slotsUsed, orbitNumbers, events, today, slots, onCollect, onAdd, onEdit, onResolve, onFocus }: {
+function QuestScreen({ wishes, slotsUsed, orbitNumbers, events, today, slots, onCollect, onAddOrbit, onAddList, onEdit, onResolve, onFocus }: {
   wishes: Wish[]
   orbitNumbers: ReadonlyMap<string, number>
   events: WishEvent[]
@@ -605,11 +614,15 @@ function QuestScreen({ wishes, slotsUsed, orbitNumbers, events, today, slots, on
   slots: number
   slotsUsed: number
   onCollect: (wish: Wish) => void
-  onAdd: () => void
+  onAddOrbit: () => void
+  onAddList: () => void
   onEdit: (wish: Wish) => void
   onResolve: (wish: Wish) => void
   onFocus: (wish: Wish) => void
 }) {
+  const orbitWishes = wishes.filter((wish) => wish.targetDate)
+  const listWishes = wishes.filter((wish) => !wish.targetDate)
+
   return (
     <main className="quest-screen">
       <header className="screen-head">
@@ -619,7 +632,7 @@ function QuestScreen({ wishes, slotsUsed, orbitNumbers, events, today, slots, on
       </header>
 
       <ul className="quest-list">
-        {wishes.map((wish) => {
+        {orbitWishes.map((wish) => {
           const progress = progressOf(wish)
           const share = dailyShare(wish, events, today)
           const days = remainingDays(wish, today)
@@ -681,17 +694,45 @@ function QuestScreen({ wishes, slotsUsed, orbitNumbers, events, today, slots, on
             <li key={`slot-${slotNumber}`} className={`quest-slot${locked ? ' locked' : ''}`}>
               {locked ? (
                 <>
-                  <Lock size={18} />
+                  <span className="pixel-lock-icon" aria-hidden="true">🔒</span>
                   <strong>슬롯 {slotNumber} 잠김</strong>
                   <span>{slotNumber === 2 ? 'Lv.2 또는 완주 1개' : 'Lv.4 또는 완주 3개'}</span>
                 </>
               ) : (
-                <button onClick={onAdd}><Plus size={18} /> 슬롯 {slotNumber} · 새 소원 빌기</button>
+                <button onClick={onAddOrbit}><Plus size={18} /> 슬롯 {slotNumber} · 새 궤도 열기</button>
               )}
             </li>
           )
         })}
       </ul>
+
+      <section className="wish-list-section">
+        <header className="wish-list-head">
+          <div>
+            <span className="pixel-label">WISH LIST</span>
+            <h2>기간 없는 위시</h2>
+          </div>
+          <button onClick={onAddList}><Plus size={17} /> 위시 추가</button>
+        </header>
+
+        {listWishes.length ? (
+          <ul className="plain-wish-list">
+            {listWishes.map((wish) => (
+              <li key={wish.id}>
+                <button onClick={() => onEdit(wish)}>
+                  <span><strong>{wish.name}</strong><small>목표 금액</small></span>
+                  <b>{money(wish.targetAmount)}원</b>
+                  <ChevronRight size={17} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <button className="empty-wish-list" onClick={onAddList}>
+            <Plus size={18} /> 언젠가 이루고 싶은 위시 추가
+          </button>
+        )}
+      </section>
     </main>
   )
 }
