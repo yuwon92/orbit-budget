@@ -182,7 +182,6 @@ export function WishSheet({ today, wish, existingShare, freeAmount, onClose, onC
   const [amount, setAmount] = useState(wish ? String(wish.targetAmount) : '')
   const [period, setPeriod] = useState(wish?.targetDate ? String(remainingDays(wish, today) ?? '') : '')
   const [unit, setUnit] = useState<'day' | 'week' | 'month'>('day')
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   const targetDate = useMemo(() => {
     const count = Number(period)
@@ -214,6 +213,11 @@ export function WishSheet({ today, wish, existingShare, freeAmount, onClose, onC
     const draft = { name: name.trim(), targetAmount, targetDate }
     if (editing) onUpdate?.(draft)
     else onCreate?.(draft)
+  }
+
+  function remove() {
+    if (!window.confirm('이 위시를 삭제할까요?\n모은 금액은 남은 자유비용으로 돌아갑니다.')) return
+    onDelete?.()
   }
 
   return (
@@ -277,14 +281,7 @@ export function WishSheet({ today, wish, existingShare, freeAmount, onClose, onC
         <button className="primary-button full" type="submit" disabled={targetAmount <= 0 || Boolean(period) && !targetDate || Boolean(wish && targetAmount < wish.savedAmount)}>{editing ? '변경사항 저장' : '궤도에 올리기'}</button>
         {editing && (
           <section className="edit-wish-danger">
-            {confirmingDelete ? (
-              <>
-                <p><strong>이 위시를 삭제할까요?</strong><span>모은 금액은 남은 자유비용으로 돌아갑니다.</span></p>
-                <div><button type="button" className="secondary-button" onClick={() => setConfirmingDelete(false)}>취소</button><button type="button" className="danger-button" onClick={onDelete}>삭제하기</button></div>
-              </>
-            ) : (
-              <button type="button" className="delete-wish-button" onClick={() => setConfirmingDelete(true)}><Trash2 size={16} /> 위시 삭제</button>
-            )}
+            <button type="button" className="delete-wish-button" onClick={remove}><Trash2 size={16} /> 위시 삭제</button>
           </section>
         )}
       </form>
