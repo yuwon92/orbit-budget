@@ -82,16 +82,22 @@ export function buildMissions(
     }
   }
 
-  if (carryoverAmount > 0) {
-    const acted = events.some((event) => event.date === today && event.source === 'carryover')
+  // 저금하고 나면 자유비용이 줄어 carryoverAmount도 함께 줄어든다. 이미 넣은 날은
+  // 그때 넣은 금액을 그대로 보여줘야 줄이 사라지거나 숫자가 흔들리지 않는다.
+  const carried = events.find((event) => event.date === today && event.source === 'carryover')
+  const carryover = carried?.amount ?? carryoverAmount
+  const carriedInto = carried && wishes.find((wish) => wish.id === carried.wishId)
+  if (carryover > 0) {
     list.push({
       id: 'carryover',
       date: today,
       kind: 'carryover',
-      title: `${carryoverAmount.toLocaleString('ko-KR')}원 저금하기`,
+      title: `${carryover.toLocaleString('ko-KR')}원 저금하기`,
       detail: '어제 남은 예산',
       xp: XP.carryover,
-      state: stateOf('carryover', acted),
+      state: stateOf('carryover', Boolean(carried)),
+      wishId: carried?.wishId,
+      wishName: carriedInto?.name,
     })
   }
 

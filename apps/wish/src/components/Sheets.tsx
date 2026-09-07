@@ -80,6 +80,68 @@ export function CollectSheet({ wishName, dailyShare, availableAmount, onClose, o
   )
 }
 
+/**
+ * 어제 남은 예산을 어느 궤도에 넣을지 고르는 시트.
+ *
+ * 남은 자리(목표 − 모은 금액)보다 많이는 못 넣으므로 궤도마다 실제로 들어갈
+ * 금액을 미리 보여준다. 자리가 남은 진행 중 위시만 후보다.
+ */
+export function CarryoverSheet({ amount, date, wishes, onClose, onDeposit }: {
+  amount: number
+  date: string | null
+  wishes: Wish[]
+  onClose: () => void
+  onDeposit: (wishId: string, amount: number) => Promise<void>
+}) {
+  const [saving, setSaving] = useState(false)
+  const targets = wishes
+    .filter((wish) => wish.status === 'active')
+    .map((wish) => ({ wish, accepted: Math.min(amount, Math.max(0, wish.targetAmount - wish.savedAmount)) }))
+
+  const run = async (wishId: string, accepted: number) => {
+    if (saving) return
+    setSaving(true)
+    try { await onDeposit(wishId, accepted) } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="sheet-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <section className="wl-sheet" role="dialog" aria-modal="true" aria-labelledby="carryover-title">
+        <div className="sheet-handle" />
+        <header className="sheet-header">
+          <div>
+            <span className="pixel-label">MISSION · CARRYOVER</span>
+            <h2 id="carryover-title">{money(amount)}원 저금하기</h2>
+          </div>
+          <button className="icon-button" onClick={onClose} aria-label="닫기"><X size={20} /></button>
+        </header>
+        <p className="resolve-summary">
+          {date ? `${date}에 ` : '어제 '}쓰고 남은 자유비용이다. 어느 궤도에 넣을지 고르자.
+        </p>
+
+        <section className="resolve-cancel">
+          {targets.length === 0 && <p>넣을 수 있는 궤도가 없다. 진행 중인 위시를 먼저 만들자.</p>}
+          {targets.map(({ wish, accepted }) => (
+            <button key={wish.id} disabled={saving || accepted <= 0} onClick={() => run(wish.id, accepted)}>
+              <span>
+                <strong>{wish.name}</strong>
+                <small>{accepted <= 0 ? '남은 자리 없음' : `${money(wish.savedAmount)} / ${money(wish.targetAmount)}원`}</small>
+              </span>
+              <b>+{money(accepted)}원</b>
+            </button>
+          ))}
+        </section>
+
+        <p className="mission-gain">
+          <span className="pixel-label">REWARD</span>
+          <strong>+{XP.carryover} XP</strong>
+          <span>그냥 써도 되는 돈을 옮긴다</span>
+        </p>
+      </section>
+    </div>
+  )
+}
+
 /** 목표 도달 뒤 구매·기다리기·정리를 한 자리에서 고르는 시트. */
 export function ResolveWishSheet({ wish, today, categories, transferTargets, onClose, onPurchase, onWait, onCancel }: {
   wish: Wish

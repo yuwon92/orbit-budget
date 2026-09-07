@@ -1,7 +1,15 @@
-import { monthlyFreeAmount } from '@orbit/budget-core/budget'
+import { dailyLeftover, monthlyFreeAmount } from '@orbit/budget-core/budget'
 import type { Category, Transaction } from '@orbit/budget-core/types'
 import { db } from './db'
 import { readPlannedIncome } from './settings'
+
+/** 하루 전 날짜. 달·해 경계를 넘어간다 */
+function previousDate(date: string): string {
+  const [year, month, day] = date.split('-').map(Number)
+  const previous = new Date(year, month - 1, day - 1)
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${previous.getFullYear()}-${pad(previous.getMonth() + 1)}-${pad(previous.getDate())}`
+}
 
 /**
  * Wish가 읽는 예산 요약. 계산은 Orbit이 하고 Wish는 결과만 본다 —
@@ -16,6 +24,13 @@ export interface OrbitBudgetSnapshot {
   reserveAmount: number
   /** 이번 달 위시 저금 합계. 위 freeAmount에서 이미 빠져 있다 */
   wishSavedAmount: number
+  /**
+   * 어제 쓰고 남은 자유비용. Wish의 '남은 예산 저금하기' 미션 금액이다.
+   * 남은 자유비용을 넘지 않게 자르고, 어제가 지난달이면 0 (자유비용 풀이 달마다 끊긴다).
+   */
+  carryoverAmount: number
+  /** carryoverAmount의 기준일. 'yyyy-MM-dd', 지난달이면 null */
+  carryoverDate: string | null
   /** 스냅샷을 만든 시각. 오프라인일 때 얼마나 오래됐는지 보여주는 데 쓴다 */
   calculatedAt: number
   /** 스냅샷 구조 버전 */
@@ -41,7 +56,7 @@ export interface SnapshotProbe {
   includePlannedIncome: boolean
 }
 
-export const SNAPSHOT_VERSION = 2
+export const SNAPSHOT_VERSION = 3
 
 /**
  * Orbit 예산을 읽어 요약을 만든다.
@@ -67,6 +82,17 @@ export async function getOrbitSnapshot(
   ])
   const reserveAmount = settings?.reserveAmount ?? 0
   const budgetedCategories = categories.filter((category) => category.monthlyBudget > 0).length
+  const freeAmount = monthlyFreeAmount(transactions, categories, today, reserveAmount, includePlannedIncome, wishSavedAmount)
+
+  // 어제 남은 자유비용. 이번 달 거래만 읽어 두므로 1일에는 기준일이 지난달이라 계산하지 않는다.
+  const yesterday = previousDate(today)
+  const carryoverDate = yesterday.startsWith(yearMonth) ? yesterday : null
+  const carryoverAmount = carryoverDate
+    ? Math.min(
+        dailyLeftover(transactions, categories, carryoverDate, { reserveAmount, includePlannedIncome, wishSavedAmount }),
+        Math.max(0, freeAmount),
+      )
+    : 0
 
   // 카테고리 존재만으로는 판단할 수 없다. 처음 열리는 DB에 기본 카테고리 4개가
   // 자동으로 심어지기 때문에(db.on('populate')), 저장소가 분리된 환경에서도
@@ -75,9 +101,11 @@ export async function getOrbitSnapshot(
 
   return {
     yearMonth,
-    freeAmount: monthlyFreeAmount(transactions, categories, today, reserveAmount, includePlannedIncome, wishSavedAmount),
+    freeAmount,
     reserveAmount,
     wishSavedAmount,
+    carryoverAmount,
+    carryoverDate,
     calculatedAt: Date.now(),
     version: SNAPSHOT_VERSION,
     connected,

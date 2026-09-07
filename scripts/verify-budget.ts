@@ -7,6 +7,9 @@ import {
   buildBreakdown,
   categoryProgress,
   countExpenses,
+  dailyFreeShare,
+  dailyLeftover,
+  freeSpentOnDate,
   inQuickSlot,
   monthlyAmountForRule,
   monthlyOccurrences,
@@ -391,6 +394,36 @@ assert.equal(csvLines[0], 'date,type,category,amount,memo,is_planned,excluded_fr
 assert.equal(csvLines[1], '2026-09-01,expense,,5000,"콤마,와 ""따옴표""",false,false') // 날짜순 정렬 + 이스케이프
 assert.equal(csvLines[2], '2026-09-13,expense,식비,12000,점심,false,false')
 console.log('CSV 생성 (컬럼 순서, 정렬, 이스케이프) 통과')
+
+// --- 하루 몫과 남은 예산 (위시 '남은 예산 저금하기'가 가져가는 값) ---
+// 9월 한 달, 수입 300,000원에 예산 잡힌 카테고리 하나(주 2회 x 5,000원 = 45,000원).
+const dayCats = [homeCat('cafe2', 45_000, { kind: 'perUse', unitAmount: 5_000, freq: { mode: 'perWeek', timesPerWeek: 2 } })]
+const dayIncome = tx('2026-09-01', 300_000, 'income', null, '')
+
+// 예산 안에서 쓴 돈은 자유비용을 깎지 않는다. 미분류 지출만 그대로 나간다.
+assert.equal(freeSpentOnDate([dayIncome, tx(MON, 8_000, 'expense', 'cafe2', '')], dayCats, MON, { reserveAmount: 0 }), 0)
+assert.equal(freeSpentOnDate([dayIncome, tx(MON, 8_000, 'expense', null, '')], dayCats, MON, { reserveAmount: 0 }), 8_000)
+// 주 몫 10,000원을 3,000원 넘겨 쓰면 초과분만 자유비용에서 빠진다
+assert.equal(freeSpentOnDate([dayIncome, tx(MON, 13_000, 'expense', 'cafe2', '')], dayCats, MON, { reserveAmount: 0 }), 3_000)
+
+// 하루 몫: 그날 아침의 자유비용 265,000원(끝난 첫 주 몫 10,000원 환급 포함)을 9/7~9/30 24일로 나눈다
+assert.equal(dailyFreeShare([dayIncome], dayCats, MON, { reserveAmount: 0 }), 11_041)
+// 아무것도 안 썼으면 하루 몫이 그대로 남는다
+assert.equal(dailyLeftover([dayIncome], dayCats, MON, { reserveAmount: 0 }), 11_041)
+// 미분류로 4,000원 쓰면 그만큼 줄어든다 (아침 기준 하루 몫은 그대로)
+assert.equal(dailyLeftover([dayIncome, tx(MON, 4_000, 'expense', null, '')], dayCats, MON, { reserveAmount: 0 }), 7_041)
+// 하루 몫을 넘겨 쓴 날은 남은 예산이 0. 음수로 내려가지 않는다
+assert.equal(dailyLeftover([dayIncome, tx(MON, 40_000, 'expense', null, '')], dayCats, MON, { reserveAmount: 0 }), 0)
+// 카테고리 예산 안에서만 쓴 날은 자유비용을 안 건드리므로 하루 몫이 온전히 남는다
+assert.equal(dailyLeftover([dayIncome, tx(MON, 8_000, 'expense', 'cafe2', '')], dayCats, MON, { reserveAmount: 0 }), 11_041)
+// 위시에 이미 저금한 돈은 풀에서 빠져 하루 몫도 함께 줄어든다
+assert.equal(dailyFreeShare([dayIncome], dayCats, MON, { reserveAmount: 0, wishSavedAmount: 24_000 }), 10_041)
+// 월 마지막 날은 남은 날이 하루뿐이라 남은 자유비용 전액이 하루 몫이다
+assert.equal(
+  dailyFreeShare([dayIncome], dayCats, '2026-09-30', { reserveAmount: 0 }),
+  monthlyFreeAmount([dayIncome], dayCats, '2026-09-30', 0),
+)
+console.log('하루 몫·남은 예산 (자유 지출만 차감, 음수 없음) 통과')
 
 // --- 위시 저금 연동 ---
 // 위시에 저금한 돈은 예비비와 같은 성격으로 이번 달 자유비용에서 한 번 빠진다.

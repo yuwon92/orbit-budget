@@ -31,7 +31,6 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `apps/wish/src/App.tsx` | Wish 셸 + 화면 4개(오르빗 허브/퀘스트 로그/우주 도감/관측자) |
 | `apps/wish/src/missions.ts` | 오늘의 미션 문구·상태. 앱 고유 개념이라 wish-core에 두지 않음 |
 | `apps/wish/src/planet.ts` | 픽셀 행성 블록 생성. 진행률 → 티끌·위성·행성·고리·위성대·성계 |
-| `apps/wish/src/data.ts` | 남은 예산 제안용 자리표시 값. 실제 기간 잔액 연동 전까지만 |
 | `apps/wish/src/lib/labels.ts` | 단계 이름·칭호 문구·도감 칸 수 |
 | `apps/wish/src/lib/hooks.ts` | `useWishes`/`useWishEvents`/`useClaims`/`usePlayer`. **App에서만 구독하고 prop으로 내림** |
 | `apps/wish/src/lib/budget.ts` | Orbit 예산 요약을 읽는 통로. 저장소가 나뉘는 환경에서는 **이 파일만 서버 조회로 교체** |
@@ -48,7 +47,7 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `packages/budget-core/src/format.ts` | 금액·요일 표시 함수 |
 | `packages/orbit-bridge/src/db.ts` | Orbit Dexie 인스턴스, 스키마·마이그레이션, 쓰기 헬퍼 |
 | `packages/orbit-bridge/src/recurring.ts` | 반복 거래 생성·동기화 |
-| `packages/orbit-bridge/src/index.ts` | Wish용 예산 스냅샷(`OrbitBudgetSnapshot`) + 자유비용 제외 위시 구매 거래 쓰기 |
+| `packages/orbit-bridge/src/index.ts` | Wish용 예산 스냅샷(`OrbitBudgetSnapshot`) + 자유비용 제외 위시 구매 거래 쓰기. 어제 남은 예산(`carryoverAmount`)도 여기서 계산 |
 | `packages/orbit-bridge/src/settings.ts` | 두 앱이 함께 읽는 설정(`orbit-planned-income`) |
 | `scripts/verify-budget.ts` | Orbit 계산 검산 |
 | `scripts/verify-wish.ts` | Wish 계산 검산 |
@@ -58,7 +57,7 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 
 Wish는 게임 허브 흐름이다. 자원 HUD 상시 노출, 오늘의 미션과 보상 수령, 퀘스트 로그·우주 도감 분리, 설정은 관측자 화면 안. 제품 규칙과 수치는 `orbit-wish-spec.md`, 디자인은 `orbit-wish-ui-design-guide.md`(둘 다 gitignore된 로컬 문서).
 
-Wish는 Orbit 예산을 `getOrbitSnapshot()`으로 읽고, 구매 확정 때만 `createWishPurchaseTransaction()`으로 거래를 쓴다. `connected`는 DB가 열리는지가 아니라 데이터가 있는지로 판단한다 — 저장소가 분리된 환경에서는 빈 DB가 새로 만들어질 뿐이라 존재 여부로는 알 수 없다. 위시 저금은 이번 달 순저금 합계로 자유비용에서 실제 차감한다.
+Wish는 Orbit 예산을 `getOrbitSnapshot()`으로 읽고, 구매 확정 때만 `createWishPurchaseTransaction()`으로 거래를 쓴다. `connected`는 DB가 열리는지가 아니라 데이터가 있는지로 판단한다 — 저장소가 분리된 환경에서는 빈 DB가 새로 만들어질 뿐이라 존재 여부로는 알 수 없다. 위시 저금은 이번 달 순저금 합계로 자유비용에서 실제 차감한다. 스냅샷의 `carryoverAmount`는 어제 쓰고 남은 자유비용(`dailyLeftover`)이며 남은 자유비용을 넘지 않게 자른다 — 스냅샷이 이번 달 거래만 읽으므로 매달 1일은 기준일이 지난달이라 0이고 `carryoverDate`도 null이다.
 
 **Wish 데이터는 `orbital-wish`(Dexie)에 저장된다.** 위시·이벤트·수령 기록·Player 네 스토어. 화면은 `packages/wish-bridge`를 통해서만 쓰고, Wish 앱 읽기는 `apps/wish/src/lib/hooks.ts`의 `useLiveQuery` 네 개가 전부다. Orbit 홈은 `listWishes()`·`listWishEvents()`를 live query로 읽어 기간이 있는 active 위시만 표시한다.
 
@@ -140,6 +139,14 @@ Dexie `'orbital-budget'`. 스토어: `categories`(id) / `transactions`(id, **dat
 `monthlyFreeAmount(txs, categories, today, reserve, includePlannedIncome = true, wishSavedAmount = 0)` — `includePlannedIncome`이 false면 `isPlanned` 수입을 빼고 센다(설정 첫 카드의 `자유비용에 예정 수입 포함` 토글). **수입에만 걸린다.** 예정 지출은 어차피 나갈 돈이라 늘 차감한다. `wishSavedAmount`는 이번 달 순저금으로 예비비처럼 한 번 차감한다.
 
 **기간 배분**(내부 `categoryBudgetPeriods`) — 횟수·교통 카테고리의 월 예산을 실제 달력 주/요일 기간에 앞에서부터 채운다. 달을 걸치는 주는 월 경계에서 자르고, 배분 총합은 월 예산을 넘지 않는다.
+
+**하루 몫·남은 예산** — Wish의 `남은 예산 저금하기` 미션 전용. Orbit 화면에는 안 쓴다.
+
+- `freeSpentOnDate(txs, categories, date, ctx)` — 그 날 지출이 자유비용을 실제로 깎은 금액. 그 날 지출을 뺀 `monthlyFreeAmount`와의 차로 구한다. 어떤 지출이 자유비용에서 나가는지 판정을 두 곳에 쓰지 않기 위한 것 — 규칙을 다시 구현하지 말 것
+- `dailyFreeShare(...)` — 그 날 아침의 남은 자유비용 ÷ 그 날 포함 월말까지의 날 수(내림)
+- `dailyLeftover(...)` — `하루 몫 - 그 날 자유 지출`, 음수면 0
+- `ctx`는 `FreeAmountContext = { reserveAmount, includePlannedIncome?, wishSavedAmount? }`
+- 삭제된 옛 `dailyAllowance`·`calcTodayBudget`과는 다른 것. 히어로 숫자로 쓰지 말 것
 
 **예산 계산 도구** — `budgetRule` → 월 예산
 `weeksInMonth` `weekdayCountInMonth` `monthlyOccurrences` `budgetFromRule`

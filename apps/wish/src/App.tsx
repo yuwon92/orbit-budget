@@ -47,13 +47,12 @@ import { OrbitRing, PixelPlanet } from './components/PixelPlanet'
 import { PixelBar } from './components/PixelBar'
 import { OrbitMap } from './components/OrbitMap'
 import { RewardOverlay, type Reward } from './components/RewardOverlay'
-import { CollectSheet, ResolveWishSheet, WishSheet } from './components/Sheets'
+import { CarryoverSheet, CollectSheet, ResolveWishSheet, WishSheet } from './components/Sheets'
 import { buildMissions, type Mission } from './missions'
 import { CODEX_SLOTS, STAGE_NAMES, TITLES } from './lib/labels'
 import { formatDate, pad2, todayString } from './lib/format'
 import { useClaims, usePlayer, useWishEvents, useWishes } from './lib/hooks'
 import { loadBudgetView, sinceLabel, type BudgetView } from './lib/budget'
-import { SAMPLE_CARRYOVER } from './data'
 
 type Screen = 'hub' | 'quests' | 'codex' | 'observer'
 
@@ -98,9 +97,11 @@ export default function App() {
   const refreshBudget = useCallback(() => { void loadBudgetView(today).then(setBudget) }, [today])
   useEffect(refreshBudget, [refreshBudget])
   const freeAmount = budget?.snapshot?.freeAmount ?? 0
-  // 어제 남은 예산. Orbit 연동 전까지는 고정 샘플 값
-  const carryover = SAMPLE_CARRYOVER
+  // 어제 쓰고 남은 자유비용. Orbit이 계산해 스냅샷으로 넘겨준다
+  const carryover = budget?.snapshot?.carryoverAmount ?? 0
+  const carryoverDate = budget?.snapshot?.carryoverDate ?? null
   const [collecting, setCollecting] = useState<Wish | null>(null)
+  const [carrying, setCarrying] = useState(false)
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<Wish | null>(null)
   const [resolving, setResolving] = useState<Wish | null>(null)
@@ -216,16 +217,18 @@ export default function App() {
       return
     }
     if (mission.kind === 'carryover') {
-      const target = active ?? openWishes[0]
-      if (!target) {
-        setToast('넣을 궤도가 없다')
-        return
-      }
-      // 금액을 0으로 만들면 미션 줄 자체가 사라진다. 중복 수행은 이벤트 유무로 막는다
-      await deposit(target.id, carryover, today, 'carryover')
-      refreshBudget()
-      setToast(`남은 예산 ${money(carryover)}원 저금 완료`)
+      // 어느 궤도에 넣을지는 시트에서 고른다. 중복 수행은 이벤트 유무로 막는다
+      setCarrying(true)
     }
+  }
+
+  /** 어제 남은 예산을 고른 궤도에 넣는다. Orbit 자유비용에서도 그만큼 빠진다 */
+  async function carryOver(wishId: string, amount: number) {
+    setCarrying(false)
+    await deposit(wishId, amount, today, 'carryover')
+    refreshBudget()
+    const target = openWishes.find((wish) => wish.id === wishId)
+    setToast(`남은 예산 ${money(amount)}원을 ${target ? target.name : '궤도'}에 저금`)
   }
 
   /** 미션 하나 수령 */
@@ -390,6 +393,15 @@ export default function App() {
           onClose={() => setCollecting(null)}
           onCollect={collect}
           onSkip={skipToday}
+        />
+      )}
+      {carrying && (
+        <CarryoverSheet
+          amount={carryover}
+          date={carryoverDate}
+          wishes={openWishes}
+          onClose={() => setCarrying(false)}
+          onDeposit={carryOver}
         />
       )}
       {adding && (

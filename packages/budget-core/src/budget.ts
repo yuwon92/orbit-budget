@@ -153,6 +153,75 @@ export function monthlyFreeAmount(
   return totalIncome(transactions, month, includePlannedIncome) - totalBudget - reserveAmount - wishSavedAmount + adjustment
 }
 
+/** 자유비용 계산에 넘기는 월 조건. 세 함수가 같은 값을 봐야 숫자가 갈라지지 않는다. */
+export interface FreeAmountContext {
+  reserveAmount: number
+  includePlannedIncome?: boolean
+  /** 이번 달 위시 저금 합계 */
+  wishSavedAmount?: number
+}
+
+/**
+ * 그 날 지출이 자유비용을 실제로 깎은 금액.
+ *
+ * 어떤 지출이 자유비용에서 나가는지는 monthlyFreeAmount가 이미 알고 있다 —
+ * 여기서 규칙을 다시 쓰면 두 곳이 갈라진다. 그래서 그 날 지출을 뺀 세계와
+ * 지금 세계의 자유비용 차이로 구한다. 카테고리 예산 안에서 쓴 돈은 0이 되고,
+ * 미분류 지출과 기간 초과분만 남는다.
+ */
+export function freeSpentOnDate(
+  transactions: Transaction[],
+  categories: Category[],
+  date: string,
+  context: FreeAmountContext,
+): number {
+  const { reserveAmount, includePlannedIncome = true, wishSavedAmount = 0 } = context
+  const withDay = monthlyFreeAmount(transactions, categories, date, reserveAmount, includePlannedIncome, wishSavedAmount)
+  const withoutDay = monthlyFreeAmount(
+    transactions.filter((t) => !(t.date === date && t.type === 'expense')),
+    categories,
+    date,
+    reserveAmount,
+    includePlannedIncome,
+    wishSavedAmount,
+  )
+  return withoutDay - withDay
+}
+
+/**
+ * 그 날의 자유비용 하루 몫. 그 날 아침의 남은 자유비용을 그 날 포함 월말까지의
+ * 날 수로 나눈다(내림). 남은 자유비용이 음수면 0.
+ */
+export function dailyFreeShare(
+  transactions: Transaction[],
+  categories: Category[],
+  date: string,
+  context: FreeAmountContext,
+): number {
+  const { reserveAmount, includePlannedIncome = true, wishSavedAmount = 0 } = context
+  const [year, month, day] = date.split('-').map(Number)
+  const daysLeft = getDaysInMonth(new Date(year, month - 1, 1)) - day + 1
+  if (daysLeft <= 0) return 0
+  const free = monthlyFreeAmount(transactions, categories, date, reserveAmount, includePlannedIncome, wishSavedAmount)
+  const morning = free + freeSpentOnDate(transactions, categories, date, context)
+  return Math.floor(Math.max(morning, 0) / daysLeft)
+}
+
+/**
+ * 그 날 쓰고 남은 자유비용. 하루 몫에서 그 날 자유 지출을 뺀 값이며 음수면 0이다.
+ * 위시 앱이 '어제 남은 예산'으로 가져가 저금 대상으로 삼는다.
+ */
+export function dailyLeftover(
+  transactions: Transaction[],
+  categories: Category[],
+  date: string,
+  context: FreeAmountContext,
+): number {
+  const share = dailyFreeShare(transactions, categories, date, context)
+  const spent = freeSpentOnDate(transactions, categories, date, context)
+  return Math.max(0, share - spent)
+}
+
 /** 특정 날짜의 지출 합계 */
 export function spentOnDate(transactions: Transaction[], date: string): number {
   return transactions
