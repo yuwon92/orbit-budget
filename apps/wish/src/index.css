@@ -1008,6 +1008,10 @@ ul { padding: 0; list-style: none; }
   bottom: 108px;
   z-index: 70;
   transform: translateX(-50%);
+  /* left:50%라 너비를 안 잡으면 남는 폭이 화면의 절반뿐이라 한 줄짜리 문구도 접힌다.
+     한 줄로 펴 두고 화면 폭에서만 자른다 */
+  width: max-content;
+  max-width: min(760px, calc(100% - 32px));
   padding: 11px 16px;
   border: 1px solid #ecd270;
   border-radius: 16px;
@@ -1019,7 +1023,7 @@ ul { padding: 0; list-style: none; }
   box-shadow: var(--shadow);
   animation: pop-in 200ms ease-out;
 }
-.wl-toast span { font-family: var(--font-emoji); }
+.wl-toast span { flex: 0 0 auto; font-family: var(--font-emoji); }
 
 /* ── 반응형 ───────────────────────────────────────── */
 
