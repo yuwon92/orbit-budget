@@ -153,6 +153,10 @@ export default function App() {
   const totalXp = useMemo(() => totalXpOf(wishes, events, claims), [wishes, events, claims])
   const level = levelFromXp(totalXp)
   const slots = slotCount(level.level, doneWishes.length)
+  // 슬롯을 차지하는 것은 기간을 정한 위시뿐이다. 기간 없는 위시는 하루 몫 미션도
+  // 만들지 않으므로(missions.ts) 몇 개를 담아 두든 관측 부담이 늘지 않는다.
+  const slotsUsed = useMemo(() => openWishes.filter((wish) => wish.targetDate).length, [openWishes])
+  const canSchedule = slotsUsed < slots
   const stats = useMemo(() => observerStats(wishes, events, today), [wishes, events, today])
   const titles = useMemo(() => earnedTitles(wishes, events, today), [wishes, events, today])
   const missions = useMemo(
@@ -277,11 +281,9 @@ export default function App() {
     setToast(targetWishId ? '모은 금액을 다른 궤도로 이동' : '모은 금액을 자유비용으로 회수')
   }
 
+  // 기간 없는 위시는 언제든 담을 수 있으므로 여는 것 자체는 막지 않는다.
+  // 슬롯이 없으면 시트 안에서 기간 입력만 잠근다.
   function openAdd() {
-    if (openWishes.length >= slots) {
-      setToast(`궤도 슬롯 ${slots}개를 모두 사용 중`)
-      return
-    }
     setAdding(true)
   }
 
@@ -338,6 +340,7 @@ export default function App() {
             missions={missions}
             pendingXp={pendingXp}
             slots={slots}
+            slotsUsed={slotsUsed}
             level={level.level}
             onSelect={setActiveId}
             onAdd={openAdd}
@@ -350,6 +353,7 @@ export default function App() {
         {screen === 'quests' && (
           <QuestScreen
             wishes={openWishes}
+            slotsUsed={slotsUsed}
             orbitNumbers={orbitNumbers}
             events={events}
             today={today}
@@ -409,6 +413,7 @@ export default function App() {
           today={today}
           existingShare={existingShare}
           freeAmount={freeAmount}
+          canSchedule={canSchedule}
           onClose={() => setAdding(false)}
           onCreate={async (input) => {
             setAdding(false)
@@ -425,6 +430,7 @@ export default function App() {
           wish={editing}
           existingShare={existingShare}
           freeAmount={freeAmount}
+          canSchedule={canSchedule || Boolean(editing.targetDate)}
           onClose={() => setEditing(null)}
           onUpdate={async (input) => {
             const target = editing
@@ -464,7 +470,7 @@ export default function App() {
   )
 }
 
-function HubScreen({ wishes, active, events, today, missions, pendingXp, slots, level, onSelect, onAdd, onRun, onClaimOne, onClaimAll, onOpenQuests }: {
+function HubScreen({ wishes, active, events, today, missions, pendingXp, slots, slotsUsed, level, onSelect, onAdd, onRun, onClaimOne, onClaimAll, onOpenQuests }: {
   wishes: Wish[]
   active: Wish | null
   events: WishEvent[]
@@ -472,6 +478,7 @@ function HubScreen({ wishes, active, events, today, missions, pendingXp, slots, 
   missions: Mission[]
   pendingXp: number
   slots: number
+  slotsUsed: number
   level: number
   onSelect: (id: string) => void
   onAdd: () => void
@@ -507,7 +514,6 @@ function HubScreen({ wishes, active, events, today, missions, pendingXp, slots, 
         <OrbitMap
           wishes={wishes}
           activeId={active.id}
-          lockedSlots={Math.max(0, 3 - slots)}
           onSelect={onSelect}
           onAdd={onAdd}
         />
@@ -561,18 +567,19 @@ function HubScreen({ wishes, active, events, today, missions, pendingXp, slots, 
         <button className="claim-button" onClick={onClaimAll} disabled={!pendingXp}>
           {pendingXp ? `CLAIM +${pendingXp} XP` : '수령할 보상 없음'}
         </button>
-        <p className="claim-hint">Lv.{pad2(level)} 관측자 · 궤도 슬롯 {wishes.length} / {slots}</p>
+        <p className="claim-hint">Lv.{pad2(level)} 관측자 · 궤도 슬롯 {slotsUsed} / {slots}</p>
       </section>
     </main>
   )
 }
 
-function QuestScreen({ wishes, orbitNumbers, events, today, slots, onCollect, onAdd, onEdit, onResolve, onFocus }: {
+function QuestScreen({ wishes, slotsUsed, orbitNumbers, events, today, slots, onCollect, onAdd, onEdit, onResolve, onFocus }: {
   wishes: Wish[]
   orbitNumbers: ReadonlyMap<string, number>
   events: WishEvent[]
   today: string
   slots: number
+  slotsUsed: number
   onCollect: (wish: Wish) => void
   onAdd: () => void
   onEdit: (wish: Wish) => void
@@ -584,7 +591,7 @@ function QuestScreen({ wishes, orbitNumbers, events, today, slots, onCollect, on
       <header className="screen-head">
         <span className="pixel-label">QUEST LOG</span>
         <h1>진행 중인 궤도</h1>
-        <p>{wishes.length} / {slots} 슬롯 사용 중</p>
+        <p>{slotsUsed} / {slots} 슬롯 사용 중 · 기간 없는 위시는 슬롯을 쓰지 않는다</p>
       </header>
 
       <ul className="quest-list">
@@ -643,8 +650,8 @@ function QuestScreen({ wishes, orbitNumbers, events, today, slots, onCollect, on
           )
         })}
 
-        {Array.from({ length: Math.max(0, 3 - wishes.length) }, (_, index) => {
-          const slotNumber = wishes.length + index + 1
+        {Array.from({ length: Math.max(0, 3 - slotsUsed) }, (_, index) => {
+          const slotNumber = slotsUsed + index + 1
           const locked = slotNumber > slots
           return (
             <li key={`slot-${slotNumber}`} className={`quest-slot${locked ? ' locked' : ''}`}>

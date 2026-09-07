@@ -251,13 +251,15 @@ export interface NewWishDraft {
   targetDate: string | null
 }
 
-export function WishSheet({ today, wish, existingShare, freeAmount, onClose, onCreate, onUpdate, onDelete }: {
+export function WishSheet({ today, wish, existingShare, freeAmount, canSchedule, onClose, onCreate, onUpdate, onDelete }: {
   today: string
   wish?: Wish
   /** 이미 진행 중인 위시들의 하루 몫 합계 */
   existingShare: number
   /** 이번 달 남은 자유비용 */
   freeAmount: number
+  /** 기간을 정할 슬롯이 남았는지. 없으면 기간 없는 위시로만 저장한다 */
+  canSchedule: boolean
   onClose: () => void
   onCreate?: (draft: NewWishDraft) => void
   onUpdate?: (draft: NewWishDraft) => void
@@ -331,7 +333,7 @@ export function WishSheet({ today, wish, existingShare, freeAmount, onClose, onC
             <span>원</span>
           </div>
         </label>
-        <fieldset>
+        <fieldset disabled={!canSchedule}>
           <legend>목표 기간</legend>
           <div className="period-editor">
             <input
@@ -347,6 +349,7 @@ export function WishSheet({ today, wish, existingShare, freeAmount, onClose, onC
               ))}
             </div>
           </div>
+          {!canSchedule && <p className="sheet-warning">궤도 슬롯을 다 썼다. 기간 없이 담아 두었다가 슬롯이 나면 기간을 정하자.</p>}
         </fieldset>
 
         <p className="mission-gain">

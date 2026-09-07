@@ -885,6 +885,9 @@ ul { padding: 0; list-style: none; }
 /* 저장소를 읽는 동안의 빈 화면. 배경만 깔아 두고 아무것도 그리지 않는다 */
 .wl-app.loading { min-height: 100vh; background: var(--background); }
 
+/* 슬롯이 없어 기간을 못 정하는 상태. 입력만 잠기고 저장은 그대로 된다 */
+.wl-sheet fieldset:disabled .period-editor { opacity: .45; }
+
 /* 등록 시트의 하루 몫 과부하 경고. 배경 없이 색과 세로선으로만 구분한다 */
 .sheet-warning {
   padding: 2px 0 2px 12px;
