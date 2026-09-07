@@ -125,7 +125,6 @@ export function CarryoverSheet({ amount, rows, wishes, onClose, onDeposit }: {
             {rows.map((row) => (
               <li key={`${row.categoryId}-${row.to}`}>
                 <span>{row.categoryName}</span>
-                <small>{row.scope === 'week' ? `${row.from} ~ ${row.to}` : row.to}</small>
                 <b>{money(row.leftover)}원</b>
               </li>
             ))}
