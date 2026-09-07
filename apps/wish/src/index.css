@@ -150,7 +150,11 @@ ul { padding: 0; list-style: none; }
 
 .hud-resources strong { display: block; font-size: 14px; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 .hud-resources span:not(.res-icon) { font-size: 11px; color: var(--text-secondary); }
-.res-icon { font-family: var(--font-emoji); font-size: 19px; line-height: 1; }
+/* 유니코드 기본 표시가 '텍스트'인 문자(☄ U+2604 등)는 iOS/WebKit이
+   컬러 글리프가 있어도 흑백 쪽을 고른다 — Mona 두 폰트 모두 VS16 변이
+   시퀀스(cmap format 14)를 선언하지 않기 때문. 기본 표시가 '이모지'인
+   문자만 쓰고, 그 의도를 아래 한 줄로 못 박는다. */
+.res-icon { font-family: var(--font-emoji); font-variant-emoji: emoji; font-size: 19px; line-height: 1; }
 
 .xp-pop {
   position: absolute;

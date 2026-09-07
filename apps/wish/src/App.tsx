@@ -322,7 +322,7 @@ export default function App() {
               <span>{budget?.snapshot ? (budget.stale ? '자유비용 (지난 값)' : '남은 자유비용') : '연결 안 됨'}</span>
             </div>
           </li>
-          <li><span className="res-icon" aria-hidden="true">☄️</span><div><strong>{stats.streak}일</strong><span>연속 관측</span></div></li>
+          <li><span className="res-icon" aria-hidden="true">🌠</span><div><strong>{stats.streak}일</strong><span>연속 관측</span></div></li>
           <li><span className="res-icon" aria-hidden="true">🫙</span><div><strong>{money(vault)}원</strong><span>저금통</span></div></li>
         </ul>
         {xpPop !== null && <span className="xp-pop">+{xpPop} XP</span>}

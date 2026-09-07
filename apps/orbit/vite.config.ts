@@ -30,14 +30,20 @@ export default defineConfig({
         // dist 아래 두 앱의 문서·스크립트·스타일을 모두 담는다.
         // 아이콘과 manifest는 플러그인이 따로 넣으므로 여기서 빼야 중복되지 않는다
         globPatterns: ['**/*.{js,css,html,svg}'],
-        // 픽셀 폰트는 외부 CDN에서 온다. 한 번 받으면 캐시해 오프라인에서도 유지한다
+        // 본문·픽셀 폰트는 외부 CDN에서 온다. 한 번 받으면 캐시해 오프라인에서도 유지한다.
+        // URL에 버전을 박아 두었으므로 CacheFirst로 두어도 낡은 파일을 물고 있지 않는다.
+        //
+        // maxEntries는 실제로 받을 수 있는 파일 수보다 넉넉해야 한다. 넘치면 워크박스가
+        // 오래된 것부터 버리고, CacheFirst라 버려진 파일은 다음 요청 때 네트워크로 간다 —
+        // 연결이 나쁜 기기에서 큰 파일(컬러 이모지 185KB)만 못 받고 대체 폰트로
+        // 떨어지는 일이 생긴다. 지금 후보는 Mona 13개(css+woff2 12) + Pretendard 10개(css+woff2 9).
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.origin === 'https://cdn.jsdelivr.net' || url.origin === 'https://fonts.gstatic.com',
             handler: 'CacheFirst',
             options: {
               cacheName: 'pixel-font',
-              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 365 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },
