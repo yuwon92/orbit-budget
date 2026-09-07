@@ -61,8 +61,9 @@ function categoryBudgetPeriods(category: Category, month: string): BudgetPeriod[
 
   for (let day = 1; day <= lastDay;) {
     const from = dateInMonth(month, day)
-    const daysUntilSaturday = 6 - weekdayOf(from)
-    const endDay = Math.min(day + daysUntilSaturday, lastDay)
+    // 주는 월요일에 시작해 일요일에 끝난다 (일요일이면 그 날로 끝).
+    const daysUntilSunday = (7 - weekdayOf(from)) % 7
+    const endDay = Math.min(day + daysUntilSunday, lastDay)
     const allowance = Math.min(unit * rule.freq.timesPerWeek, remainingBudget)
     periods.push({ scope: 'week', from, to: dateInMonth(month, endDay), allowance })
     remainingBudget -= allowance

@@ -268,9 +268,10 @@ assert.deepEqual(ordered.map((c) => c.id), ['d', 'a', 'b', 'c'])
 console.log('퀵 슬롯 순서 (지정 순서 우선, 미지정은 카테고리 순서로 뒤에) 통과')
 
 // --- 홈 하루 몫 분해 ---
-// 2026-09-07은 월요일, 09-08은 화요일
+// 2026-09-07은 월요일, 09-08은 화요일, 09-09는 수요일
 const MON = '2026-09-07'
 const TUE = '2026-09-08'
+const WED = '2026-09-09'
 const foodRule = { kind: 'perUse', unitAmount: 6_500, freq: perWeek10 } as const
 const cafeRule = { kind: 'perUse', unitAmount: 5_000, freq: monWedFri } as const
 const busRule = { ...commute, freq: weekdaysAll } as const
@@ -319,8 +320,8 @@ const weeklyCafe = homeCat('weekly-cafe', 45_000, {
   kind: 'perUse', unitAmount: 5_000, freq: { mode: 'perWeek', timesPerWeek: 2 },
 })
 const spent9 = tx('2026-09-01', 9_000, 'expense', 'weekly-cafe', '')
-assert.equal(monthlyFreeAmount([dailyIncome, spent9], [weeklyCafe], '2026-09-05', 0), 55_000) // 토요일까지 유지
-assert.equal(monthlyFreeAmount([dailyIncome, spent9], [weeklyCafe], '2026-09-06', 0), 56_000) // 다음 주 1천원 이월
+assert.equal(monthlyFreeAmount([dailyIncome, spent9], [weeklyCafe], '2026-09-06', 0), 55_000) // 일요일까지 유지
+assert.equal(monthlyFreeAmount([dailyIncome, spent9], [weeklyCafe], '2026-09-07', 0), 56_000) // 다음 주 월요일에 1천원 이월
 assert.equal(buildBreakdown([weeklyCafe], [], '2026-09-28')[0].allowance, 5_000) // 9회=10k×4주+5k
 
 const plannedOutside = { ...tx('2026-09-20', 10_000, 'expense', null, ''), isPlanned: true }
@@ -345,14 +346,14 @@ const homeCats = [
   homeCat('bus', 68_200, busRule),
   homeCat('etc', 30_000, { kind: 'manual' }),
 ]
-const WEEK_FROM = '2026-09-06' // 일요일
+// 주는 월요일에 시작한다 — 09-07(월)은 09-09(수)와 같은 주다
 const weekSpend = [
-  tx(WEEK_FROM, 6_500, 'expense', 'food', ''), // 이번 주지만 오늘은 아님
-  tx(MON, 6_500, 'expense', 'food', ''),
-  tx(MON, 5_000, 'expense', 'cafe', ''),
-  tx(MON, 30_000, 'expense', 'etc', ''), // 월 단위 카테고리는 히어로 행에 표시하지 않는다
+  tx(MON, 6_500, 'expense', 'food', ''), // 이번 주지만 오늘은 아님
+  tx(WED, 6_500, 'expense', 'food', ''),
+  tx(WED, 5_000, 'expense', 'cafe', ''),
+  tx(WED, 30_000, 'expense', 'etc', ''), // 월 단위 카테고리는 히어로 행에 표시하지 않는다
 ]
-const rows = buildBreakdown(homeCats, weekSpend, MON)
+const rows = buildBreakdown(homeCats, weekSpend, WED)
 
 assert.deepEqual(rows.map((r) => r.categoryId), ['food', 'cafe', 'bus'])
 // 식비: 주 단위라 이번 주 65,000에서 이번 주 지출 13,000을 뺀다 (오늘치만 빼지 않는다)
@@ -372,7 +373,7 @@ const hidden = buildBreakdown(
     homeCat('etc', 30_000, { kind: 'manual' }),
   ],
   weekSpend,
-  MON,
+  WED,
 )
 assert.deepEqual(hidden, rows)
 console.log('홈 예산 행 (기간별 예산, 주/일 한도, 건수) 통과')

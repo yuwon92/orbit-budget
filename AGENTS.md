@@ -99,7 +99,7 @@ BudgetRule = { kind:'manual' }
 ```
 
 날짜는 전부 `'yyyy-MM-dd'` 문자열, 월은 `'yyyy-MM'`. 문자열 비교로 대소 판단(`t.date < today`).
-요일은 `0=일 … 6=토`. 주 시작은 **일요일**(달력과 일치).
+요일은 `0=일 … 6=토`. 주 예산 기간의 주 시작은 **월요일**(월~일). 달력 화면 그리드는 일요일 시작.
 
 - `interval`이 없으면 월 단위(예전 규칙). 주 단위는 `weekdays`(여러 요일 가능)를 쓰고 `dayOfMonth`는 안 씀(주기를 되돌릴 때를 위해 값은 남겨둠)
 - `isPlanned`는 저장 시 `date > 오늘`로 자동 결정. `materializeRecurring`이 앱을 열 때 오늘 이하 날짜를 전부 `false`로 확정
