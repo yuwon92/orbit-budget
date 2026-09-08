@@ -1107,12 +1107,17 @@ ul { padding: 0; list-style: none; }
   .sheet-backdrop {
     inset: 0;
     height: auto;
+    overflow: hidden;
     overscroll-behavior: none;
   }
 
   .wl-sheet {
     max-height: calc(var(--sheet-vh, 100dvh) - 8px);
     margin-bottom: var(--sheet-bottom, 0px);
+    border-bottom: 0;
+    /* 시트 아래로 화면보다 긴 흰 면을 이어 붙인다. iOS가 키보드·안전 영역을
+       별도 뷰포트로 잡아도 남는 부분은 backdrop에서 잘리고 뒤 화면은 보이지 않는다. */
+    box-shadow: 0 100vh 0 100vh var(--surface);
     overscroll-behavior: contain;
   }
 }

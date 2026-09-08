@@ -13,11 +13,15 @@ export function useSheetViewport() {
 
     const apply = () => {
       if (!viewport) return
+      const occludedBottom = Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop))
+      // iOS standalone은 키보드가 없어도 안전 영역·브라우저 UI만큼 작은 차이를 보고한다.
+      // 화면의 20% 이상 가려졌을 때만 키보드로 보고 시트를 위로 올린다.
+      const keyboardThreshold = Math.min(160, Math.round(window.innerHeight * 0.2))
       root.style.setProperty('--sheet-vh', `${Math.round(viewport.height)}px`)
       root.style.setProperty('--sheet-top', `${Math.round(viewport.offsetTop)}px`)
       root.style.setProperty(
         '--sheet-bottom',
-        `${Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop))}px`,
+        `${occludedBottom >= keyboardThreshold ? occludedBottom : 0}px`,
       )
     }
 
