@@ -1064,15 +1064,55 @@ ul { padding: 0; list-style: none; }
 /* ── 모바일 키보드가 열린 시트 ────────────────────── */
 
 @media (max-width: 680px) {
+  html, body, #root {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  .wl-app {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    padding-bottom: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .wl-hud {
+    position: relative;
+    top: auto;
+    flex: 0 0 auto;
+  }
+
+  .wl-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding-bottom: 24px;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  .wl-nav {
+    position: static;
+    left: auto;
+    bottom: auto;
+    transform: none;
+    flex: 0 0 72px;
+    margin: 8px auto max(10px, env(safe-area-inset-bottom));
+  }
+
   .sheet-backdrop {
-    inset: auto 0 auto;
-    top: var(--sheet-top, 0px);
-    height: var(--sheet-vh, 100dvh);
+    inset: 0;
+    height: auto;
     overscroll-behavior: none;
   }
 
   .wl-sheet {
     max-height: calc(var(--sheet-vh, 100dvh) - 8px);
+    margin-bottom: var(--sheet-bottom, 0px);
     overscroll-behavior: contain;
   }
 }

@@ -8,14 +8,17 @@ const isMobileSheet = () => window.matchMedia(MOBILE_SHEET).matches
 export function useSheetViewport() {
   useEffect(() => {
     const root = document.documentElement
-    const body = document.body
     const viewport = window.visualViewport
-    const scrollY = window.scrollY
+    const scroller = document.querySelector<HTMLElement>('.wl-content')
 
     const apply = () => {
       if (!viewport) return
       root.style.setProperty('--sheet-vh', `${Math.round(viewport.height)}px`)
       root.style.setProperty('--sheet-top', `${Math.round(viewport.offsetTop)}px`)
+      root.style.setProperty(
+        '--sheet-bottom',
+        `${Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop))}px`,
+      )
     }
 
     apply()
@@ -23,36 +26,18 @@ export function useSheetViewport() {
     viewport?.addEventListener('scroll', apply)
 
     const lock = isMobileSheet()
-    const previous = {
-      rootOverflow: root.style.overflow,
-      bodyOverflow: body.style.overflow,
-      bodyPosition: body.style.position,
-      bodyTop: body.style.top,
-      bodyWidth: body.style.width,
-    }
+    const previousScrollerOverflow = scroller?.style.overflowY ?? ''
 
-    if (lock) {
-      root.style.overflow = 'hidden'
-      body.style.overflow = 'hidden'
-      body.style.position = 'fixed'
-      body.style.top = `-${scrollY}px`
-      body.style.width = '100%'
-    }
+    if (lock && scroller) scroller.style.overflowY = 'hidden'
 
     return () => {
       viewport?.removeEventListener('resize', apply)
       viewport?.removeEventListener('scroll', apply)
       root.style.removeProperty('--sheet-vh')
       root.style.removeProperty('--sheet-top')
+      root.style.removeProperty('--sheet-bottom')
 
-      if (lock) {
-        root.style.overflow = previous.rootOverflow
-        body.style.overflow = previous.bodyOverflow
-        body.style.position = previous.bodyPosition
-        body.style.top = previous.bodyTop
-        body.style.width = previous.bodyWidth
-        window.scrollTo({ top: scrollY, behavior: 'instant' })
-      }
+      if (lock && scroller) scroller.style.overflowY = previousScrollerOverflow
     }
   }, [])
 }
