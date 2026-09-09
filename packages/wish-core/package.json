@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "exports": {
+    "./dust": "./src/dust.ts",
     "./types": "./src/types.ts",
     "./wish": "./src/wish.ts",
     "./xp": "./src/xp.ts"

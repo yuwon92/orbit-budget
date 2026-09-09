@@ -35,6 +35,13 @@ import {
   sumXp,
   totalXp,
 } from '../packages/wish-core/src/xp.ts'
+import {
+  DUST,
+  bonusDustGrants,
+  missionDustGrants,
+  missionDustRows,
+  stardustBalance,
+} from '../packages/wish-core/src/dust.ts'
 import type { Claim, Wish, WishEvent, WishStatus } from '../packages/wish-core/src/types.ts'
 
 const wish = (over: Partial<Wish> = {}): Wish => ({
@@ -322,6 +329,75 @@ const claim = (date: string, missionId: string): Claim => ({
   const events = [deposit('2026-09-01', 10_000)]
   assert.equal(totalXp(cancelled, events, claims), XP.share + XP.firstWish)
   console.log('보너스·총 XP 통과')
+}
+
+// ── 별가루 원장 ───────────────────────────────────────
+{
+  // 배점표가 XP 키를 전부 덮는다. 한쪽만 늘면 그 행동의 별가루가 조용히 빠진다
+  assert.deepEqual(Object.keys(DUST).sort(), Object.keys(XP).sort())
+
+  assert.equal(stardustBalance([]), 0)
+  const base = { type: 'earn' as const, amount: 10, sourceType: 'bonus' as const, createdAt: 0 }
+  // 같은 이름표가 두 줄 들어와도 한 번만 센다
+  assert.equal(stardustBalance([{ ...base, id: 'x', sourceId: 'x' }, { ...base, id: 'x', sourceId: 'x' }]), 10)
+  assert.equal(stardustBalance([
+    { ...base, id: 'x', sourceId: 'x' },
+    { ...base, id: 'y', sourceId: 'y', type: 'spend', amount: 4 },
+  ]), 6)
+
+  const wishes = [wish({ savedAmount: 14_000 })]
+  const events = [
+    deposit('2026-09-01', 10_000),
+    deposit('2026-09-02', 4_000),
+    ev({ type: 'wait', date: '2026-09-03' }),
+  ]
+  const units = missionUnits(wishes, events)
+  const claims = units.map((unit) => claim(unit.date, unit.missionId))
+
+  // 이름표에 now를 섞지 않는다. 언제 만들어도 같아야 저장의 건너뛰기가 먹는다
+  assert.deepEqual(
+    missionDustGrants(units, claims, 0).map((row) => row.id),
+    missionDustGrants(units, claims, 1_700_000_000_000).map((row) => row.id),
+  )
+  assert.equal(missionDustGrants(units, claims, 0)[0].id, 'mission:2026-09-01:share-w1')
+  // 수령하지 않은 미션에는 별가루가 없다
+  assert.equal(missionDustGrants(units, [], 0).length, 0)
+
+  const fullDay = units.filter((unit) => unit.date === '2026-09-01')
+  const partialDay = units.filter((unit) => unit.date === '2026-09-02')
+  assert.equal(missionDustRows(partialDay, 0).length, 1)
+  assert.equal(stardustBalance(missionDustRows(partialDay, 0)), DUST.partial)
+  assert.equal(stardustBalance(missionDustRows(fullDay, 0)), DUST.share)
+  assert.ok(missionDustRows(fullDay, 0).some((row) => row.id.endsWith(':topup')))
+  // 부분으로 받아 둔 날을 그 날 전액으로 채워도 기본 줄 이름표가 같아 합계가 5다
+  const laterFull = missionDustRows([{ ...partialDay[0], xp: XP.share }], 0)
+  assert.equal(stardustBalance([...missionDustRows(partialDay, 0), ...laterFull]), DUST.share)
+
+  // 기다리기·넘기기는 부분 개념이 없어 줄 하나
+  const waitDay = units.filter((unit) => unit.kind === 'wait')
+  assert.equal(missionDustRows(waitDay, 0).length, 1)
+  assert.equal(stardustBalance(missionDustRows(waitDay, 0)), DUST.wait)
+  const carried = missionUnits(wishes, [deposit('2026-09-05', 5_000, { source: 'carryover' })])
+  assert.equal(missionDustRows(carried, 0).length, 1)
+  assert.equal(stardustBalance(missionDustRows(carried, 0)), DUST.carryover)
+
+  // 보너스 — 첫 위시 하나, 완주마다 하나, 7일 묶음마다 하나
+  const twoWeeks = Array.from({ length: 14 }, (_, index) =>
+    deposit(`2026-09-${String(index + 1).padStart(2, '0')}`, 10_000))
+  const bonus = bonusDustGrants([wish({ status: 'done' })], twoWeeks, 0)
+  assert.equal(bonus.filter((row) => row.id === 'firstwish:me').length, 1)
+  assert.equal(bonus.filter((row) => row.id === 'complete:w1').length, 1)
+  const streakRows = bonus.filter((row) => row.sourceId.startsWith('streak7:'))
+  assert.equal(streakRows.length, 2)
+  // 이름표는 묶음의 마지막 날짜다
+  assert.deepEqual(streakRows.map((row) => row.id), ['streak7:2026-09-07', 'streak7:2026-09-14'])
+  // 이름표 충돌이 없어야 저장 단계에서 지급이 겹치지 않는다
+  assert.equal(new Set(bonus.map((row) => row.id)).size, bonus.length)
+  assert.equal(bonusDustGrants([], [], 0).length, 0)
+  // 13일까지는 묶음 하나. 앱을 다시 열어도 이름표가 그대로라 다시 지급되지 않는다
+  assert.equal(bonusDustGrants([wish()], twoWeeks.slice(0, 13), 0)
+    .filter((row) => row.id.startsWith('streak7:')).length, 1)
+  console.log('별가루 원장 통과')
 }
 
 // ── 연속 기록 ─────────────────────────────────────────
