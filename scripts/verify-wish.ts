@@ -19,6 +19,8 @@ import {
   vaultTotal,
 } from '../packages/wish-core/src/wish.ts'
 import {
+  LEVEL_STEPS,
+  LEVEL_TITLES,
   XP,
   bonusXp,
   claimIdOf,
@@ -202,6 +204,25 @@ const claim = (date: string, missionId: string): Claim => ({
   assert.equal(projectedDate(paced, [], '2026-09-10'), '2026-09-30')
   assert.equal(projectedDate(wish({ targetDate: null }), [], '2026-09-10'), null)
   console.log('진행률·행성 단계·구매 잠금 통과')
+}
+
+// ── 레벨 곡선 ─────────────────────────────────────────
+{
+  assert.equal(LEVEL_STEPS.length, 20)
+  assert.equal(LEVEL_TITLES.length, 20)
+  // Lv.1~8 문턱은 이미 지급된 보상의 기준이라 고정이다
+  assert.deepEqual(LEVEL_STEPS.slice(0, 8), [0, 100, 300, 700, 1400, 2500, 4000, 6000])
+  // 기준 사용자 하루 22.86 XP × 730일 ≈ 16,688 → Lv.20 = 16,800
+  assert.equal(LEVEL_STEPS[19], 16_800)
+  LEVEL_STEPS.forEach((step, index, all) => { if (index) assert.ok(step > all[index - 1]) })
+  // 문턱 값 자체는 그 레벨의 시작, 1 모자라면 이전 레벨
+  LEVEL_STEPS.forEach((step, index) => {
+    assert.equal(levelFromXp(step).level, index + 1)
+    if (step) assert.equal(levelFromXp(step - 1).level, index)
+  })
+  assert.equal(levelFromXp(16_800).max, true)
+  assert.equal(levelFromXp(999_999).level, 20)
+  console.log('레벨 곡선 통과')
 }
 
 // ── 레벨과 슬롯 ───────────────────────────────────────

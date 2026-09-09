@@ -22,12 +22,32 @@ export const XP = {
   firstWish: 50,
 } as const
 
-/** 누적 XP 기준 레벨 문턱. Lv1부터 Lv8까지 */
-export const LEVEL_STEPS = [0, 100, 300, 700, 1400, 2500, 4000, 6000]
+/**
+ * 누적 XP 기준 레벨 문턱. Lv.1~20.
+ *
+ * Lv.1~8 여덟 값은 한 글자도 바꾸지 않는다 — 문턱을 내리면 이미 받은 레벨 보상과
+ * 어긋나고, 올리면 이미 오른 레벨이 내려간다. Lv.9~20은 증분 900 고정으로 나눠
+ * Lv.20을 16,800에 둔다. 기준 사용자(하루 몫 매일 + 넘기기 주 2회 + 연속)가
+ * 하루 22.86 XP를 쌓아 약 24개월에 닿는 값이다.
+ *
+ * Lv.8→9에서 증분이 2,000에서 900으로 떨어지는 역전은 의도한 것이다. 뒷 구간은
+ * 레벨 보상이 촘촘한 구간이라 문턱을 키우면 보상 간격이 벌어진다. 속도를 다시
+ * 조정할 일이 생기면 문턱이 아니라 XP 배점을 건드린다 — 문턱을 나중에 내리면
+ * 이미 지급한 레벨 보상과 어긋난다.
+ */
+export const LEVEL_STEPS = [
+  0, 100, 300, 700, 1400, 2500, 4000, 6000,
+  6900, 7800, 8700, 9600, 10500, 11400,
+  12300, 13200, 14100, 15000, 15900, 16800,
+]
 
+/** Lv.9 이후는 작업명. 카피는 레벨 보상표와 함께 확정한다 */
 export const LEVEL_TITLES = [
   'STARGAZER', 'DRIFTER', 'EXPLORER', 'NAVIGATOR',
   'VOYAGER', 'ASTRONOMER', 'CONSTELLATOR', 'COSMOGRAPHER',
+  'PATHFINDER', 'MOONWARDEN', 'STARSMITH', 'AURORIST',
+  'SKYWRIGHT', 'COMETCHASER', 'NEBULIST', 'SUNSEEKER',
+  'STARWEAVER', 'LIGHTKEEPER', 'GALAXIAN', 'COSMOCRAFTER',
 ]
 
 /** 레벨별 해금. 슬롯은 레벨 또는 완주 횟수 중 먼저 도달한 쪽으로 열린다 */
@@ -177,9 +197,19 @@ function depositRuns(events: WishEvent[]): string[][] {
   return runs
 }
 
+/**
+ * 채운 7일 묶음마다 그 묶음의 마지막 날짜. 별가루 연속 보너스의 이름표가 여기서 나온다.
+ * 이 날짜가 나중에 밀리면 같은 묶음에 별가루가 두 번 지급된다 — dust.ts 첫 주석 참고.
+ */
+export function streakBlockEnds(events: WishEvent[]): string[] {
+  return depositRuns(events).flatMap((run) =>
+    Array.from({ length: Math.floor(run.length / 7) }, (_, index) => run[index * 7 + 6]),
+  )
+}
+
 /** 지금까지 채운 7일 묶음 수. 연속 보너스 횟수 */
 function streakBlocks(events: WishEvent[]) {
-  return depositRuns(events).reduce((sum, run) => sum + Math.floor(run.length / 7), 0)
+  return streakBlockEnds(events).length
 }
 
 /**
