@@ -10,8 +10,14 @@ export function useSheetViewport() {
     const root = document.documentElement
     const viewport = window.visualViewport
     const scroller = document.querySelector<HTMLElement>('.wl-content')
+    const sheet = document.querySelector<HTMLElement>('.wl-sheet')
 
     const apply = () => {
+      // 이전 렌더에서 생긴 가로 위치가 iOS에 남아 있어도 시트를 항상 왼쪽 원점에 둔다.
+      root.scrollLeft = 0
+      document.body.scrollLeft = 0
+      if (scroller) scroller.scrollLeft = 0
+      if (sheet) sheet.scrollLeft = 0
       if (!viewport) return
       const occludedBottom = Math.max(0, Math.round(window.innerHeight - viewport.height - viewport.offsetTop))
       // iOS standalone은 키보드가 없어도 안전 영역·브라우저 UI만큼 작은 차이를 보고한다.

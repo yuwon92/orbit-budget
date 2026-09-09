@@ -1191,3 +1191,27 @@ ul { padding: 0; list-style: none; }
   line-height: 1;
 }
 .slot-mark .pixel-lock-icon { font-size: 16px; }
+
+/* ── 위시 시트 가로 넘침 방지 ─────────────────────── */
+
+.wl-sheet { overflow-x: hidden; }
+.wl-sheet fieldset,
+.period-editor,
+.input-with-unit { min-width: 0; max-width: 100%; }
+.period-editor { grid-template-columns: minmax(0, 1fr) auto; }
+.period-editor > input,
+.input-with-unit > input { width: 100%; min-width: 0; }
+
+/* iOS가 입력 포커스 전후의 가로 스크롤 위치를 보존하지 못하게 세로 축만 연다. */
+@media (max-width: 680px) {
+  .sheet-backdrop,
+  .wl-content,
+  .wl-sheet { max-width: 100%; overflow-x: hidden; overscroll-behavior-x: none; }
+  .period-editor { grid-template-columns: minmax(0, 1fr) 132px; }
+  .period-unit-choice {
+    width: 132px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .period-unit-choice button { width: 100%; min-width: 0; }
+}
