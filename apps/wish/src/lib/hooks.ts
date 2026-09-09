@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { wishDb } from '@orbit/wish-bridge/db'
+import type { DustRow } from '@orbit/wish-core/dust'
 import type { Claim, Player, Wish, WishEvent } from '@orbit/wish-core/types'
 
 // App에서 한 번만 구독해 prop으로 내린다. HUD가 모든 화면에서 같은 값을 쓰므로
@@ -15,6 +16,10 @@ export const useWishEvents = (): WishEvent[] | undefined =>
 
 export const useClaims = (): Claim[] | undefined =>
   useLiveQuery(() => wishDb.claims.toArray(), [])
+
+/** 별가루 원장. 잔액은 저장하지 않고 이 줄들의 합계로 매번 계산한다 */
+export const useDustLedger = (): DustRow[] | undefined =>
+  useLiveQuery(() => wishDb.dustLedger.toArray(), [])
 
 /**
  * undefined = 로딩 중, null = 아직 만들어지지 않음.

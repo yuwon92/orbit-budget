@@ -20,6 +20,11 @@ import {
   sumXp,
   totalXp as totalXpOf,
 } from '@orbit/wish-core/xp'
+import {
+  bonusDustGrants,
+  missionDustRows,
+  stardustBalance,
+} from '@orbit/wish-core/dust'
 import type { Wish, WishEvent } from '@orbit/wish-core/types'
 import {
   chooseWait,
@@ -29,6 +34,7 @@ import {
   claimMission,
   createWish,
   deposit,
+  grantDust,
   markCelebratedLevel,
   markCelebratedTitles,
   purchaseWish,
@@ -48,7 +54,7 @@ import { ObservatoryScreen, type ObsSub } from './screens/ObservatoryScreen'
 import { buildMissions, type Mission } from './missions'
 import { TITLES } from './lib/labels'
 import { pad2, todayString } from './lib/format'
-import { useClaims, usePlayer, useWishEvents, useWishes } from './lib/hooks'
+import { useClaims, useDustLedger, usePlayer, useWishEvents, useWishes } from './lib/hooks'
 import { loadBudgetView, type BudgetView } from './lib/budget'
 
 type Screen = 'hub' | 'quests' | 'codex' | 'observatory'
@@ -85,12 +91,15 @@ export default function App() {
   const storedWishes = useWishes()
   const storedEvents = useWishEvents()
   const storedClaims = useClaims()
+  const storedDust = useDustLedger()
   const player = usePlayer()
   const loaded =
-    storedWishes !== undefined && storedEvents !== undefined && storedClaims !== undefined && player !== undefined
+    storedWishes !== undefined && storedEvents !== undefined && storedClaims !== undefined
+    && storedDust !== undefined && player !== undefined
   const wishes = useMemo(() => storedWishes ?? [], [storedWishes])
   const events = useMemo(() => storedEvents ?? [], [storedEvents])
   const claims = useMemo(() => storedClaims ?? [], [storedClaims])
+  const dustRows = useMemo(() => storedDust ?? [], [storedDust])
 
   const [activeId, setActiveId] = useState<string | null>(null)
 
@@ -108,7 +117,8 @@ export default function App() {
   const [editing, setEditing] = useState<Wish | null>(null)
   const [resolving, setResolving] = useState<Wish | null>(null)
   const [rewards, setRewards] = useState<Reward[]>([])
-  const [xpPop, setXpPop] = useState<number | null>(null)
+  // 수령 직후 뜨는 한 줄. XP와 별가루를 따로 띄우지 않고 한 상태로 묶는다
+  const [xpPop, setXpPop] = useState<{ xp: number; dust: number } | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [dark, setDark] = useState(readTheme)
   const [switcherOpen, setSwitcherOpen] = useState(false)
@@ -139,6 +149,14 @@ export default function App() {
     if (player === undefined) return
     if (player === null || player.lastOpenedDate !== today) void ensurePlayer(today)
   }, [player, today])
+
+  // 완주·첫 위시·연속 7일은 수령 버튼이 없어 영수증이 없다. 별가루를 걸 데가
+  // 없으므로 화면을 열 때마다 「있어야 할 줄」을 전부 만들어 보내고 저장 단계에서
+  // 없는 것만 남긴다. 이름표가 결정적이라 백 번 열어도 지급은 한 번씩이다.
+  useEffect(() => {
+    if (!loaded) return
+    void grantDust(bonusDustGrants(wishes, events, Date.now()))
+  }, [loaded, wishes, events])
 
   // 화면에 필요한 값은 전부 이벤트와 수령 기록에서 파생한다. 저장하는 XP는 없다.
   const openWishes = useMemo(
@@ -173,6 +191,8 @@ export default function App() {
     [wishes, events, claims],
   )
   const pendingXp = sumXp(pending)
+  // 별가루 잔액은 저장하지 않는다. 원장 줄의 합계로 매번 계산한다
+  const stardust = useMemo(() => stardustBalance(dustRows), [dustRows])
   const vault = vaultTotal(wishes)
   // 등록할 때 무리한 계획을 경고하는 데 쓴다
   const existingShare = totalDailyShare(openWishes, events, today)
@@ -267,14 +287,14 @@ export default function App() {
   async function claimOne(mission: Mission) {
     const unit = pending.find((item) => item.date === mission.date && item.missionId === mission.id)
     if (!unit) return
-    setXpPop(unit.xp)
-    await claimMission(unit.date, unit.missionId)
+    setXpPop({ xp: unit.xp, dust: stardustBalance(missionDustRows([unit], 0)) })
+    await claimMission(unit)
   }
 
   /** 지금 받을 수 있는 것 전부 수령. 지난 날짜의 미수령분도 함께 들어온다 */
   async function claimAll() {
     if (!pending.length) return
-    setXpPop(pendingXp)
+    setXpPop({ xp: pendingXp, dust: stardustBalance(missionDustRows(pending, 0)) })
     await claimAllWrite(pending)
   }
 
@@ -290,6 +310,9 @@ export default function App() {
       categoryId,
     })
     await purchaseWish(wish.id, today, transactionId)
+    // 완주 별가루를 여기서 한 번 더 부른다. 구독이 갱신되기를 기다리지 않아야
+    // 완주 연출과 잔액이 같은 순간에 맞는다
+    void grantDust(bonusDustGrants([...wishes.filter((item) => item.id !== wish.id), { ...wish, status: 'done' }], events, Date.now()))
     setResolving(null)
     pushReward({
       kind: 'complete',
@@ -346,10 +369,11 @@ export default function App() {
               <span>{budget?.snapshot ? (budget.stale ? '자유비용 (지난 값)' : '남은 자유비용') : '연결 안 됨'}</span>
             </div>
           </li>
-          <li><span className="res-icon" aria-hidden="true">🌠</span><div><strong>{stats.streak}일</strong><span>연속 관측</span></div></li>
+          {/* 연속 일수는 관측소 통계의 「현재 연속」에 그대로 남아 사라지지 않는다 */}
+          <li><span className="res-icon" aria-hidden="true">✨</span><div><strong>{money(stardust)}</strong><span>별가루</span></div></li>
           <li><span className="res-icon" aria-hidden="true">🫙</span><div><strong>{money(vault)}원</strong><span>저금통</span></div></li>
         </ul>
-        {xpPop !== null && <span className="xp-pop">+{xpPop} XP</span>}
+        {xpPop !== null && <span className="xp-pop">+{xpPop.xp} XP · +{xpPop.dust} 별가루</span>}
       </header>
 
       <div className="wl-content">

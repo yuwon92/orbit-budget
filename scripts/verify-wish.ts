@@ -42,6 +42,7 @@ import {
   missionDustRows,
   stardustBalance,
 } from '../packages/wish-core/src/dust.ts'
+import { unclaimedLevels } from '../packages/wish-core/src/reward.ts'
 import type { Claim, Wish, WishEvent, WishStatus } from '../packages/wish-core/src/types.ts'
 
 const wish = (over: Partial<Wish> = {}): Wish => ({
@@ -398,6 +399,20 @@ const claim = (date: string, missionId: string): Claim => ({
   assert.equal(bonusDustGrants([wish()], twoWeeks.slice(0, 13), 0)
     .filter((row) => row.id.startsWith('streak7:')).length, 1)
   console.log('별가루 원장 통과')
+}
+
+// ── 레벨 보상 소급 ────────────────────────────────────
+{
+  // 이미 레벨이 오른 채로 보상 기능을 만나면 지난 레벨이 전부 미수령으로 쌓인다
+  assert.deepEqual(unclaimedLevels(5, []), [1, 2, 3, 4, 5])
+  assert.deepEqual(unclaimedLevels(5, [1, 2, 3]), [4, 5])
+  assert.deepEqual(unclaimedLevels(1, [1]), [])
+  // 아직 오르지 않은 레벨은 미수령이 아니다
+  assert.ok(unclaimedLevels(3, []).every((level) => level <= 3))
+  assert.deepEqual(unclaimedLevels(0, []), [])
+  // 순서를 건너뛰고 받은 기록이 있어도 남은 것만 낸다
+  assert.deepEqual(unclaimedLevels(4, [2, 4]), [1, 3])
+  console.log('레벨 보상 소급 통과')
 }
 
 // ── 연속 기록 ─────────────────────────────────────────

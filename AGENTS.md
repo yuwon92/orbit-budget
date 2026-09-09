@@ -43,8 +43,10 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `apps/wish/src/index.css` | Wish 전역 CSS 한 파일. 밝은 노랑 우주 |
 | `packages/wish-core/src/types.ts` | Wish·WishEvent·Claim·Player 타입 |
 | `packages/wish-core/src/wish.ts` | 하루 몫·남은 일수·하루 판정·월 저금 합계·구매 잠금. **순수 함수만** |
-| `packages/wish-core/src/xp.ts` | 배점표·레벨 곡선·미션 수령 단위·연속 기록·통계·칭호. **순수 함수만** |
-| `packages/wish-bridge/src/db.ts` | `orbital-wish` Dexie 인스턴스와 v1 스키마 |
+| `packages/wish-core/src/xp.ts` | XP 배점표·Lv.20 곡선·미션 수령 단위·연속 기록·통계·칭호. **순수 함수만** |
+| `packages/wish-core/src/dust.ts` | 별가루 배점표·원장 합계·지급 이름표 생성. **순수 함수만** |
+| `packages/wish-core/src/reward.ts` | 레벨 보상 미수령 판정. **순수 함수만** |
+| `packages/wish-bridge/src/db.ts` | `orbital-wish` Dexie 인스턴스와 v1·v2 스키마 |
 | `packages/wish-bridge/src/index.ts` | **위시 데이터의 유일한 쓰기 창구.** 이벤트와 savedAmount를 한 트랜잭션에서 갱신 |
 | `packages/budget-core/src/types.ts` | Orbit 도메인 타입 전부 |
 | `packages/budget-core/src/budget.ts` | **모든 계산. 순수 함수만. DB·UI 접근 금지** |
@@ -68,6 +70,8 @@ Wish는 Orbit 예산을 `getOrbitSnapshot()`으로 읽고, 구매 확정 때만 
 **Wish 데이터는 `orbital-wish`(Dexie)에 저장된다.** 위시·이벤트·수령 기록·Player 네 스토어. 화면은 `packages/wish-bridge`를 통해서만 쓰고, Wish 앱 읽기는 `apps/wish/src/lib/hooks.ts`의 `useLiveQuery` 네 개가 전부다. Orbit 홈은 `listWishes()`·`listWishEvents()`를 live query로 읽어 기간이 있는 active 위시만 표시한다.
 
 **하루 몫과 남은 예산 넘기기는 별개 미션이다.** `deposit`의 `source`가 갈라준다 — `manual`만 하루 몫 판정(`actionDepositsOn`·`dayStatus`)에 들어가고, `carryover`는 자기 미션만, `transfer`는 어느 쪽도 아니다. 넘기기로 하루 몫이 채워지면 안 된다.
+
+**별가루는 XP와 반대로 저장한다.** XP는 파생값이라 배점을 고치면 과거까지 다시 계산되지만, 별가루는 `dustLedger`에 한 줄씩 쌓고 잔액은 그 합계라 이미 지급된 값이 그대로 남는다. 의도한 차이다. 지급 한 줄에는 고유 이름표(`mission:{date}:{missionId}`, `complete:{wishId}`, `streak7:{묶음 마지막 날}` 등)가 붙고 저장은 **이미 있으면 건너뛰기**다 — `put`으로 덮어쓰면 배점 조정이 과거 지급액까지 바꾼다. 미션 수령은 영수증과 별가루를 한 트랜잭션에 넣는다. 영수증만 남으면 그 미션은 다시 수령할 수 없어 별가루를 영영 못 받는다. 완주·첫 위시·연속 7일은 수령 버튼이 없어 App이 화면을 열 때마다 「있어야 할 줄」을 통째로 보내고 저장 단계가 없는 것만 남긴다.
 
 **XP는 어디에도 저장하지 않는다.** `WishEvent`와 `Claim`(수령 영수증)에서 매번 다시 계산한다. 배점을 바꾸면 과거 기록도 새 배점으로 재계산된다. 미션은 행마다 개별 수령 버튼이 있고 아래 `CLAIM` 버튼이 미수령 전부를 한 번에 받는다. 승격 전 초안(위시 상세 중심 4탭, `PlanetVisual`, `orbital-wish` 스키마 선언)은 커밋 `70d9ce5`에 남아 있다.
 
@@ -235,6 +239,7 @@ plannedIncome: boolean  // 자유비용에 예정 수입을 넣을지. 기본 tr
 ## 함정
 
 - **Wish 하단 탭 아이콘은 위치 기반**(`apps/wish/src/index.css` `.wl-nav button:nth-child(n)`). 🪐🚀⭐🔭가 `NAV` 배열 순서가 아니라 **자식 순서**에 묶여 있다. 탭을 늘리거나 순서를 바꾸면 아이콘이 조용히 어긋난다 — 탭은 4개 고정이고, 새 화면은 탭이 아니라 하위 화면 상태로 붙일 것
+- **「지난 날짜로 저금 입력」을 만들면 별가루 연속 보너스가 이중 지급된다.** `streak7` 이름표는 7일 묶음의 마지막 날짜다. 지금은 모든 저금이 오늘 날짜로만 기록돼 묶음 경계가 앞으로만 자라 안전하지만, 중간 구멍이 메워지면 묶음이 합쳐지며 경계가 밀린다. 이미 지급한 `streak7:2026-09-15`와 새로 나온 `streak7:2026-09-18`이 둘 다 남는다. 그 기능을 만들 때 `dust.ts` 첫 주석부터 다시 볼 것
 - **전역 `.dot{position:absolute}`** 이 행성 장식용으로 존재. 목록용 점은 `.cat-dot` 사용
 - 달력 점 색 클래스(`.planned`/`.income`/`.spent`)는 이름이 흔해 다른 곳과 부딪힌다. `.calendar-amount`/`.calendar-legend` 안으로 한정해 뒀으니 전역으로 되돌리지 말 것(예전엔 `!important` 전역이라 거래 내역 수입 원 배경까지 덮었다)
 - `.category-card p{font-size:12px}`가 카드 안 모든 `p`를 이김. 카드 안에 작은 글씨를 넣으려면 `.category-card .클래스`로 선택자를 올릴 것

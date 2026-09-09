@@ -3,6 +3,7 @@
 // 둘이 어긋나면 진행률과 이벤트 원장이 갈라진다.
 import { canPurchase, monthlyDeposit, seedFromId } from '@orbit/wish-core/wish'
 import { claimIdOf, type MissionUnit } from '@orbit/wish-core/xp'
+import { missionDustGrants, type DustRow } from '@orbit/wish-core/dust'
 import type { Claim, Player, Wish, WishEvent } from '@orbit/wish-core/types'
 import { wishDb } from './db'
 
@@ -208,22 +209,57 @@ export async function cancelWish(wishId: string, date: string, targetWishId: str
 export const listWishes = () => wishDb.wishes.toArray()
 export const listWishEvents = () => wishDb.wishEvents.toArray()
 
-/** 미션 하나 수령. 영수증만 남기고 XP 값은 저장하지 않는다 */
-export async function claimMission(date: string, missionId: string) {
-  const claim: Claim = { id: claimIdOf(date, missionId), date, missionId, createdAt: Date.now() }
-  await wishDb.claims.put(claim)
+const receiptOf = (unit: MissionUnit, now: number): Claim =>
+  ({ id: claimIdOf(unit.date, unit.missionId), date: unit.date, missionId: unit.missionId, createdAt: now })
+
+/**
+ * 별가루 지급. 이미 있는 이름표는 건너뛴다.
+ *
+ * put이 아니라 add인 이유 — put은 덮어쓰기라 나중에 배점표를 조정하면 과거 지급액까지
+ * 새 값으로 바꿔 버린다. 지급액은 최초 지급 시점 값으로 굳어야 한다.
+ *
+ * 트랜잭션 안에서 부르면 그 트랜잭션에 함께 묶인다. 미션 수령이 그렇게 쓴다.
+ */
+async function addDustRows(rows: DustRow[]) {
+  // 한 번에 들어온 줄 사이의 중복도 먼저 걷어낸다. bulkAdd는 중복 키에서 던진다
+  const unique = [...new Map(rows.map((row) => [row.id, row])).values()]
+  if (!unique.length) return
+  // 기본키 조회라 bulkGet으로 본다. where('id')는 인덱스 이름이 어긋나면 조회
+  // 시점에 던지고, 그러면 미션 수령까지 함께 실패한다
+  const existing = await wishDb.dustLedger.bulkGet(unique.map((row) => row.id))
+  const fresh = unique.filter((_, index) => existing[index] === undefined)
+  if (fresh.length) await wishDb.dustLedger.bulkAdd(fresh)
+}
+
+/** 영수증이 없는 보너스 지급용. 화면을 열 때마다 「있어야 할 줄」을 통째로 보낸다 */
+export async function grantDust(rows: DustRow[]) {
+  if (!rows.length) return
+  await wishDb.transaction('rw', wishDb.dustLedger, () => addDustRows(rows))
+}
+
+/**
+ * 미션 하나 수령. 영수증만 남기고 XP 값은 저장하지 않는다.
+ * 별가루는 같은 트랜잭션에 넣는다 — 따로 저장하면 영수증만 남고 별가루는 없는
+ * 상태가 만들어지고, 그 미션은 다시 수령할 수 없어 영영 못 받는다.
+ */
+export async function claimMission(unit: MissionUnit) {
+  const now = Date.now()
+  const receipt = receiptOf(unit, now)
+  await wishDb.transaction('rw', wishDb.claims, wishDb.dustLedger, async () => {
+    await wishDb.claims.put(receipt)
+    await addDustRows(missionDustGrants([unit], [receipt], now))
+  })
 }
 
 /** 지금 받을 수 있는 것 전부. 지난 날짜의 미수령분도 함께 들어온다 */
 export async function claimAll(units: MissionUnit[]) {
   if (!units.length) return
   const now = Date.now()
-  await wishDb.claims.bulkPut(units.map((unit) => ({
-    id: claimIdOf(unit.date, unit.missionId),
-    date: unit.date,
-    missionId: unit.missionId,
-    createdAt: now,
-  })))
+  const receipts = units.map((unit) => receiptOf(unit, now))
+  await wishDb.transaction('rw', wishDb.claims, wishDb.dustLedger, async () => {
+    await wishDb.claims.bulkPut(receipts)
+    await addDustRows(missionDustGrants(units, receipts, now))
+  })
 }
 
 /**

@@ -61,6 +61,49 @@ export interface Player {
   lastOpenedDate: string
 }
 
+// 아래 다섯은 별가루 경제가 쓰는 저장 형태다. 화면은 Phase마다 하나씩 붙지만
+// 스토어는 v2에서 한 번에 선언한다 — 나중에 하나씩 추가하면 그때마다 새 버전이
+// 필요하고, 버전이 늘수록 기존 DB를 여는 경로가 길어진다.
+
+/** 보유 꾸미기 아이템. itemId가 기본키라 같은 아이템을 두 번 갖지 않는다 */
+export interface OwnedItem {
+  itemId: string
+  acquiredAt: number
+  sourceType: 'shop' | 'box' | 'level' | 'region'
+  /** 어느 지급에서 왔는지. 별가루 원장의 이름표와 같은 형식 */
+  sourceId: string
+}
+
+/** 장착 상태. 카테고리당 한 줄이고 해제는 줄 삭제 */
+export interface Equipped {
+  category: string
+  itemId: string
+  updatedAt: number
+}
+
+/** 레벨 보상 수령 기록. 없는 레벨이 미수령이다 */
+export interface LevelClaim {
+  level: number
+  claimedAt: number
+}
+
+/** 아직 열지 않은 상자도 보유물이라 따로 남긴다 */
+export interface OwnedBox {
+  boxId: string
+  type: 'normal' | 'rare'
+  acquiredAt: number
+  openedAt: number | null
+}
+
+/** 상자 개봉 결과. 중복이면 별가루로 전환되고 그 이름표가 여기서 나온다 */
+export interface BoxOpen {
+  id: string
+  boxId: string
+  itemId: string
+  duplicate: boolean
+  openedAt: number
+}
+
 /** 하루 판정 네 갈래. 스펙 §4 */
 export type DayStatus = 'full' | 'partial' | 'skip' | 'none'
 
