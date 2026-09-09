@@ -4,7 +4,7 @@ import { pad2 } from '../lib/format'
 
 export type Reward =
   | { kind: 'levelup'; from: number; to: number; title: string; unlock: string | null }
-  | { kind: 'complete'; name: string; seed: number; stardust: number; date: string }
+  | { kind: 'complete'; name: string; seed: number; xp: number; date: string }
   | { kind: 'title'; name: string; detail: string; icon: string }
 
 /** 레벨업·완주 연출. 픽셀 버스트 → 문구 → 보상 순으로 짧게 끝낸다. (가이드 12장) */
@@ -50,7 +50,7 @@ export function RewardOverlay({ reward, onClose }: { reward: Reward; onClose: ()
           <p className="reward-title">WISH COMPLETED</p>
           <p className="reward-name">{reward.name}</p>
           <p className="reward-sub">소원이 이루어졌다 · {reward.date.replaceAll('-', '.')}</p>
-          <p className="reward-unlock">+{reward.stardust.toLocaleString('ko-KR')} STARDUST · 도감에 별 하나 추가</p>
+          <p className="reward-unlock">+{reward.xp.toLocaleString('ko-KR')} XP · 도감에 별 하나 추가</p>
         </div>
       )}
       <button className="reward-dismiss">화면을 누르면 닫힘</button>

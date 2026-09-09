@@ -292,7 +292,7 @@ export default function App() {
       kind: 'complete',
       name: wish.name,
       seed: wish.seed,
-      stardust: keptDays(events, wish.id) * XP.share + XP.complete,
+      xp: keptDays(events, wish.id) * XP.share + XP.complete,
       date: today,
     })
     setActiveId((current) => (current === wish.id ? null : current))
@@ -749,8 +749,8 @@ function CodexScreen({ wishes, events }: { wishes: Wish[]; events: WishEvent[] }
       date,
       days: daysBetween(wish.startDate, date) + 1,
       keptDays: kept,
-      // 그 위시에서 얻은 별먼지. 지킨 날 XP + 완주 보너스
-      stardust: kept * XP.share + XP.complete,
+      // 그 위시에서 얻은 XP. 지킨 날 XP + 완주 보너스
+      xp: kept * XP.share + XP.complete,
     }
   }).sort((a, b) => (a.date < b.date ? 1 : -1)), [wishes, events])
 
@@ -789,7 +789,7 @@ function CodexScreen({ wishes, events }: { wishes: Wish[]; events: WishEvent[] }
             <div><dt>걸린 날</dt><dd>{entry.days}일</dd></div>
             <div><dt>지킨 날</dt><dd>{entry.keptDays}일</dd></div>
             <div><dt>모은 금액</dt><dd>{money(entry.wish.targetAmount)}원</dd></div>
-            <div><dt>얻은 별먼지</dt><dd>{entry.stardust.toLocaleString('ko-KR')}</dd></div>
+            <div><dt>얻은 XP</dt><dd>{entry.xp.toLocaleString('ko-KR')}</dd></div>
           </dl>
         </section>
       ) : (
@@ -853,7 +853,7 @@ function ObserverScreen({ level, totalXp, pendingXp, stats, titles, budget, dark
           <PixelBar ratio={level.ratio} segments={16} />
           <p className="observer-xp-numbers">
             <strong>{level.into.toLocaleString('ko-KR')}</strong>
-            <span>/ {level.max ? '—' : level.need.toLocaleString('ko-KR')} STARDUST</span>
+            <span>/ {level.max ? '—' : level.need.toLocaleString('ko-KR')} XP</span>
           </p>
           <p className="observer-xp-sub">
             누적 {totalXp.toLocaleString('ko-KR')} · 다음 레벨까지 {level.max ? 0 : level.need - level.into}
