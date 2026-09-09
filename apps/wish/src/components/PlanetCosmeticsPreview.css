@@ -1,0 +1,101 @@
+/* 개발용 행성 꾸미기 프리뷰 전용. index.css에 두면 쓰지 않는 100줄이 배포 CSS에 그대로 실린다.
+   프리뷰 컴포넌트에서만 import한다. */
+
+.cosmetics-preview {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 48px 0 72px;
+}
+.cosmetics-preview-head { margin-bottom: 28px; }
+.cosmetics-preview-head h1 { margin: 7px 0 8px; font-size: clamp(28px, 5vw, 44px); }
+.cosmetics-preview-head p { color: var(--text-secondary); }
+.cosmetics-preview-themes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.cosmetics-preview-theme {
+  min-width: 0;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  color: var(--text-primary);
+  background: var(--background);
+}
+.cosmetics-preview-theme.preview-light {
+  --background: #fffdf8; --surface: #ffffff; --surface-sub: #fff8df;
+  --text-primary: #29251e; --text-secondary: #6e6659; --text-tertiary: #aaa292;
+  --border: #eee8da; --pixel-ink: #b66d00;
+}
+.cosmetics-preview-theme.preview-dark {
+  --background: #1a1710; --surface: #262016; --surface-sub: #322a1c;
+  --text-primary: #fff8df; --text-secondary: #cfc2a6; --text-tertiary: #8f836c;
+  --border: #463d2b; --pixel-ink: #ffc52e;
+}
+.cosmetics-preview-controls {
+  margin: 18px 0 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 26px;
+}
+.cosmetics-preview-control { min-width: 0; display: grid; gap: 6px; }
+.cosmetics-preview-choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.cosmetics-preview-choices button {
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: none;
+  cursor: pointer;
+}
+/* 선택 표시는 글자 배경 없이 테두리와 글자색으로만 준다. */
+.cosmetics-preview-choices button[aria-pressed='true'] {
+  border-color: var(--pixel-ink);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.cosmetics-preview-section { margin-top: 28px; }
+.cosmetics-preview-section header { margin-bottom: 12px; }
+.cosmetics-preview-section h2 { margin-top: 4px; font-size: 18px; }
+.cosmetics-preview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 10px; }
+.cosmetics-preview-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  text-align: center;
+  background: var(--surface);
+}
+.cosmetics-preview-planet { min-height: 70px; display: grid; place-items: center; }
+.cosmetics-preview-card strong { font-size: 12px; }
+.cosmetics-preview-card code { max-width: 100%; overflow-wrap: anywhere; font-size: 10px; color: var(--text-secondary); }
+.cosmetics-preview-card small { font-family: var(--font-pixel); font-size: 10px; color: var(--text-tertiary); }
+.cosmetics-size-row {
+  min-height: 174px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: clamp(12px, 4vw, 38px);
+  overflow-x: auto;
+  background: var(--surface);
+}
+.cosmetics-size-row figure { margin: 0; flex: 0 0 auto; display: grid; justify-items: center; gap: 8px; }
+.cosmetics-size-row figcaption { font-family: var(--font-pixel); font-size: 10px; color: var(--text-tertiary); }
+
+@media (max-width: 760px) {
+  .cosmetics-preview { padding-top: 28px; }
+  .cosmetics-preview-themes { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 400px) {
+  .cosmetics-preview { width: min(100% - 20px, 1180px); }
+  .cosmetics-preview-theme { padding: 14px; }
+  .cosmetics-preview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cosmetics-size-row { justify-content: flex-start; }
+}

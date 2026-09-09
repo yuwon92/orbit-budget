@@ -32,11 +32,14 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `apps/wish/src/screens/` | 탭 화면 4개 — `HubScreen`(오르빗 허브)/`QuestScreen`(퀘스트 로그)/`CodexScreen`(우주 도감)/`ObservatoryScreen`(관측소). 관측소 하위 화면도 여기 |
 | `apps/wish/src/missions.ts` | 오늘의 미션 문구·상태. 앱 고유 개념이라 wish-core에 두지 않음 |
 | `apps/wish/src/planet.ts` | 픽셀 행성 블록 생성. 진행률 → 티끌·위성·행성·고리·위성대·성계 |
+| `apps/wish/src/cosmetics.ts` | 꾸미기 16종의 ID·표시명·해금 레벨·색상/픽셀 좌표 원본(source of truth) |
+| `apps/wish/src/cosmeticBlocks.ts` | 꾸미기 데이터를 SVG `rect` 블록으로 변환하고 seed 기반 결정적 배치를 만드는 렌더러 |
 | `apps/wish/src/lib/labels.ts` | 단계 이름·칭호 문구·도감 칸 수 |
 | `apps/wish/src/lib/hooks.ts` | `useWishes`/`useWishEvents`/`useClaims`/`usePlayer`. **App에서만 구독하고 prop으로 내림** |
 | `apps/wish/src/lib/budget.ts` | Orbit 예산 요약을 읽는 통로. 저장소가 나뉘는 환경에서는 **이 파일만 서버 조회로 교체** |
 | `apps/wish/src/lib/format.ts` | `todayString`·`formatDate`·`pad2` |
 | `apps/wish/src/components/` | `PixelPlanet`(행성·궤도 링), `PixelBar`, `OrbitMap`, `RewardOverlay`, `Sheets` |
+| `apps/wish/src/components/PlanetCosmeticsPreview.tsx` | 꾸미기 프리셋 개발용 비교 화면. `npm run dev` → `/apps/wish/?cosmetics-preview`. 프로덕션 번들에서는 트리셰이킹으로 빠진다 |
 | `apps/wish/src/index.css` | Wish 전역 CSS 한 파일. 밝은 노랑 우주 |
 | `packages/wish-core/src/types.ts` | Wish·WishEvent·Claim·Player 타입 |
 | `packages/wish-core/src/wish.ts` | 하루 몫·남은 일수·하루 판정·월 저금 합계·구매 잠금. **순수 함수만** |
@@ -67,6 +70,8 @@ Wish는 Orbit 예산을 `getOrbitSnapshot()`으로 읽고, 구매 확정 때만 
 **하루 몫과 남은 예산 넘기기는 별개 미션이다.** `deposit`의 `source`가 갈라준다 — `manual`만 하루 몫 판정(`actionDepositsOn`·`dayStatus`)에 들어가고, `carryover`는 자기 미션만, `transfer`는 어느 쪽도 아니다. 넘기기로 하루 몫이 채워지면 안 된다.
 
 **XP는 어디에도 저장하지 않는다.** `WishEvent`와 `Claim`(수령 영수증)에서 매번 다시 계산한다. 배점을 바꾸면 과거 기록도 새 배점으로 재계산된다. 미션은 행마다 개별 수령 버튼이 있고 아래 `CLAIM` 버튼이 미수령 전부를 한 번에 받는다. 승격 전 초안(위시 상세 중심 4탭, `PlanetVisual`, `orbital-wish` 스키마 선언)은 커밋 `70d9ce5`에 남아 있다.
+
+**Wish 꾸미기 원본은 별도 이미지가 아니라 `apps/wish/src/cosmetics.ts`의 팔레트와 픽셀 좌표 코드다.** 프리셋 ID는 팔레트 `solar`/`mint`/`coral`/`lavender`, 링 `single`/`double`/`debris`, 궤도 장식 `moonlet`/`probe`/`meteor`/`star-cluster`, 배경 `starfield`/`nebula`/`constellation`, 완주 효과 `sparkles`/`comet-trail`의 총 16개다. `cosmeticBlocks.ts`가 이를 SVG `rect`로 변환하며 seed가 같으면 같은 배치가 나오게 한다. 전체 비교는 개발 URL `/apps/wish/?cosmetics-preview`(`npm run dev:wish`면 `/?cosmetics-preview`)의 `PlanetCosmeticsPreview.tsx`에서 한다. 프리뷰 전용 CSS는 `components/PlanetCosmeticsPreview.css`에 따로 둔다 — `index.css`에 두면 쓰지 않는 100줄이 배포 CSS에 실린다(JS는 빠지는데 CSS만 남는다). 별도 SVG/PNG를 만들거나 `exports/wish-planets`에 섞지 않는다. 해당 폴더는 기존 행성 성장 단계 추출물이다. 현재 꾸미기는 `Player`·DB·`wish-bridge` 저장에 연결하지 않았으며, 향후에는 선택한 프리셋 ID만 연결해 저장한다.
 
 ### Orbit 컴포넌트 (`apps/orbit/src/components/`)
 

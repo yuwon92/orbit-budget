@@ -1,11 +1,11 @@
 import { rng, stageOf } from '@orbit/wish-core/wish'
 import type { PlanetStage } from '@orbit/wish-core/types'
+import type { PlanetPalette } from './cosmetics'
 
 // 4px 격자 위에 사각 블록만 찍는다. 그러데이션 없이 노랑 4단으로 명암을 만든다.
-const HIGHLIGHT = '#FFF1AC'
-const LIGHT = '#FFD43B'
-const MID = '#FFB126'
-const DARK = '#EA8A00'
+export const DEFAULT_PLANET_PALETTE: PlanetPalette = {
+  highlight: '#FFF1AC', light: '#FFD43B', mid: '#FFB126', dark: '#EA8A00',
+}
 export const GRID = 32
 
 export interface Block { x: number; y: number; w: number; h: number; fill: string; key: string }
@@ -14,7 +14,60 @@ const RADIUS: Record<PlanetStage, number> = {
   seed: 0, moon: 4.6, planet: 7.6, ring: 8.4, satellites: 8.4, system: 8.4,
 }
 
-export function buildBlocks(progress: number, seed: number): Block[] {
+/** 진행 단계별 행성 반지름. 고리 프리셋이 앞뒤를 가르는 기준으로 쓴다. */
+export function planetRadius(progress: number): number {
+  return RADIUS[stageOf(progress)]
+}
+
+export interface PlanetBuildOptions {
+  palette?: PlanetPalette
+  includeLegacyRing?: boolean
+  includeLegacySatellites?: boolean
+  includeLegacyCompletionStars?: boolean
+}
+
+const ringPoint = (t: number) => {
+  const dx = Math.cos(t) * 13
+  const dy = Math.sin(t) * 4.4
+  const tilt = -0.2
+  return {
+    x: Math.round(16 + dx * Math.cos(tilt) - dy * Math.sin(tilt)),
+    y: Math.round(16 + dx * Math.sin(tilt) + dy * Math.cos(tilt)),
+  }
+}
+
+/** 위성 3개는 고리 위에 얹는다. 고리 프리셋을 쓸 때도 같은 자리에 다시 그린다. */
+function putSatellites(put: (x: number, y: number, fill: string) => void, palette: PlanetPalette) {
+  for (const t of [0.35, 2.5, 4.3]) {
+    const point = ringPoint(t)
+    put(point.x, point.y, palette.light)
+    put(point.x + 1, point.y, palette.mid)
+    put(point.x, point.y + 1, palette.mid)
+    put(point.x + 1, point.y + 1, palette.dark)
+  }
+}
+
+/**
+ * 위성만 따로 뽑는다. 고리 프리셋은 buildBlocks 뒤에 그려서 기존 위성을 덮어 버리므로
+ * 위성대·성계 단계 표시가 사라지지 않게 고리 위 레이어로 다시 올린다.
+ */
+export function buildSatelliteBlocks(palette: PlanetPalette = DEFAULT_PLANET_PALETTE): Block[] {
+  const cells = new Map<string, string>()
+  putSatellites((x, y, fill) => {
+    if (x < 0 || y < 0 || x >= GRID || y >= GRID) return
+    cells.set(`${x}:${y}`, fill)
+  }, palette)
+  return [...cells].map(([key, fill]) => {
+    const [x, y] = key.split(':').map(Number)
+    return { x, y, w: 1, h: 1, fill, key: `satellite:${key}` }
+  })
+}
+
+export function buildBlocks(progress: number, seed: number, options: PlanetBuildOptions = {}): Block[] {
+  const { highlight: HIGHLIGHT, light: LIGHT, mid: MID, dark: DARK } = options.palette ?? DEFAULT_PLANET_PALETTE
+  const includeLegacyRing = options.includeLegacyRing ?? true
+  const includeLegacySatellites = options.includeLegacySatellites ?? true
+  const includeLegacyCompletionStars = options.includeLegacyCompletionStars ?? true
   const stage = stageOf(progress)
   const random = rng(seed * 977 + 13)
   const cells = new Map<string, string>()
@@ -71,17 +124,7 @@ export function buildBlocks(progress: number, seed: number): Block[] {
     }
   }
 
-  const ringPoint = (t: number) => {
-    const dx = Math.cos(t) * 13
-    const dy = Math.sin(t) * 4.4
-    const tilt = -0.2
-    return {
-      x: Math.round(16 + dx * Math.cos(tilt) - dy * Math.sin(tilt)),
-      y: Math.round(16 + dx * Math.sin(tilt) + dy * Math.cos(tilt)),
-    }
-  }
-
-  if (stage === 'ring' || stage === 'satellites' || stage === 'system') {
+  if (includeLegacyRing && (stage === 'ring' || stage === 'satellites' || stage === 'system')) {
     // 고리는 각도를 촘촘히 훑어 그린다. 행성 뒤로 도는 절반은 가려서 깊이를 만든다.
     for (let t = 0; t < Math.PI * 2; t += 0.02) {
       const point = ringPoint(t)
@@ -93,18 +136,11 @@ export function buildBlocks(progress: number, seed: number): Block[] {
     }
   }
 
-  if (stage === 'satellites' || stage === 'system') {
-    // 위성은 고리 위에 얹는다.
-    for (const t of [0.35, 2.5, 4.3]) {
-      const point = ringPoint(t)
-      put(point.x, point.y, LIGHT)
-      put(point.x + 1, point.y, MID)
-      put(point.x, point.y + 1, MID)
-      put(point.x + 1, point.y + 1, DARK)
-    }
+  if (includeLegacySatellites && (stage === 'satellites' || stage === 'system')) {
+    putSatellites(put, options.palette ?? DEFAULT_PLANET_PALETTE)
   }
 
-  if (stage === 'system') {
+  if (includeLegacyCompletionStars && stage === 'system') {
     // 완주한 행성 주변에 픽셀 별을 띄운다.
     const stars = [[6, 4], [26, 4], [4, 27], [29, 20]]
     for (const [sx, sy] of stars) {

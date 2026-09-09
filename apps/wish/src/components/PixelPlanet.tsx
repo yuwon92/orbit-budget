@@ -1,7 +1,17 @@
 import { useMemo } from 'react'
-import { buildBlocks, GRID } from '../planet'
+import { stageOf } from '@orbit/wish-core/wish'
+import { buildCosmeticBlocks, buildRingBlocks } from '../cosmeticBlocks'
+import {
+  BACKGROUND_PRESETS,
+  COMPLETION_EFFECT_PRESETS,
+  DECORATION_PRESETS,
+  PALETTE_PRESETS,
+  RING_PRESETS,
+  presetById,
+} from '../cosmetics'
+import { buildBlocks, buildSatelliteBlocks, DEFAULT_PLANET_PALETTE, GRID, planetRadius } from '../planet'
 
-interface PixelPlanetProps {
+export interface PixelPlanetProps {
   progress: number
   seed: number
   size?: number
@@ -12,10 +22,59 @@ interface PixelPlanetProps {
    * 몸통이 상자의 절반만 채운다 — 로고처럼 작게 놓을 때 옆 아이콘보다 작아 보인다.
    */
   crop?: boolean
+  paletteId?: string
+  ringId?: string
+  decorationId?: string
+  backgroundId?: string
+  completionEffectId?: string
 }
 
-export function PixelPlanet({ progress, seed, size = 160, dim = false, float = false, crop = false }: PixelPlanetProps) {
-  const blocks = useMemo(() => buildBlocks(progress, seed), [progress, seed])
+export function PixelPlanet({
+  progress,
+  seed,
+  size = 160,
+  dim = false,
+  float = false,
+  crop = false,
+  paletteId,
+  ringId,
+  decorationId,
+  backgroundId,
+  completionEffectId,
+}: PixelPlanetProps) {
+  const blocks = useMemo(() => {
+    const palettePreset = presetById(PALETTE_PRESETS, paletteId)
+    const ringPreset = presetById(RING_PRESETS, ringId)
+    const decorationPreset = presetById(DECORATION_PRESETS, decorationId)
+    const backgroundPreset = presetById(BACKGROUND_PRESETS, backgroundId)
+    const completionPreset = presetById(COMPLETION_EFFECT_PRESETS, completionEffectId)
+    const palette = palettePreset?.colors ?? DEFAULT_PLANET_PALETTE
+    const stage = stageOf(progress)
+    const hasRing = stage === 'ring' || stage === 'satellites' || stage === 'system'
+    const hasDecoration = stage === 'satellites' || stage === 'system'
+    const completed = stage === 'system'
+
+    const background = backgroundPreset
+      ? buildCosmeticBlocks(backgroundPreset, palette, 'background')
+      : []
+    const planet = buildBlocks(progress, seed, {
+      palette,
+      includeLegacyRing: !ringPreset,
+      // 고리 프리셋을 쓰면 위성은 고리 뒤로 밀리므로 아래에서 다시 올린다.
+      includeLegacySatellites: !ringPreset,
+      includeLegacyCompletionStars: !backgroundPreset && !completionPreset,
+    })
+    const ring = ringPreset && hasRing ? buildRingBlocks(ringPreset, palette, planetRadius(progress), 'ring') : []
+    const satellites = ringPreset && hasDecoration ? buildSatelliteBlocks(palette) : []
+    const decoration = decorationPreset && hasDecoration
+      ? buildCosmeticBlocks(decorationPreset, palette, 'decoration')
+      : []
+    const completion = completionPreset && completed
+      ? buildCosmeticBlocks(completionPreset, palette, 'completion')
+      : []
+
+    return [...background, ...planet, ...ring, ...satellites, ...decoration, ...completion]
+  }, [backgroundId, completionEffectId, decorationId, paletteId, progress, ringId, seed])
   return (
     <svg
       className={`pixel-planet${float ? ' floating' : ''}${dim ? ' dim' : ''}`}
