@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#ffd43b" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="description" content="자유비용을 모아 위시를 이루는 목표 관리 앱" />
     <link rel="icon" type="image/svg+xml" href="./wish-icon.svg" />
     <link rel="apple-touch-icon" href="./wish-icon.svg" />
@@ -20,6 +21,8 @@
         var saved = localStorage.getItem('wish-theme') || localStorage.getItem('wish-lab-theme')
         var dark = saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches
         if (dark) document.documentElement.classList.add('dark')
+        var themeColor = document.querySelector('meta[name="theme-color"]')
+        if (themeColor) themeColor.setAttribute('content', dark ? '#1a1710' : '#ffffff')
       } catch (e) { /* 저장소 접근 불가 */ }
     </script>
   </head>

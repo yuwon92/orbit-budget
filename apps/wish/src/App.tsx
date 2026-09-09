@@ -66,6 +66,7 @@ const NAV: { id: Screen; label: string }[] = [
 
 // index.html의 첫 페인트 스크립트와 같은 키를 쓴다.
 const THEME_KEY = 'wish-theme'
+const THEME_COLORS = { light: '#ffffff', dark: '#1a1710' } as const
 
 /** 승격 전 Wish Lab 키('wish-lab-theme')로 저장된 선택을 한 번 더 읽어준다. */
 function readTheme() {
@@ -114,6 +115,8 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
+    document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+      ?.setAttribute('content', dark ? THEME_COLORS.dark : THEME_COLORS.light)
     try {
       localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light')
     } catch { /* 저장소 접근 불가 */ }
