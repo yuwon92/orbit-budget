@@ -42,7 +42,7 @@ export function RewardOverlay({ reward, onClose }: { reward: Reward; onClose: ()
           <p className="reward-title compact">TITLE EARNED</p>
           <p className="reward-jump"><span className="to">{reward.name}</span></p>
           <p className="reward-sub">{reward.detail}</p>
-          <p className="reward-unlock">관측자 화면에 칭호 추가</p>
+          <p className="reward-unlock">관측소에 칭호 추가</p>
         </div>
       ) : (
         <div className="reward-body">

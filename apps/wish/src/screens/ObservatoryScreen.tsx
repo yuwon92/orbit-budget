@@ -7,7 +7,7 @@ import { TITLES } from '../lib/labels'
 import { pad2 } from '../lib/format'
 import { sinceLabel, type BudgetView } from '../lib/budget'
 
-export function ObserverScreen({ level, totalXp, pendingXp, stats, titles, budget, dark, onThemeChange }: {
+export function ObservatoryScreen({ level, totalXp, pendingXp, stats, titles, budget, dark, onThemeChange }: {
   level: ReturnType<typeof levelFromXp>
   totalXp: number
   pendingXp: number
@@ -20,10 +20,10 @@ export function ObserverScreen({ level, totalXp, pendingXp, stats, titles, budge
   const earned = new Set(titles)
 
   return (
-    <main className="observer-screen">
+    <main className="observatory-screen">
       <header className="screen-head">
-        <span className="pixel-label">OBSERVER</span>
-        <h1>관측자 Lv.{pad2(level.level)}</h1>
+        <span className="pixel-label">OBSERVATORY</span>
+        <h1>관측소 Lv.{pad2(level.level)}</h1>
       </header>
 
       <section className="observer-card">

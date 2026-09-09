@@ -28,7 +28,8 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `apps/orbit/src/lib/csv.ts` | CSV 문자열 생성 + 다운로드 |
 | `apps/orbit/src/lib/hooks.ts` | `useCategories()` (sortOrder 정렬) |
 | `apps/orbit/src/index.css` | Orbit 전역 CSS 한 파일. 클래스명 기반 |
-| `apps/wish/src/App.tsx` | Wish 셸 + 화면 4개(오르빗 허브/퀘스트 로그/우주 도감/관측자) |
+| `apps/wish/src/App.tsx` | Wish 셸 — 탭·테마·시트·저장소 구독. 화면은 갖지 않음 |
+| `apps/wish/src/screens/` | 탭 화면 4개 — `HubScreen`(오르빗 허브)/`QuestScreen`(퀘스트 로그)/`CodexScreen`(우주 도감)/`ObservatoryScreen`(관측소). 관측소 하위 화면도 여기 |
 | `apps/wish/src/missions.ts` | 오늘의 미션 문구·상태. 앱 고유 개념이라 wish-core에 두지 않음 |
 | `apps/wish/src/planet.ts` | 픽셀 행성 블록 생성. 진행률 → 티끌·위성·행성·고리·위성대·성계 |
 | `apps/wish/src/lib/labels.ts` | 단계 이름·칭호 문구·도감 칸 수 |
@@ -55,7 +56,7 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 
 **설치되는 PWA는 하나다.** iOS가 홈 화면 앱마다 저장소를 나누기 때문에, 아이콘을 두 개 만들면 Wish가 Orbit 예산을 읽지 못한다(기기 확인 완료). manifest·서비스 워커는 `apps/orbit`에만 있고 Wish는 같은 앱의 `/wish/` 화면이다. 코드베이스는 그대로 분리돼 있어 나중에 도메인을 나눌 때 manifest만 되살리면 된다.
 
-Wish는 게임 허브 흐름이다. 자원 HUD 상시 노출, 오늘의 미션과 보상 수령, 퀘스트 로그·우주 도감 분리, 설정은 관측자 화면 안. 제품 규칙과 수치는 `orbit-wish-spec.md`, 디자인은 `orbit-wish-ui-design-guide.md`(둘 다 gitignore된 로컬 문서).
+Wish는 게임 허브 흐름이다. 자원 HUD 상시 노출, 오늘의 미션과 보상 수령, 퀘스트 로그·우주 도감 분리, 설정은 관측소 화면 안. 제품 규칙과 수치는 `orbit-wish-spec.md`, 디자인은 `orbit-wish-ui-design-guide.md`(둘 다 gitignore된 로컬 문서).
 
 Wish는 Orbit 예산을 `getOrbitSnapshot()`으로 읽고, 구매 확정 때만 `createWishPurchaseTransaction()`으로 거래를 쓴다. `connected`는 DB가 열리는지가 아니라 데이터가 있는지로 판단한다 — 저장소가 분리된 환경에서는 빈 DB가 새로 만들어질 뿐이라 존재 여부로는 알 수 없다. 위시 저금은 이번 달 순저금 합계로 자유비용에서 실제 차감한다. 스냅샷의 `carryoverAmount`는 어제 끝난 예산 기간에서 자유비용으로 넘어온 잔액 합계(`releasedLeftovers`)이며, 카테고리별 내역은 `carryoverRows`에 그대로 실어 보낸다. 남은 자유비용을 넘지 않게 자른다 — 스냅샷이 이번 달 거래만 읽으므로 매달 1일은 기준일이 지난달이라 0이고 `carryoverDate`도 null이다.
 
@@ -226,6 +227,7 @@ plannedIncome: boolean  // 자유비용에 예정 수입을 넣을지. 기본 tr
 
 ## 함정
 
+- **Wish 하단 탭 아이콘은 위치 기반**(`apps/wish/src/index.css` `.wl-nav button:nth-child(n)`). 🪐🚀⭐🔭가 `NAV` 배열 순서가 아니라 **자식 순서**에 묶여 있다. 탭을 늘리거나 순서를 바꾸면 아이콘이 조용히 어긋난다 — 탭은 4개 고정이고, 새 화면은 탭이 아니라 하위 화면 상태로 붙일 것
 - **전역 `.dot{position:absolute}`** 이 행성 장식용으로 존재. 목록용 점은 `.cat-dot` 사용
 - 달력 점 색 클래스(`.planned`/`.income`/`.spent`)는 이름이 흔해 다른 곳과 부딪힌다. `.calendar-amount`/`.calendar-legend` 안으로 한정해 뒀으니 전역으로 되돌리지 말 것(예전엔 `!important` 전역이라 거래 내역 수입 원 배경까지 덮었다)
 - `.category-card p{font-size:12px}`가 카드 안 모든 `p`를 이김. 카드 안에 작은 글씨를 넣으려면 `.category-card .클래스`로 선택자를 올릴 것

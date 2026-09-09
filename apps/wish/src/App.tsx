@@ -44,20 +44,20 @@ import { CarryoverSheet, CollectSheet, ResolveWishSheet, WishSheet } from './com
 import { HubScreen } from './screens/HubScreen'
 import { QuestScreen } from './screens/QuestScreen'
 import { CodexScreen } from './screens/CodexScreen'
-import { ObserverScreen } from './screens/ObserverScreen'
+import { ObservatoryScreen } from './screens/ObservatoryScreen'
 import { buildMissions, type Mission } from './missions'
 import { TITLES } from './lib/labels'
 import { pad2, todayString } from './lib/format'
 import { useClaims, usePlayer, useWishEvents, useWishes } from './lib/hooks'
 import { loadBudgetView, type BudgetView } from './lib/budget'
 
-type Screen = 'hub' | 'quests' | 'codex' | 'observer'
+type Screen = 'hub' | 'quests' | 'codex' | 'observatory'
 
 const NAV: { id: Screen; label: string }[] = [
   { id: 'hub', label: '궤도' },
   { id: 'quests', label: '위시' },
   { id: 'codex', label: '도감' },
-  { id: 'observer', label: '관측자' },
+  { id: 'observatory', label: '관측소' },
 ]
 
 // index.html의 첫 페인트 스크립트와 같은 키를 쓴다.
@@ -385,8 +385,8 @@ export default function App() {
           />
         )}
         {screen === 'codex' && <CodexScreen wishes={doneWishes} events={events} />}
-        {screen === 'observer' && (
-          <ObserverScreen
+        {screen === 'observatory' && (
+          <ObservatoryScreen
             level={level}
             totalXp={totalXp}
             pendingXp={pendingXp}
