@@ -1215,3 +1215,51 @@ ul { padding: 0; list-style: none; }
   }
   .period-unit-choice button { width: 100%; min-width: 0; }
 }
+
+/* ── 관측소 하위 화면 ──────────────────────────────── */
+
+/* 하위 화면은 바텀시트가 아니라 .wl-content 안에서 탭 뷰 전체를 대체한다.
+   하단 탭과 HUD는 그대로 둔다 — 모바일에서 .wl-nav는 셸의 flex 아이템이라
+   숨기면 높이가 재계산되며 스크롤 위치가 튄다. */
+.obs-sub { display: block; }
+
+/* 블록으로 둔다. inline-flex면 뒤따르는 .pixel-label이 같은 줄로 흘러 겹친다 */
+.back-button {
+  margin-bottom: 10px;
+  padding: 0;
+  border: 0;
+  display: flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: none;
+  cursor: pointer;
+}
+.back-button:hover { color: var(--text-primary); }
+
+.obs-links {
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.obs-links li + li { border-top: 1px solid var(--border); }
+.obs-links button {
+  width: 100%;
+  min-height: 64px;
+  padding: 13px 16px;
+  border: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  background: none;
+  cursor: pointer;
+}
+.obs-links button > span { min-width: 0; flex: 1; display: grid; gap: 5px; }
+.obs-links strong { font-size: 14px; }
+.obs-links small { font-size: 11px; font-weight: 400; color: var(--text-tertiary); }
+.obs-links svg { flex: 0 0 auto; color: var(--text-tertiary); }

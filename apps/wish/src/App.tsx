@@ -44,7 +44,7 @@ import { CarryoverSheet, CollectSheet, ResolveWishSheet, WishSheet } from './com
 import { HubScreen } from './screens/HubScreen'
 import { QuestScreen } from './screens/QuestScreen'
 import { CodexScreen } from './screens/CodexScreen'
-import { ObservatoryScreen } from './screens/ObservatoryScreen'
+import { ObservatoryScreen, type ObsSub } from './screens/ObservatoryScreen'
 import { buildMissions, type Mission } from './missions'
 import { TITLES } from './lib/labels'
 import { pad2, todayString } from './lib/format'
@@ -76,6 +76,10 @@ function readTheme() {
 export default function App() {
   const today = useMemo(todayString, [])
   const [screen, setScreen] = useState<Screen>('hub')
+  // 관측소 하위 화면. 탭을 옮기면 반드시 비운다 — 안 그러면 다른 탭에 갔다
+  // 돌아왔을 때 하위 화면이 그대로 떠 있다
+  const [obsSub, setObsSub] = useState<ObsSub>(null)
+  const goScreen = useCallback((next: Screen) => { setObsSub(null); setScreen(next) }, [])
 
   // 저장소 구독은 여기 한 곳뿐. 화면들은 prop으로 받는다
   const storedWishes = useWishes()
@@ -365,7 +369,7 @@ export default function App() {
             onRun={runMission}
             onClaimOne={claimOne}
             onClaimAll={claimAll}
-            onOpenQuests={() => setScreen('quests')}
+            onOpenQuests={() => goScreen('quests')}
           />
         )}
         {screen === 'quests' && (
@@ -381,7 +385,7 @@ export default function App() {
             onAddList={() => setAdding('list')}
             onEdit={(wish) => setEditing(wish)}
             onResolve={setResolving}
-            onFocus={(wish) => { setActiveId(wish.id); setScreen('hub') }}
+            onFocus={(wish) => { setActiveId(wish.id); goScreen('hub') }}
           />
         )}
         {screen === 'codex' && <CodexScreen wishes={doneWishes} events={events} />}
@@ -395,13 +399,15 @@ export default function App() {
             budget={budget}
             dark={dark}
             onThemeChange={setDark}
+            sub={obsSub}
+            onSub={setObsSub}
           />
         )}
       </div>
 
       <nav className="wl-nav" aria-label="주요 화면">
         {NAV.map((item) => (
-          <button key={item.id} className={screen === item.id ? 'active' : ''} onClick={() => setScreen(item.id)}>
+          <button key={item.id} className={screen === item.id ? 'active' : ''} onClick={() => goScreen(item.id)}>
             <span aria-hidden="true" />
             <span>{item.label}</span>
           </button>
@@ -441,10 +447,10 @@ export default function App() {
             const wish = await createWish({ ...input, today })
             if (mode === 'orbit') {
               setActiveId(wish.id)
-              setScreen('hub')
+              goScreen('hub')
               setToast('새 행성이 궤도에 도착')
             } else {
-              setScreen('quests')
+              goScreen('quests')
               setToast('기간 없는 위시에 추가')
             }
           }}
