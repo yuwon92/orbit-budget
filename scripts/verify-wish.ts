@@ -14,6 +14,7 @@ import {
   progress,
   projectedDate,
   remainingDays,
+  rng,
   stageOf,
   totalDailyShare,
   vaultTotal,
@@ -46,6 +47,7 @@ import {
   CATEGORIES,
   ITEMS,
   ITEM_IDS,
+  PRICES,
   MANDATORY_CATEGORIES,
   RARITIES,
   STARTER_ITEMS,
@@ -56,6 +58,20 @@ import {
   itemsOfCategory,
 } from '../packages/wish-core/src/items.ts'
 import { canBuy, priceOf, purchaseRows, shopItems } from '../packages/wish-core/src/shop.ts'
+import {
+  BOX_ODDS,
+  BOX_PRICE,
+  DUPLICATE_DUST,
+  PITY_LIMIT,
+  boxOpenId,
+  boxPool,
+  boxPurchaseRow,
+  boxRarities,
+  duplicateDustId,
+  duplicateDustRow,
+  pityCount,
+  rollBox,
+} from '../packages/wish-core/src/box.ts'
 import {
   LEVEL_REWARDS,
   MAX_REWARD_LEVEL,
@@ -680,6 +696,100 @@ const claim = (date: string, missionId: string): Claim => ({
   const partial = ev({ type: 'cancel', date: '2026-09-03', wishId: 'w2', amount: 120_000 })
   assert.equal(earnedTitles(wishes, [...events, partial], '2026-09-03').includes('letgo'), false)
   console.log('통계·칭호 통과')
+}
+
+// ── 코스믹 박스 ───────────────────────────────────────
+{
+  const TYPES = ['normal', 'rare', 'premium'] as const
+
+  // 확률의 합은 1이다. 어긋나면 마지막 등급이 넘치거나 뽑히지 않는 칸이 생긴다
+  TYPES.forEach((type) => {
+    const sum = Object.values(BOX_ODDS[type]).reduce((total, value) => total + value, 0)
+    assert.ok(Math.abs(sum - 1) < 1e-9, `${type} 확률 합 ${sum}`)
+  })
+  // 희귀 확정·프리미엄에는 일반이 없다(§8). 있으면 「확정」이라는 이름이 거짓이 된다
+  assert.equal(BOX_ODDS.rare.common, 0)
+  assert.equal(BOX_ODDS.premium.common, 0)
+
+  TYPES.forEach((type) => {
+    const pool = boxPool(type)
+    assert.ok(pool.length > 0, `${type} 풀이 비었다`)
+    // 레벨·지역 전용은 일반 상자에 넣지 않는다(§8). 상점 재고만 오른다
+    pool.forEach((itemId) => assert.equal(ITEMS[itemId].source, 'shop', `상자 풀에 든 ${itemId}`))
+    // 확률이 0인 등급은 풀에도 없어야 한다 — 뽑을 수 없는 아이템이 목록에 뜬다
+    const allowed = boxRarities(type)
+    pool.forEach((itemId) => assert.ok(allowed.includes(ITEMS[itemId].rarity), `못 뽑는 등급 ${itemId}`))
+    // 확률이 있는 등급은 뽑을 아이템이 있어야 한다. 비면 다른 등급으로 미끄러진다
+    allowed.forEach((rarity) => {
+      assert.ok(pool.some((itemId) => ITEMS[itemId].rarity === rarity), `${type} ${rarity} 후보 없음`)
+    })
+  })
+
+  // 중복 전환은 §7 가격의 1/4이다. 둘이 갈라지면 「사는 것보다 중복이 낫다」가 된다
+  assert.equal(DUPLICATE_DUST.common, PRICES.common / 4)
+  assert.equal(DUPLICATE_DUST.rare, PRICES.rare / 4)
+  assert.equal(DUPLICATE_DUST.epic, PRICES.epic / 4)
+
+  // 상점에 오르는 상자는 일반뿐이다. 희귀 확정·프리미엄에 값이 붙으면 Lv.14·20
+  // 보상이 「사면 그만인 것」이 된다
+  assert.ok((BOX_PRICE.normal ?? 0) > 0)
+  assert.equal(BOX_PRICE.rare, undefined)
+  assert.equal(BOX_PRICE.premium, undefined)
+
+  const all = new Set<string>(boxPool('normal'))
+
+  // 미보유가 남아 있으면 중복은 나오지 않는다(§8 미보유 우선)
+  for (let seed = 0; seed < 200; seed += 1) {
+    const result = rollBox('normal', new Set(['ring-debris']), 0, rng(seed))
+    assert.equal(result.duplicate, false, `씨앗 ${seed}에서 이른 중복`)
+    assert.equal(result.duplicateDust, 0)
+    assert.notEqual(result.itemId, 'ring-debris')
+  }
+
+  // 전부 보유했을 때만 중복이고 그때는 별가루가 나온다
+  const dup = rollBox('normal', all, 0, rng(1))
+  assert.equal(dup.duplicate, true)
+  assert.ok(dup.duplicateDust > 0)
+  assert.equal(dup.duplicateDust, DUPLICATE_DUST[ITEMS[dup.itemId].rarity])
+
+  // 천장 — 마지막 희귀 이후 PITY_LIMIT번을 굴렸으면 다음은 희귀 이상이다
+  for (let seed = 0; seed < 50; seed += 1) {
+    const forced = rollBox('normal', new Set(), PITY_LIMIT, rng(seed))
+    assert.notEqual(ITEMS[forced.itemId].rarity, 'common', `천장이 안 걸린 씨앗 ${seed}`)
+  }
+  // 희귀 확정 상자는 천장과 무관하게 언제나 희귀 이상이다
+  for (let seed = 0; seed < 50; seed += 1) {
+    assert.notEqual(ITEMS[rollBox('rare', new Set(), 0, rng(seed)).itemId].rarity, 'common')
+    assert.notEqual(ITEMS[rollBox('premium', new Set(), 0, rng(seed)).itemId].rarity, 'common')
+  }
+
+  // 같은 씨앗이면 같은 결과다. 저장 트랜잭션이 재시도돼도 아이템이 바뀌지 않는다
+  assert.deepEqual(rollBox('normal', new Set(), 0, rng(7)), rollBox('normal', new Set(), 0, rng(7)))
+
+  // 천장 횟수 — 마지막 희귀 이상 이후의 개봉 수. 개봉 순서대로 들어온다
+  assert.equal(pityCount([]), 0)
+  assert.equal(pityCount([{ itemId: 'planet-color-mint' }, { itemId: 'planet-color-coral' }]), 2)
+  assert.equal(pityCount([{ itemId: 'planet-color-mint' }, { itemId: 'ring-debris' }]), 0)
+  assert.equal(pityCount([{ itemId: 'ring-debris' }, { itemId: 'planet-color-mint' }]), 1)
+  // 카탈로그에서 사라진 아이템은 일반으로 세고 넘어간다 — 천장이 멈추면 안 된다
+  assert.equal(pityCount([{ itemId: '없는-아이템' }]), 1)
+
+  // 이름표에 시각을 섞지 않는다. 두 번 돌려도 같은 줄로 걸려야 한다
+  const openId = boxOpenId('level:16:normal:1')
+  assert.equal(openId, 'open:level:16:normal:1')
+  assert.equal(duplicateDustId(openId), 'duplicate:open:level:16:normal:1')
+  const dustRow = duplicateDustRow(openId, 60, 1_700_000_000_000)
+  assert.equal(dustRow.type, 'earn')
+  assert.equal(dustRow.sourceType, 'duplicate')
+  assert.equal(dustRow.id, duplicateDustRow(openId, 60, 0).id)
+
+  // 상자 구매는 차감 줄이고 이름표가 상자 id로 갈린다 — 같은 종류를 여러 장 산다
+  const buyRow = boxPurchaseRow('shop:normal:2', 'normal', 0)
+  assert.equal(buyRow.type, 'spend')
+  assert.equal(buyRow.amount, BOX_PRICE.normal)
+  assert.equal(buyRow.id, 'purchase:box:shop:normal:2')
+  assert.notEqual(buyRow.id, boxPurchaseRow('shop:normal:3', 'normal', 0).id)
+  console.log('코스믹 박스 통과')
 }
 
 console.log('\n모든 Wish 검산 통과')

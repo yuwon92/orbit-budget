@@ -1,13 +1,22 @@
 // orbital-wish의 유일한 쓰기 창구. 화면은 여기를 통해서만 저장한다.
 // 이벤트 추가와 savedAmount 갱신은 항상 한 트랜잭션 안에서 함께 한다 —
 // 둘이 어긋나면 진행률과 이벤트 원장이 갈라진다.
-import { canPurchase, monthlyDeposit, seedFromId } from '@orbit/wish-core/wish'
+import { canPurchase, monthlyDeposit, rng, seedFromId } from '@orbit/wish-core/wish'
 import { claimIdOf, type MissionUnit } from '@orbit/wish-core/xp'
 import { missionDustGrants, stardustBalance, type DustRow } from '@orbit/wish-core/dust'
 import { canBuy, purchaseRows, type BuyRefusal } from '@orbit/wish-core/shop'
+import {
+  boxOpenId,
+  boxPriceOf,
+  boxPurchaseRow,
+  duplicateDustRow,
+  pityCount,
+  rollBox,
+} from '@orbit/wish-core/box'
 import { LEVEL_REWARDS, isValidChoice, itemsOfLevel, levelDustId } from '@orbit/wish-core/reward'
 import { MANDATORY_CATEGORIES, STARTER_ITEMS, defaultItemFor, equipTargetOf, isMandatory } from '@orbit/wish-core/items'
-import type { Claim, OwnedBox, OwnedItem, Player, Wish, WishEvent } from '@orbit/wish-core/types'
+import type { BoxOpen, Claim, OwnedBox, OwnedItem, Player, Wish, WishEvent } from '@orbit/wish-core/types'
+import type { BoxType } from '@orbit/wish-core/reward'
 import { wishDb } from './db'
 
 const newId = () => crypto.randomUUID()
@@ -345,7 +354,7 @@ export type ClaimOutcome = 'ok' | 'claimed' | 'unknownLevel' | 'needsChoice'
  * 선택형은 고른 것이 그 레벨의 풀에 있는지 저장 창구에서 다시 확인한다 — 화면을
  * 우회해 아무 아이템이나 들어오는 것을 막는다.
  *
- * 상자는 지급만 하고 열지 않는다(§5). 개봉은 Phase 5.
+ * 상자는 지급만 하고 열지 않는다(§5). 개봉은 `openBox`가 따로 맡는다.
  */
 export async function claimLevelReward(level: number, selectedItemId?: string): Promise<ClaimOutcome> {
   const reward = LEVEL_REWARDS[level]
@@ -412,6 +421,84 @@ export async function buyItem(itemId: string): Promise<BuyOutcome> {
     }])
     return 'ok'
   })
+}
+
+export type BuyBoxOutcome = 'ok' | 'notForSale' | 'poor'
+
+/**
+ * 상자 구매. 검증 → 별가루 차감 줄 → 상자 지급이 한 트랜잭션이다(§7 구매 규칙).
+ * 아이템 구매와 달리 **같은 종류를 여러 장 살 수 있다** — 상자는 소모품이다.
+ * 그래서 재구매를 막는 「이미 보유」 검사가 없고, 이름표는 상자 id로 갈린다.
+ *
+ * 상자 id 순번은 이미 산 상자 수에서 뽑고 `add`로 넣는다. 순번이 겹치면 조용히
+ * 덮어쓰는 대신 트랜잭션이 통째로 되돌아가 별가루도 함께 살아난다.
+ */
+export async function buyBox(type: BoxType): Promise<BuyBoxOutcome> {
+  const price = boxPriceOf(type)
+  if (price === undefined || price <= 0) return 'notForSale'
+  return wishDb.transaction('rw', wishDb.dustLedger, wishDb.boxes, async () => {
+    // 화면이 들고 있던 잔액을 믿지 않는다. 상점 구매와 같은 이유다
+    const balance = stardustBalance(await wishDb.dustLedger.toArray())
+    if (balance < price) return 'poor'
+    const bought = (await wishDb.boxes.toArray()).filter((row) => row.boxId.startsWith('shop:'))
+    const boxId = `shop:${type}:${bought.length + 1}`
+    const row = boxPurchaseRow(boxId, type, Date.now())
+    await addDustRows([row])
+    await wishDb.boxes.add({ boxId, type, acquiredAt: row.createdAt, openedAt: null })
+    return 'ok'
+  })
+}
+
+export type OpenBoxResult =
+  | { status: 'ok' | 'already'; open: BoxOpen }
+  | { status: 'missing' }
+
+/**
+ * 상자 개봉. **결과를 DB에 먼저 확정하고 연출은 그 뒤다**(§8). 개봉 도중 앱이
+ * 꺼져도 `boxOpens`에 결과가 남아 다시 들어오면 같은 아이템이 나온다.
+ *
+ * 추첨을 화면이 아니라 여기서 돌린다 — 미보유 목록과 천장 횟수를 트랜잭션 안에서
+ * 다시 읽어야 한다. 화면을 그린 뒤 다른 탭에서 아이템을 샀으면 「이미 가진 것」을
+ * 미보유로 알고 뽑는다. 상점 구매가 잔액을 다시 합산하는 것과 같은 이유다.
+ *
+ * 난수 씨앗은 상자 id다. 트랜잭션이 재시도돼도 같은 결과가 나오고, 이미 열린
+ * 상자는 저장된 기록을 그대로 돌려준다.
+ */
+export async function openBox(boxId: string): Promise<OpenBoxResult> {
+  return wishDb.transaction(
+    'rw',
+    wishDb.boxes, wishDb.boxOpens, wishDb.ownedItems, wishDb.dustLedger,
+    async () => {
+      const box = await wishDb.boxes.get(boxId)
+      if (!box) return { status: 'missing' as const }
+      const id = boxOpenId(boxId)
+      // 이미 연 상자면 저장된 결과를 그대로 돌려준다. 연출만 다시 재생하면 된다
+      const existing = await wishDb.boxOpens.get(id)
+      if (existing) return { status: 'already' as const, open: existing }
+
+      const owned = new Set((await wishDb.ownedItems.toArray()).map((row) => row.itemId))
+      const opens = (await wishDb.boxOpens.toArray()).sort((a, b) => a.openedAt - b.openedAt)
+      const result = rollBox(box.type, owned, pityCount(opens), rng(seedFromId(boxId)))
+
+      const now = Date.now()
+      const open: BoxOpen = {
+        id,
+        boxId,
+        itemId: result.itemId,
+        duplicate: result.duplicate,
+        duplicateDust: result.duplicateDust,
+        openedAt: now,
+      }
+      await wishDb.boxOpens.add(open)
+      await wishDb.boxes.update(boxId, { openedAt: now })
+      if (result.duplicate) {
+        await addDustRows([duplicateDustRow(id, result.duplicateDust, now)])
+      } else {
+        await addOwnedItems([{ itemId: result.itemId, acquiredAt: now, sourceType: 'box', sourceId: id }])
+      }
+      return { status: 'ok' as const, open }
+    },
+  )
 }
 
 /**

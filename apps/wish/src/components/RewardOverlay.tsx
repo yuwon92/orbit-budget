@@ -1,12 +1,27 @@
 import { useEffect, useRef, type CSSProperties } from 'react'
+import type { ItemId, Rarity } from '@orbit/wish-core/items'
 import { PixelPlanet } from './PixelPlanet'
 import { pad2 } from '../lib/format'
+import { RARITY_LABELS } from '../lib/items'
+import { previewProps, type EquippedItems } from '../lib/preview'
 
 export type Reward =
   | { kind: 'levelup'; from: number; to: number; title: string; unlock: string | null }
   | { kind: 'complete'; name: string; seed: number; xp: number; date: string }
   | { kind: 'title'; name: string; detail: string; icon: string }
   | { kind: 'levelReward'; level: number; dust: number; itemName?: string }
+  /** 상자 개봉. 결과는 이미 저장됐고 여기서는 보여 주기만 한다(§8) */
+  | {
+      kind: 'box'
+      boxName: string
+      itemId: ItemId
+      itemName: string
+      rarity: Rarity
+      /** 지금 장착 상태. 뽑힌 아이템만 갈아 끼워 그린다 */
+      items: EquippedItems
+      duplicate: boolean
+      dust: number
+    }
 
 /**
  * 레벨업·완주 연출. 픽셀 버스트 → 문구 → 보상 순으로 짧게 끝낸다. (가이드 12장)
@@ -50,6 +65,18 @@ export function RewardOverlay({ reward, onClose }: { reward: Reward; onClose: ()
           <p className="reward-jump"><span className="to">LV {pad2(reward.level)}</span></p>
           <p className="reward-sub">+{reward.dust.toLocaleString('ko-KR')} 별가루</p>
           {reward.itemName && <p className="reward-unlock">{reward.itemName} 획득</p>}
+        </div>
+      ) : reward.kind === 'box' ? (
+        <div className="reward-body">
+          <PixelPlanet {...previewProps(reward.items, reward.itemId, 132)} />
+          <p className="reward-title compact">{reward.duplicate ? 'DUPLICATE' : 'BOX OPENED'}</p>
+          <p className="reward-jump"><span className="to">{reward.itemName}</span></p>
+          <p className="reward-sub">{reward.boxName} · {RARITY_LABELS[reward.rarity]}</p>
+          <p className="reward-unlock">
+            {reward.duplicate
+              ? `이미 보유 · 별가루 +${reward.dust.toLocaleString('ko-KR')}`
+              : '꾸미기에 추가'}
+          </p>
         </div>
       ) : reward.kind === 'title' ? (
         <div className="reward-body">

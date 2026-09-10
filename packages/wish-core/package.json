@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "exports": {
+    "./box": "./src/box.ts",
     "./dust": "./src/dust.ts",
     "./items": "./src/items.ts",
     "./reward": "./src/reward.ts",

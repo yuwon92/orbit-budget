@@ -1406,6 +1406,10 @@ ul { padding: 0; list-style: none; }
   pointer-events: none;
 }
 
+/* 패널 바로 밑에 오는 분류 탭. .panel은 아래 여백이 없어서 그냥 두면 알약이
+   패널 테두리에 붙어 겹쳐 보인다 — 상점의 상자 패널 다음이 그 자리다 */
+.panel + .category-tabs { margin-top: 16px; }
+
 .category-tabs {
   margin-bottom: 12px;
   padding-bottom: 2px;
@@ -1497,6 +1501,38 @@ ul { padding: 0; list-style: none; }
 .shop-balance > span:last-child { font-size: 11px; color: var(--text-tertiary); }
 
 .shop-empty { padding: 18px 0; font-size: 12px; color: var(--text-tertiary); text-align: center; }
+
+/* ── 상자 ──────────────────────────────────────────── */
+
+.box-list { display: grid; gap: 10px; }
+.box-card {
+  padding: 13px 14px 14px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  display: grid;
+  gap: 10px;
+  background: var(--surface);
+}
+.box-card-head { display: flex; align-items: center; gap: 10px; }
+.box-card-head > div { display: grid; gap: 2px; }
+.box-card-head strong { font-size: 14px; }
+.box-card-head span { font-size: 11px; color: var(--text-tertiary); }
+.box-icon { font-family: var(--font-emoji); font-variant-emoji: emoji; font-size: 26px; line-height: 1; }
+.box-count { margin-left: auto; font-size: 11px; font-variant-numeric: tabular-nums; }
+
+/* 확률은 늘 펼쳐 둔다(§8). 등급 구분은 색 점 하나 — 글자에 바탕색을 깔지 않는다 */
+.box-odds { display: grid; gap: 5px; }
+.box-odds li { display: flex; align-items: center; gap: 7px; font-size: 11px; }
+.box-odds i { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
+.box-odds > li > span { flex: 0 0 34px; color: var(--text-secondary); }
+.box-odds strong { font-variant-numeric: tabular-nums; }
+.box-odds small { margin-left: auto; color: var(--text-tertiary); }
+
+.box-pity { font-size: 11px; color: var(--text-tertiary); }
+
+/* 열기와 구매가 함께 있는 카드는 두 칸으로 나눈다. 하나뿐이면 그대로 폭을 다 쓴다 */
+.box-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+.box-buy-note { font-size: 11px; color: var(--text-tertiary); text-align: center; }
 
 /* 살 수 없는 가격은 색으로만 구분한다. 글자에 바탕색을 깔지 않는다 */
 .item-cell small.short { color: var(--danger); }

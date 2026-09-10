@@ -29,17 +29,17 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `apps/orbit/src/lib/hooks.ts` | `useCategories()` (sortOrder 정렬) |
 | `apps/orbit/src/index.css` | Orbit 전역 CSS 한 파일. 클래스명 기반 |
 | `apps/wish/src/App.tsx` | Wish 셸 — 탭·테마·시트·저장소 구독. 화면은 갖지 않음 |
-| `apps/wish/src/screens/` | 탭 화면 4개 — `HubScreen`(오르빗 허브)/`QuestScreen`(퀘스트 로그)/`CodexScreen`(우주 도감)/`ObservatoryScreen`(관측소). 관측소 하위 화면도 여기 |
+| `apps/wish/src/screens/` | 탭 화면 4개 — `HubScreen`(오르빗 허브)/`QuestScreen`(퀘스트 로그)/`CodexScreen`(우주 도감)/`ObservatoryScreen`(관측소). 관측소 하위 화면(레벨 보상·꾸미기·상점·설정)도 여기 |
 | `apps/wish/src/missions.ts` | 오늘의 미션 문구·상태. 앱 고유 개념이라 wish-core에 두지 않음 |
 | `apps/wish/src/planet.ts` | 픽셀 행성 블록 생성. 진행률 → 티끌·위성·행성·고리·위성대·성계 + 표면 무늬 3종 |
 | `apps/wish/src/cosmetics.ts` | 꾸미기 그리기 값 — 색상 팔레트·링 타원·픽셀 좌표·효과 애니메이션 갈래. id는 카탈로그의 아이템 id와 같은 값 |
 | `apps/wish/src/cosmeticBlocks.ts` | 꾸미기 데이터를 SVG `rect` 블록으로 변환하고 seed 기반 결정적 배치를 만드는 렌더러 |
 | `apps/wish/src/lib/labels.ts` | 단계 이름·칭호 문구·도감 칸 수 |
 | `apps/wish/src/lib/items.ts` | 아이템·카테고리·희귀도·획득처 한국어 카피 + 희귀도 색 점 |
-| `apps/wish/src/lib/rewards.ts` | 레벨 보상 이름·상자 이름·한 줄 요약 + 아이템 → 레벨 역인덱스(`levelOfItem`) |
+| `apps/wish/src/lib/rewards.ts` | 레벨 보상 이름·상자 이름과 설명·한 줄 요약 + 아이템 → 레벨 역인덱스(`levelOfItem`) |
 | `apps/wish/src/lib/preview.ts` | 아이템 미리보기 인자. 꾸미기·상점·보상이 같은 그림을 쓴다 |
 | `apps/wish/src/lib/dev.ts` | 개발용 XP 가산·연출 표본. `import.meta.env.DEV` 안에서만 호출 |
-| `apps/wish/src/lib/hooks.ts` | `useWishes`/`useWishEvents`/`useClaims`/`useDustLedger`/`useOwnedItems`/`useEquipped`/`useLevelClaims`/`usePlayer`. **App에서만 구독하고 prop으로 내림** |
+| `apps/wish/src/lib/hooks.ts` | `useWishes`/`useWishEvents`/`useClaims`/`useDustLedger`/`useOwnedItems`/`useEquipped`/`useLevelClaims`/`useBoxes`/`useBoxOpens`/`usePlayer`. **App에서만 구독하고 prop으로 내림** |
 | `apps/wish/src/lib/budget.ts` | Orbit 예산 요약을 읽는 통로. 저장소가 나뉘는 환경에서는 **이 파일만 서버 조회로 교체** |
 | `apps/wish/src/lib/format.ts` | `todayString`·`formatDate`·`pad2` |
 | `apps/wish/src/components/` | `PixelPlanet`(행성·궤도 링), `UniversePreview`(장착 합성), `LevelRewardCard`(수령 카드), `PixelBar`, `OrbitMap`, `RewardOverlay`, `Sheets`(상점·꾸미기 공용 `ItemSheet`, 레벨 보상표 `LevelRoadmapSheet` 포함) |
@@ -52,6 +52,7 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `packages/wish-core/src/items.ts` | 아이템 카탈로그 — id·카테고리·희귀도·획득처·가격, 기본 아이템, 스타터 세트, 필수 자리, 장착 상태 펴기. **순수 함수만** |
 | `packages/wish-core/src/shop.ts` | 상점 목록·가격·구매 가능 판정·구매 원장 줄. **순수 함수만** |
 | `packages/wish-core/src/reward.ts` | Lv.1~20 보상표·미수령 판정·선택 유효성·다음 보상. **순수 함수만** |
+| `packages/wish-core/src/box.ts` | 상자 확률표·풀·천장 횟수·개봉 추첨(`rollBox`)·중복 전환·상자 가격. **순수 함수만. 난수를 인자로 받는다** |
 | `packages/wish-bridge/src/db.ts` | `orbital-wish` Dexie 인스턴스와 v1·v2 스키마 |
 | `packages/wish-bridge/src/index.ts` | **위시 데이터의 유일한 쓰기 창구.** 이벤트와 savedAmount를 한 트랜잭션에서 갱신 |
 | `packages/budget-core/src/types.ts` | Orbit 도메인 타입 전부 |
@@ -69,7 +70,7 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 
 Wish는 게임 허브 흐름이다. 자원 HUD 상시 노출, 오늘의 미션과 보상 수령, 퀘스트 로그·우주 도감 분리, 관측소 하위 화면은 레벨 보상·꾸미기·상점·설정. 제품 규칙과 수치는 `orbit-wish-spec.md`, 디자인은 `orbit-wish-ui-design-guide.md`(둘 다 gitignore된 로컬 문서).
 
-**관측소 진입은 제목 바로 밑 아이콘 줄(`.obs-shortcuts` — 🎨 꾸미기 · 🛒 상점 · 🔧 설정)이다.** 화면 맨 아래 목록 줄이었을 때는 꾸미기·상점이 스크롤 끝까지 내려야 보였다. 같은 곳으로 가는 문을 둘로 두지 않는다.
+**관측소 진입은 제목 바로 밑 아이콘 줄(`.obs-shortcuts` — 🎨 꾸미기 · 🛒 상점 · 🔧 설정)이다.** 미개봉 상자가 있으면 상점 칸이 잔액 대신 장수를 알린다. 화면 맨 아래 목록 줄이었을 때는 꾸미기·상점이 스크롤 끝까지 내려야 보였다. 같은 곳으로 가는 문을 둘로 두지 않는다.
 
 **관측소 하위 화면은 `.wl-content` 안에서 탭 뷰 전체를 대체한다.** 바텀시트가 아니고 하단 탭·HUD는 그대로 둔다 — 680px 이하에서 `.wl-nav`는 셸의 flex 아이템이라 숨기면 스크롤이 튄다. 상태는 `App.tsx`의 `obsSub` 하나이고, 탭 이동은 `goScreen()`을 거쳐 `obsSub`를 반드시 비운다(안 그러면 다른 탭에 갔다 돌아왔을 때 하위 화면이 그대로 뜬다). 뒤로가기는 각 화면 헤더의 `.back-button`뿐 — 라우터가 없어 브라우저·스와이프 뒤로가기는 미지원. 알려진 격차.
 
@@ -98,9 +99,21 @@ Wish는 게임 허브 흐름이다. 자원 HUD 상시 노출, 오늘의 미션�
 - **확정 보상은 `source: 'level'`, 선택형 풀은 `source: 'shop'`.** 같은 아이템이 두 레벨에 걸리면 두 번째 지급이 「이미 보유」로 조용히 사라져 사용자는 보상을 못 받은 것으로 읽는다. 검산이 중복과 획득처를 함께 막는다
 - **지난 레벨의 보상을 자동 지급하지 않는다**(§11). 고르는 보상이 섞여 있어서 대신 골라 주면 안 된다. 미수령분은 관측소 카드에 쌓아 두고 직접 받게 한다
 - **`claimLevelReward`는 수령 기록·별가루·아이템·상자를 한 트랜잭션에 넣는다.** 갈라지면 「기록만 남고 보상은 없는」 레벨이 생기고 그 레벨은 다시 받을 수 없다
-- **상자는 지급만 하고 열지 않는다**(§5). 상자 id에 순번을 넣어(`level:16:normal:2`) 두 번 시도해도 불어나지 않게 한다. 개봉은 Phase 5
+- **레벨 보상의 상자는 지급만 하고 열지 않는다**(§5). 상자 id에 순번을 넣어(`level:16:normal:2`) 두 번 시도해도 불어나지 않게 한다. 개봉은 상자 화면에서 따로 한다
 - **「다음 보상」 카드를 누르면 Lv.20까지의 보상표가 열린다**(`LevelRoadmapSheet`). 카드 하나는 바로 다음 것만 말해 줘서 지금 모으는 XP가 무엇으로 돌아오는지 그 앞이 안 보인다. 필요 XP는 `LEVEL_STEPS`의 누적값을 그대로 읽는다 — 화면이 말한 문턱과 레벨업 판정의 문턱이 어긋나면 안 된다. 지난 레벨은 넣지 않는다(받은 것은 꾸미기에 이미 있다)
 - **수령은 관측소 홈에서 한다.** `LevelRewardCard`가 홈 패널과 밀린 보상 목록 화면에 같이 들어간다. 하위 화면은 **둘 이상 밀렸을 때만**(§11 소급) 연다 — 평소 미수령은 0~1개라 화면을 옮길 이유가 없다
+
+**상자는 상점 화면 안에 있다.** 사는 곳과 여는 곳이 갈리면 「상자」를 찾아 화면을 둘 뒤져야 하고, 상자 화면을 따로 두면 미개봉이 없는 평소에는 늘 비어 있다. 상품 격자 위 `상자` 패널에 보유 상자 열기와 코스믹 박스 구매가 함께 있다.
+
+**상자는 결과를 먼저 저장하고 연출은 그 뒤다**(§8). `openBox`가 트랜잭션 안에서 추첨·저장까지 끝내고 화면은 돌려받은 결과를 보여 주기만 한다. 개봉 연출 중 앱이 꺼져도 `boxOpens`에 결과가 남고, 다시 열면 저장된 기록을 그대로 돌려준다 — 다시 뽑지 않는다.
+
+- **추첨을 화면에서 하지 않는다.** 미보유 목록과 천장 횟수를 트랜잭션 안에서 다시 읽어야 한다 — 화면을 그린 뒤 다른 탭에서 아이템을 샀으면 이미 가진 것을 미보유로 알고 뽑는다. 상점이 잔액을 다시 합산하는 것과 같은 이유
+- **난수는 `rollBox`의 인자다.** 씨앗은 상자 id(`rng(seedFromId(boxId))`) — 트랜잭션이 재시도돼도 같은 아이템이 나온다. 안에서 `Math.random`을 부르면 화면이 본 것과 저장된 것이 갈라진다
+- **미보유가 하나라도 남아 있으면 중복은 나오지 않는다.** 뽑힌 등급에 미보유가 없으면 높은 등급부터 옮겨 간다 — 낮은 쪽으로 미끄러지면 열수록 손해가 된다. 전부 보유했을 때만 중복이고 그때는 §7 가격의 1/4을 별가루로 준다(`DUPLICATE_DUST`, 검산이 비율을 지킨다)
+- **상자 풀은 `source: 'shop'`뿐이다**(§8 「레벨·지역 전용은 일반 상자에 넣지 않는다」). 전설은 전 상자 확률 0 — 상자에 넣을 전설 아이템이 아직 없다. 전용 아이템이 생기면 `boxPool`의 획득처 조건과 `BOX_ODDS`의 legendary 칸을 **함께** 연다. 한쪽만 열면 뽑을 것이 없는 칸이 생겨 아래 등급으로 조용히 미끄러진다
+- **천장은 일반 상자에만 걸린다**(`PITY_LIMIT` 9 — 열 번째는 희귀 이상 확정). 희귀 확정·프리미엄은 확률표에 일반이 없어 천장이 필요 없다
+- **상자는 소모품이라 같은 종류를 여러 장 산다.** 아이템 구매와 달리 「이미 보유」 검사가 없고, 이름표는 상자 id로 갈린다(`purchase:box:shop:normal:2`). 그래서 **두 번 누르면 두 장 산다** — 아이템 구매의 「두 번째는 이미 있는 줄로 걸린다」가 여기서는 성립하지 않는다
+- **상점에 오르는 상자는 코스믹 박스뿐이다.** 희귀 확정·프리미엄에 값을 붙이면 Lv.14·20 보상이 「사면 그만인 것」이 된다
 
 **개발용 도구는 가드를 핸들러 본문 안에 둔다.** `import.meta.env.DEV ? handler : undefined`로 넘기는 자리만 접으면 핸들러 본문과 문구가 프로덕션 번들에 남는다. 본문 첫 줄에 `if (!import.meta.env.DEV) return`을 두면 `lib/dev.ts`까지 통째로 빠진다. 빌드 후 `dist/wish/assets/index-*.js`를 grep해 확인할 것 — `dist/assets/`는 Orbit 번들이다.
 

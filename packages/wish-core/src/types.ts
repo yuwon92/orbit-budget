@@ -104,6 +104,8 @@ export interface BoxOpen {
   boxId: string
   itemId: string
   duplicate: boolean
+  /** 중복 전환액. 중복이 아니면 0 — 연출을 다시 재생할 때 이 값을 읽는다 */
+  duplicateDust: number
   openedAt: number
 }
 

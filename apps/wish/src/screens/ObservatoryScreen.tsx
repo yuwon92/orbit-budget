@@ -3,7 +3,8 @@ import { money } from '@orbit/budget-core/format'
 import { earnedTitles, levelFromXp, observerStats } from '@orbit/wish-core/xp'
 import { MAX_REWARD_LEVEL, nextMajorReward } from '@orbit/wish-core/reward'
 import { ITEM_IDS, equippedMap, type ItemCategory, type ItemId } from '@orbit/wish-core/items'
-import type { Equipped, OwnedItem } from '@orbit/wish-core/types'
+import type { BoxOpen, Equipped, OwnedBox, OwnedItem } from '@orbit/wish-core/types'
+import type { BoxType } from '@orbit/wish-core/reward'
 import { LevelRewardCard } from '../components/LevelRewardCard'
 import { LevelRoadmapSheet } from '../components/Sheets'
 import { UniversePreview } from '../components/UniversePreview'
@@ -27,6 +28,7 @@ export type ObsSub = 'rewards' | 'decorate' | 'shop' | 'settings' | null
 export function ObservatoryScreen({
   level, totalXp, pendingXp, stats, titles, budget, dark, onThemeChange,
   owned, equipped, onEquip, onUnequip, stardust, onBuy,
+  boxes, boxOpens, onOpenBox, onBuyBox,
   unclaimedRewards, onClaimReward, sub, onSub, ...dev
 }: {
   level: ReturnType<typeof levelFromXp>
@@ -43,6 +45,10 @@ export function ObservatoryScreen({
   onUnequip: (category: ItemCategory) => void
   stardust: number
   onBuy: (itemId: ItemId) => void
+  boxes: OwnedBox[]
+  boxOpens: BoxOpen[]
+  onOpenBox: (boxId: string) => void
+  onBuyBox: (type: BoxType) => void
   unclaimedRewards: number[]
   onClaimReward: (level: number, selectedItemId?: ItemId) => void
   sub: ObsSub
@@ -87,6 +93,10 @@ export function ObservatoryScreen({
         onBuy={onBuy}
         onEquip={onEquip}
         onUnequip={onUnequip}
+        boxes={boxes}
+        boxOpens={boxOpens}
+        onOpenBox={onOpenBox}
+        onBuyBox={onBuyBox}
         onDecorate={() => onSub('decorate')}
         back={() => onSub(null)}
       />
@@ -108,6 +118,7 @@ export function ObservatoryScreen({
   const upcoming = nextMajorReward(level.level)
   const nextClaim = unclaimedRewards[0]
   const items = equippedMap(equipped)
+  const unopenedBoxes = boxes.filter((box) => box.openedAt === null).length
 
   return (
     <main className="observatory-screen">
@@ -124,10 +135,16 @@ export function ObservatoryScreen({
           <strong>꾸미기</strong>
           <small>보유 {owned.length} / {ITEM_IDS.length}</small>
         </button>
+        {/* 상자도 상점 안에 있다. 미개봉이 있으면 잔액 대신 그것부터 알린다 —
+            같은 곳으로 가는 문을 둘로 두지 않는다 */}
         <button onClick={() => onSub('shop')}>
           <span className="obs-shortcut-icon" aria-hidden="true">🛒</span>
           <strong>상점</strong>
-          <small>별가루 {stardust.toLocaleString('ko-KR')}</small>
+          <small>
+            {unopenedBoxes
+              ? `미개봉 상자 ${unopenedBoxes}장`
+              : `별가루 ${stardust.toLocaleString('ko-KR')}`}
+          </small>
         </button>
         <button onClick={() => onSub('settings')}>
           <span className="obs-shortcut-icon" aria-hidden="true">🔧</span>

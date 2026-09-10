@@ -18,7 +18,7 @@ export interface LevelReward {
   fixed?: ItemId[]
   /** 사용자가 하나를 고른다. 고르는 순간 수령 처리(§5) */
   choice?: { of: ItemId[] }
-  /** 상자·티켓. 지급 시점과 개봉 시점을 나눈다(§5). 개봉은 Phase 5 */
+  /** 상자·티켓. 지급 시점과 개봉 시점을 나눈다(§5). 개봉 추첨은 `box.ts` */
   boxes?: { type: BoxType; count: number }[]
   /** 표시용. 실제 판정은 slotCount가 한다 */
   slot?: number

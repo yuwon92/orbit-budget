@@ -24,8 +24,8 @@ import {
   missionDustRows,
   stardustBalance,
 } from '@orbit/wish-core/dust'
-import type { ItemCategory, ItemId } from '@orbit/wish-core/items'
-import { LEVEL_REWARDS, unclaimedLevels } from '@orbit/wish-core/reward'
+import { ITEMS, equippedMap, type ItemCategory, type ItemId } from '@orbit/wish-core/items'
+import { LEVEL_REWARDS, unclaimedLevels, type BoxType } from '@orbit/wish-core/reward'
 import type { Wish, WishEvent } from '@orbit/wish-core/types'
 import {
   chooseWait,
@@ -34,6 +34,7 @@ import {
   claimAll as claimAllWrite,
   claimMission,
   createWish,
+  buyBox,
   buyItem,
   claimLevelReward,
   deposit,
@@ -42,6 +43,7 @@ import {
   grantDust,
   markCelebratedLevel,
   markCelebratedTitles,
+  openBox,
   purchaseWish,
   recordWaitDay,
   skipDay,
@@ -60,11 +62,12 @@ import { ObservatoryScreen, type ObsSub } from './screens/ObservatoryScreen'
 import { buildMissions, type Mission } from './missions'
 import { TITLES } from './lib/labels'
 import { pad2, todayString } from './lib/format'
-import { ITEM_LABELS } from './lib/items'
-import { titleOfLevel } from './lib/rewards'
+import { ITEM_LABELS, RARITY_LABELS } from './lib/items'
+import { BOX_LABELS, titleOfLevel } from './lib/rewards'
 import { SAMPLE_REWARDS, readDevXp, writeDevXp } from './lib/dev'
 import {
-  useClaims, useDustLedger, useEquipped, useLevelClaims, useOwnedItems, usePlayer, useWishEvents, useWishes,
+  useBoxOpens, useBoxes, useClaims, useDustLedger, useEquipped, useLevelClaims, useOwnedItems,
+  usePlayer, useWishEvents, useWishes,
 } from './lib/hooks'
 import { loadBudgetView, type BudgetView } from './lib/budget'
 
@@ -119,11 +122,14 @@ export default function App() {
   const storedOwned = useOwnedItems()
   const storedEquipped = useEquipped()
   const storedLevelClaims = useLevelClaims()
+  const storedBoxes = useBoxes()
+  const storedBoxOpens = useBoxOpens()
   const player = usePlayer()
   const loaded =
     storedWishes !== undefined && storedEvents !== undefined && storedClaims !== undefined
     && storedDust !== undefined && storedOwned !== undefined && storedEquipped !== undefined
-    && storedLevelClaims !== undefined && player !== undefined
+    && storedLevelClaims !== undefined && storedBoxes !== undefined && storedBoxOpens !== undefined
+    && player !== undefined
   const wishes = useMemo(() => storedWishes ?? [], [storedWishes])
   const events = useMemo(() => storedEvents ?? [], [storedEvents])
   const claims = useMemo(() => storedClaims ?? [], [storedClaims])
@@ -131,6 +137,8 @@ export default function App() {
   const owned = useMemo(() => storedOwned ?? [], [storedOwned])
   const equipped = useMemo(() => storedEquipped ?? [], [storedEquipped])
   const levelClaims = useMemo(() => storedLevelClaims ?? [], [storedLevelClaims])
+  const boxes = useMemo(() => storedBoxes ?? [], [storedBoxes])
+  const boxOpens = useMemo(() => storedBoxOpens ?? [], [storedBoxOpens])
 
   const [activeId, setActiveId] = useState<string | null>(null)
 
@@ -284,6 +292,41 @@ export default function App() {
   const active = orbitWishes.find((wish) => wish.id === activeId) ?? orbitWishes[0] ?? null
 
   const pushReward = useCallback((next: Reward) => setRewards((current) => [...current, next]), [])
+
+  /**
+   * 상자 개봉. 추첨과 저장은 쓰기 창구가 트랜잭션 안에서 끝내고, 여기서는 돌려받은
+   * 결과를 연출로만 보여 준다(§8 「결과를 먼저 확정하고 연출은 그 뒤」).
+   *
+   * `already`도 같은 연출을 태운다 — 개봉 도중 앱이 꺼졌다가 다시 눌렀을 때 저장된
+   * 결과가 그대로 나오는 경로다. 다시 뽑지 않는다.
+   */
+  const handleOpenBox = useCallback((boxId: string) => {
+    void openBox(boxId).then((outcome) => {
+      if (outcome.status === 'missing') return setToast('없는 상자')
+      const { open } = outcome
+      const itemId = open.itemId as ItemId
+      const box = boxes.find((row) => row.boxId === boxId)
+      pushReward({
+        kind: 'box',
+        boxName: box ? BOX_LABELS[box.type] : '상자',
+        itemId,
+        itemName: ITEM_LABELS[itemId]?.name ?? itemId,
+        // 카탈로그에서 빠진 아이템의 지난 기록을 다시 재생할 수 있다. 장착 쪽이
+        // defaultItemFor로 대신 그리는 것과 같은 자리다
+        rarity: ITEMS[itemId]?.rarity ?? 'common',
+        items: equippedMap(equipped),
+        duplicate: open.duplicate,
+        dust: open.duplicateDust,
+      })
+    })
+  }, [boxes, equipped, pushReward])
+
+  const handleBuyBox = useCallback((type: BoxType) => {
+    void buyBox(type).then((outcome) => {
+      if (outcome === 'ok') return setToast(`${BOX_LABELS[type]} 1장 획득`)
+      setToast(outcome === 'poor' ? '별가루 부족' : '판매하지 않는 상자')
+    })
+  }, [])
 
   // 개발용 칭호 연출은 누를 때마다 실제 칭호표 순서로 하나씩 돌려 본다.
   const previewTitleIndex = useRef(0)
@@ -546,6 +589,10 @@ export default function App() {
             onUnequip={handleUnequip}
             stardust={stardust}
             onBuy={handleBuy}
+            boxes={boxes}
+            boxOpens={boxOpens}
+            onOpenBox={handleOpenBox}
+            onBuyBox={handleBuyBox}
             onTestDust={import.meta.env.DEV ? handleTestDust : undefined}
             devXp={import.meta.env.DEV ? devXp : undefined}
             onDevXp={import.meta.env.DEV ? handleDevXp : undefined}

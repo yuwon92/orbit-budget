@@ -512,7 +512,7 @@ export function ItemSheet({ itemId, items, owned, stardust, onBuy, onEquip, onUn
               <span>
                 {level !== undefined
                   ? isChoiceItem(itemId) ? '레벨 보상에서 여러 종 중 하나로 선택' : '레벨 보상으로 확정 지급'
-                  : '상점에 오르지 않는 아이템 · 개봉 기능 준비 중'}
+                  : def.source === 'region' ? '신규 지역 해금 뒤 획득' : '상자 개봉으로 확률 획득'}
               </span>
             </p>
           )}
