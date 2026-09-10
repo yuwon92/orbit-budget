@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { money } from '@orbit/budget-core/format'
 import { CATEGORIES, ITEMS, equippedMap, type ItemCategory, type ItemId } from '@orbit/wish-core/items'
 import { shopItems } from '@orbit/wish-core/shop'
@@ -12,11 +12,12 @@ import { previewProps } from '../lib/preview'
 type Filter = ItemCategory | 'all'
 
 /** 관측소 하위 화면. 탭 뷰 전체를 대체하고 하단 탭은 그대로 둔다 */
-export function ShopScreen({ owned, equipped, stardust, onBuy, back }: {
+export function ShopScreen({ owned, equipped, stardust, onBuy, onDecorate, back }: {
   owned: OwnedItem[]
   equipped: Equipped[]
   stardust: number
   onBuy: (itemId: ItemId) => void
+  onDecorate: () => void
   back: () => void
 }) {
   const [filter, setFilter] = useState<Filter>('all')
@@ -28,7 +29,10 @@ export function ShopScreen({ owned, equipped, stardust, onBuy, back }: {
   return (
     <main className="obs-sub">
       <header className="screen-head">
-        <button className="back-button" onClick={back}><ChevronLeft size={15} /> 관측소</button>
+        <div className="sub-head-row">
+          <button className="back-button" onClick={back}><ChevronLeft size={15} /> 관측소</button>
+          <button className="ghost-button" onClick={onDecorate}>꾸미기 <ChevronRight size={13} /></button>
+        </div>
         <span className="pixel-label">SHOP</span>
         <h1>상점</h1>
       </header>

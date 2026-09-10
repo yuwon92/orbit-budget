@@ -1,4 +1,5 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Clock3, Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react'
 import { money } from '@orbit/budget-core/format'
 import type { ReleasedLeftover } from '@orbit/budget-core/budget'
@@ -8,6 +9,18 @@ import { addDays, canPurchase, daysBetween, purchaseUnlockDate, remainingDays } 
 import type { Wish } from '@orbit/wish-core/types'
 import { useSheetFocus, useSheetViewport } from '../lib/sheet'
 import { PixelPlanet } from './PixelPlanet'
+
+/**
+ * 시트 껍데기. 시트를 `document.body`로 올린다.
+ *
+ * `.wl-content`가 `position: relative; z-index: 1`이라 쌓임 맥락을 만든다. 그 안에서
+ * 연 시트는 `z-index: 60`을 줘도 그 맥락 안에서만 60이라, 바깥의 `.wl-hud`(20)보다
+ * 아래로 깔린다 — 뒷면을 덮는 어두운 막이 HUD만 비껴가 자유비용·별가루 줄이 혼자
+ * 밝게 남았다. App.tsx가 직접 여는 시트들은 `.wl-content` 바깥이라 원래 멀쩡했다.
+ */
+function SheetPortal({ children }: { children: ReactNode }) {
+  return createPortal(children, document.body)
+}
 
 /** 미션 수행 시트. 하루 몫이 프리필된 상태로 열린다. */
 export function CollectSheet({ wishName, dailyShare, availableAmount, onClose, onCollect, onSkip }: {
@@ -437,6 +450,7 @@ export function PurchaseSheet({ name, detail, price, balance, planet, onClose, o
   const poor = after < 0
 
   return (
+    <SheetPortal>
     <div className="sheet-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="wl-sheet" role="dialog" aria-modal="true" aria-labelledby="purchase-title">
         <div className="sheet-handle" />
@@ -465,5 +479,6 @@ export function PurchaseSheet({ name, detail, price, balance, planet, onClose, o
         <button className="quiet-button full" onClick={onClose}>그만두기</button>
       </section>
     </div>
+    </SheetPortal>
   )
 }

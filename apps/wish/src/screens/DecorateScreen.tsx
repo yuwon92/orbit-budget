@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   CATEGORIES,
   ITEMS,
@@ -17,11 +17,12 @@ import { CATEGORY_LABELS, ITEM_LABELS, RARITY_DOTS, RARITY_LABELS, SOURCE_LABELS
 import { PREVIEW_PROGRESS, PREVIEW_SEED, previewProps } from '../lib/preview'
 
 /** 관측소 하위 화면. 탭 뷰 전체를 대체하고 하단 탭은 그대로 둔다 */
-export function DecorateScreen({ owned, equipped, onEquip, onUnequip, back }: {
+export function DecorateScreen({ owned, equipped, onEquip, onUnequip, onShop, back }: {
   owned: OwnedItem[]
   equipped: Equipped[]
   onEquip: (category: ItemCategory, itemId: ItemId) => void
   onUnequip: (category: ItemCategory) => void
+  onShop: () => void
   back: () => void
 }) {
   const [category, setCategory] = useState<ItemCategory>('planetColor')
@@ -36,7 +37,10 @@ export function DecorateScreen({ owned, equipped, onEquip, onUnequip, back }: {
   return (
     <main className="obs-sub">
       <header className="screen-head">
-        <button className="back-button" onClick={back}><ChevronLeft size={15} /> 관측소</button>
+        <div className="sub-head-row">
+          <button className="back-button" onClick={back}><ChevronLeft size={15} /> 관측소</button>
+          <button className="ghost-button" onClick={onShop}>상점 <ChevronRight size={13} /></button>
+        </div>
         <span className="pixel-label">DECORATE</span>
         <h1>꾸미기</h1>
       </header>

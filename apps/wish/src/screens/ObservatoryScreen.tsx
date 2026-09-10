@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import { ChevronRight } from 'lucide-react'
 import { money } from '@orbit/budget-core/format'
 import { earnedTitles, levelFromXp, observerStats } from '@orbit/wish-core/xp'
 import { MAX_REWARD_LEVEL, nextMajorReward } from '@orbit/wish-core/reward'
-import { equippedMap, type ItemCategory, type ItemId } from '@orbit/wish-core/items'
+import { ITEM_IDS, equippedMap, type ItemCategory, type ItemId } from '@orbit/wish-core/items'
 import type { Equipped, OwnedItem } from '@orbit/wish-core/types'
 import { LevelRewardCard } from '../components/LevelRewardCard'
 import { UniversePreview } from '../components/UniversePreview'
@@ -69,6 +68,7 @@ export function ObservatoryScreen({
         equipped={equipped}
         onEquip={onEquip}
         onUnequip={onUnequip}
+        onShop={() => onSub('shop')}
         back={() => onSub(null)}
       />
     )
@@ -80,6 +80,7 @@ export function ObservatoryScreen({
         equipped={equipped}
         stardust={stardust}
         onBuy={onBuy}
+        onDecorate={() => onSub('decorate')}
         back={() => onSub(null)}
       />
     )
@@ -107,6 +108,26 @@ export function ObservatoryScreen({
         <span className="pixel-label">OBSERVATORY</span>
         <h1>관측소 Lv.{pad2(level.level)}</h1>
       </header>
+
+      {/* 꾸미기·상점은 관측소의 주 내용이라 제목 바로 밑에 둔다. 화면 맨 아래
+          목록 줄에 있을 때는 스크롤을 끝까지 내려야 보였다 */}
+      <nav className="obs-shortcuts" aria-label="관측소 바로가기">
+        <button onClick={() => onSub('decorate')}>
+          <span className="obs-shortcut-icon" aria-hidden="true">🎨</span>
+          <strong>꾸미기</strong>
+          <small>보유 {owned.length} / {ITEM_IDS.length}</small>
+        </button>
+        <button onClick={() => onSub('shop')}>
+          <span className="obs-shortcut-icon" aria-hidden="true">🛒</span>
+          <strong>상점</strong>
+          <small>별가루 {stardust.toLocaleString('ko-KR')}</small>
+        </button>
+        <button onClick={() => onSub('settings')}>
+          <span className="obs-shortcut-icon" aria-hidden="true">🔧</span>
+          <strong>설정</strong>
+          <small>테마 · 예산 연결</small>
+        </button>
+      </nav>
 
       <section className="panel">
         <div className="panel-head"><div><span className="pixel-label">MY UNIVERSE</span><h2>나의 우주</h2></div></div>
@@ -201,26 +222,6 @@ export function ObservatoryScreen({
         </div>
       </section>
 
-      <ul className="obs-links">
-        <li>
-          <button onClick={() => onSub('decorate')}>
-            <span><strong>꾸미기</strong><small>행성 색 · 무늬 · 링 · 배경 · 동료 · 효과</small></span>
-            <ChevronRight size={17} />
-          </button>
-        </li>
-        <li>
-          <button onClick={() => onSub('shop')}>
-            <span><strong>상점</strong><small>별가루 {stardust.toLocaleString('ko-KR')} · 꾸미기 아이템 구매</small></span>
-            <ChevronRight size={17} />
-          </button>
-        </li>
-        <li>
-          <button onClick={() => onSub('settings')}>
-            <span><strong>설정</strong><small>화면 테마 · 예산 연결</small></span>
-            <ChevronRight size={17} />
-          </button>
-        </li>
-      </ul>
     </main>
   )
 }

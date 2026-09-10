@@ -36,19 +36,22 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `apps/wish/src/cosmeticBlocks.ts` | 꾸미기 데이터를 SVG `rect` 블록으로 변환하고 seed 기반 결정적 배치를 만드는 렌더러 |
 | `apps/wish/src/lib/labels.ts` | 단계 이름·칭호 문구·도감 칸 수 |
 | `apps/wish/src/lib/items.ts` | 아이템·카테고리·희귀도·획득처 한국어 카피 + 희귀도 색 점 |
-| `apps/wish/src/lib/hooks.ts` | `useWishes`/`useWishEvents`/`useClaims`/`useDustLedger`/`useOwnedItems`/`useEquipped`/`usePlayer`. **App에서만 구독하고 prop으로 내림** |
+| `apps/wish/src/lib/rewards.ts` | 레벨 보상 이름·상자 이름·한 줄 요약 |
+| `apps/wish/src/lib/preview.ts` | 아이템 미리보기 인자. 꾸미기·상점·보상이 같은 그림을 쓴다 |
+| `apps/wish/src/lib/dev.ts` | 개발용 XP 가산·연출 표본. `import.meta.env.DEV` 안에서만 호출 |
+| `apps/wish/src/lib/hooks.ts` | `useWishes`/`useWishEvents`/`useClaims`/`useDustLedger`/`useOwnedItems`/`useEquipped`/`useLevelClaims`/`usePlayer`. **App에서만 구독하고 prop으로 내림** |
 | `apps/wish/src/lib/budget.ts` | Orbit 예산 요약을 읽는 통로. 저장소가 나뉘는 환경에서는 **이 파일만 서버 조회로 교체** |
 | `apps/wish/src/lib/format.ts` | `todayString`·`formatDate`·`pad2` |
-| `apps/wish/src/components/` | `PixelPlanet`(행성·궤도 링), `UniversePreview`(장착 합성), `PixelBar`, `OrbitMap`, `RewardOverlay`, `Sheets`(구매 확인 시트 포함) |
+| `apps/wish/src/components/` | `PixelPlanet`(행성·궤도 링), `UniversePreview`(장착 합성), `LevelRewardCard`(수령 카드), `PixelBar`, `OrbitMap`, `RewardOverlay`, `Sheets`(구매 확인 시트 포함) |
 | `apps/wish/src/components/PlanetCosmeticsPreview.tsx` | 꾸미기 프리셋 개발용 비교 화면. `npm run dev` → `/apps/wish/?cosmetics-preview`. 프로덕션 번들에서는 트리셰이킹으로 빠진다 |
 | `apps/wish/src/index.css` | Wish 전역 CSS 한 파일. 밝은 노랑 우주 |
 | `packages/wish-core/src/types.ts` | Wish·WishEvent·Claim·Player 타입 |
 | `packages/wish-core/src/wish.ts` | 하루 몫·남은 일수·하루 판정·월 저금 합계·구매 잠금. **순수 함수만** |
-| `packages/wish-core/src/xp.ts` | XP 배점표·Lv.20 곡선·미션 수령 단위·연속 기록·통계·칭호. **순수 함수만** |
+| `packages/wish-core/src/xp.ts` | XP 배점표·Lv.20 곡선·슬롯 판정·미션 수령 단위·연속 기록·통계·칭호. **순수 함수만**. 해금표(`UNLOCKS`)는 보상표로 합쳐 없앴다 |
 | `packages/wish-core/src/dust.ts` | 별가루 배점표·원장 합계·지급 이름표 생성. **순수 함수만** |
 | `packages/wish-core/src/items.ts` | 아이템 카탈로그 — id·카테고리·희귀도·획득처·가격, 기본 아이템, 스타터 세트, 장착 상태 펴기. **순수 함수만** |
 | `packages/wish-core/src/shop.ts` | 상점 목록·가격·구매 가능 판정·구매 원장 줄. **순수 함수만** |
-| `packages/wish-core/src/reward.ts` | 레벨 보상 미수령 판정. **순수 함수만** |
+| `packages/wish-core/src/reward.ts` | Lv.1~20 보상표·미수령 판정·선택 유효성·다음 보상. **순수 함수만** |
 | `packages/wish-bridge/src/db.ts` | `orbital-wish` Dexie 인스턴스와 v1·v2 스키마 |
 | `packages/wish-bridge/src/index.ts` | **위시 데이터의 유일한 쓰기 창구.** 이벤트와 savedAmount를 한 트랜잭션에서 갱신 |
 | `packages/budget-core/src/types.ts` | Orbit 도메인 타입 전부 |
@@ -64,7 +67,9 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 
 **설치되는 PWA는 하나다.** iOS가 홈 화면 앱마다 저장소를 나누기 때문에, 아이콘을 두 개 만들면 Wish가 Orbit 예산을 읽지 못한다(기기 확인 완료). manifest·서비스 워커는 `apps/orbit`에만 있고 Wish는 같은 앱의 `/wish/` 화면이다. 코드베이스는 그대로 분리돼 있어 나중에 도메인을 나눌 때 manifest만 되살리면 된다.
 
-Wish는 게임 허브 흐름이다. 자원 HUD 상시 노출, 오늘의 미션과 보상 수령, 퀘스트 로그·우주 도감 분리, 관측소 하위 화면은 꾸미기·상점·설정. 제품 규칙과 수치는 `orbit-wish-spec.md`, 디자인은 `orbit-wish-ui-design-guide.md`(둘 다 gitignore된 로컬 문서).
+Wish는 게임 허브 흐름이다. 자원 HUD 상시 노출, 오늘의 미션과 보상 수령, 퀘스트 로그·우주 도감 분리, 관측소 하위 화면은 레벨 보상·꾸미기·상점·설정. 제품 규칙과 수치는 `orbit-wish-spec.md`, 디자인은 `orbit-wish-ui-design-guide.md`(둘 다 gitignore된 로컬 문서).
+
+**관측소 진입은 제목 바로 밑 아이콘 줄(`.obs-shortcuts` — 🎨 꾸미기 · 🛒 상점 · 🔧 설정)이다.** 화면 맨 아래 목록 줄이었을 때는 꾸미기·상점이 스크롤 끝까지 내려야 보였다. 같은 곳으로 가는 문을 둘로 두지 않는다.
 
 **관측소 하위 화면은 `.wl-content` 안에서 탭 뷰 전체를 대체한다.** 바텀시트가 아니고 하단 탭·HUD는 그대로 둔다 — 680px 이하에서 `.wl-nav`는 셸의 flex 아이템이라 숨기면 스크롤이 튄다. 상태는 `App.tsx`의 `obsSub` 하나이고, 탭 이동은 `goScreen()`을 거쳐 `obsSub`를 반드시 비운다(안 그러면 다른 탭에 갔다 돌아왔을 때 하위 화면이 그대로 뜬다). 뒤로가기는 각 화면 헤더의 `.back-button`뿐 — 라우터가 없어 브라우저·스와이프 뒤로가기는 미지원. 알려진 격차.
 
@@ -80,6 +85,19 @@ Wish는 게임 허브 흐름이다. 자원 HUD 상시 노출, 오늘의 미션�
 - **두 번 눌러도 안전한 이유** — 별가루 줄 이름표가 `purchase:buy:${itemId}`이고 `ownedItems`의 기본키가 `itemId`라 두 번째 시도는 둘 다 「이미 있음」으로 걸린다. 재구매 불가와 자연히 맞아떨어진다
 - **상점에는 `source: 'shop'`만 오른다.** 상자·레벨·지역 전용은 꾸미기 화면이 획득처와 함께 보여 준다
 - **가격은 레벨 곡선과 같은 기준 사용자로 잡는다**(하루 13.6 별가루). 둘이 다른 사용자를 가정하면 밸런스가 어긋난다. `PRICES`(`items.ts`) 한 곳에만 있다
+
+**레벨이 무엇을 열어 주는지는 `LEVEL_REWARDS` 한 곳에서만 정한다.** 예전 `UNLOCKS`는 Lv.2~8만 덮으면서 보상표와 같은 레벨에 다른 것을 약속해 헷갈렸다. 지웠고 궤도 해금 트랙은 레벨 보상 트랙이 됐다. 레벨업 축하 연출의 해금 문구도 보상표에서 뽑는다(`App.tsx`).
+
+- **슬롯 판정자는 `slotCount(level, completed)` 하나뿐이다.** `LevelReward.slot`은 목록에 글자로 보여 주는 용도다. 슬롯을 수령 기록으로 옮기면 「이미 열린 슬롯 유지」(§11)가 깨진다
+- **확정 보상은 `source: 'level'`, 선택형 풀은 `source: 'shop'`.** 같은 아이템이 두 레벨에 걸리면 두 번째 지급이 「이미 보유」로 조용히 사라져 사용자는 보상을 못 받은 것으로 읽는다. 검산이 중복과 획득처를 함께 막는다
+- **지난 레벨의 보상을 자동 지급하지 않는다**(§11). 고르는 보상이 섞여 있어서 대신 골라 주면 안 된다. 미수령분은 관측소 카드에 쌓아 두고 직접 받게 한다
+- **`claimLevelReward`는 수령 기록·별가루·아이템·상자를 한 트랜잭션에 넣는다.** 갈라지면 「기록만 남고 보상은 없는」 레벨이 생기고 그 레벨은 다시 받을 수 없다
+- **상자는 지급만 하고 열지 않는다**(§5). 상자 id에 순번을 넣어(`level:16:normal:2`) 두 번 시도해도 불어나지 않게 한다. 개봉은 Phase 5
+- **수령은 관측소 홈에서 한다.** `LevelRewardCard`가 홈 패널과 밀린 보상 목록 화면에 같이 들어간다. 하위 화면은 **둘 이상 밀렸을 때만**(§11 소급) 연다 — 평소 미수령은 0~1개라 화면을 옮길 이유가 없다
+
+**개발용 도구는 가드를 핸들러 본문 안에 둔다.** `import.meta.env.DEV ? handler : undefined`로 넘기는 자리만 접으면 핸들러 본문과 문구가 프로덕션 번들에 남는다. 본문 첫 줄에 `if (!import.meta.env.DEV) return`을 두면 `lib/dev.ts`까지 통째로 빠진다. 빌드 후 `dist/wish/assets/index-*.js`를 grep해 확인할 것 — `dist/assets/`는 Orbit 번들이다.
+
+- **XP는 저장되지 않아 「레벨을 N으로 맞추기」를 저장으로 할 수 없다.** 설정의 개발용 XP는 계산된 `totalXp`에 가산값을 얹는 방식이고, 그래서 레벨 판정·레벨업 연출·미수령 보상이 실제 경로를 그대로 탄다
 
 Wish는 Orbit 예산을 `getOrbitSnapshot()`으로 읽고, 구매 확정 때만 `createWishPurchaseTransaction()`으로 거래를 쓴다. `connected`는 DB가 열리는지가 아니라 데이터가 있는지로 판단한다 — 저장소가 분리된 환경에서는 빈 DB가 새로 만들어질 뿐이라 존재 여부로는 알 수 없다. 위시 저금은 이번 달 순저금 합계로 자유비용에서 실제 차감한다. 스냅샷의 `carryoverAmount`는 어제 끝난 예산 기간에서 자유비용으로 넘어온 잔액 합계(`releasedLeftovers`)이며, 카테고리별 내역은 `carryoverRows`에 그대로 실어 보낸다. 남은 자유비용을 넘지 않게 자른다 — 스냅샷이 이번 달 거래만 읽으므로 매달 1일은 기준일이 지난달이라 0이고 `carryoverDate`도 null이다.
 
@@ -248,6 +266,7 @@ plannedIncome: boolean  // 자유비용에 예정 수입을 넣을지. 기본 tr
 - `apps/orbit/src/index.css` 한 파일. 상단은 원본 프로토타입 CSS(한 줄에 몰아쓴 압축 형태), **하단이 기능별 오버라이드 블록**. 새 스타일은 파일 **끝에 주석 헤더와 함께 추가**하고, 기존 규칙 수정보다 오버라이드를 우선
 - 반응형 분기: 900 / 680 / 400px
 - 테마: `:root` 변수 + `:root.dark` 재정의. 색은 항상 `var(--...)`
+- **픽셀 폰트(`--font-pixel`, Mona12)를 24px 이상으로 키울 때 마침표·쉼표를 넣지 말 것.** 12px 비트맵이라 1픽셀 문장부호가 3×3 블록이 되고 글자 사이에 뜬 점처럼 보인다. 연출의 큰 글자는 `LV 01`, 11px `.pixel-label`은 `LV. 01`
 - **텍스트에 배경색 칩·하이라이트 금지.** 상태 구분은 색 점 + 부호 + 흐린 회색 텍스트
 - 음수는 `.negative` / `.over` 클래스로 `var(--danger)`
 - 카테고리 구슬(`.category-planet`)의 하이라이트는 **비율값**(25%/21.5%). 크기를 바꿔도 모양이 같아야 함
@@ -256,6 +275,7 @@ plannedIncome: boolean  // 자유비용에 예정 수입을 넣을지. 기본 tr
 
 - **Wish 하단 탭 아이콘은 위치 기반**(`apps/wish/src/index.css` `.wl-nav button:nth-child(n)`). 🪐🚀⭐🔭가 `NAV` 배열 순서가 아니라 **자식 순서**에 묶여 있다. 탭을 늘리거나 순서를 바꾸면 아이콘이 조용히 어긋난다 — 탭은 4개 고정이고, 새 화면은 탭이 아니라 하위 화면 상태로 붙일 것
 - **「지난 날짜로 저금 입력」을 만들면 별가루 연속 보너스가 이중 지급된다.** `streak7` 이름표는 7일 묶음의 마지막 날짜다. 지금은 모든 저금이 오늘 날짜로만 기록돼 묶음 경계가 앞으로만 자라 안전하지만, 중간 구멍이 메워지면 묶음이 합쳐지며 경계가 밀린다. 이미 지급한 `streak7:2026-09-15`와 새로 나온 `streak7:2026-09-18`이 둘 다 남는다. 그 기능을 만들 때 `dust.ts` 첫 주석부터 다시 볼 것
+- **`.wl-content` 안에서 여는 시트는 포털로 `document.body`에 올릴 것**(`Sheets.tsx`의 `SheetPortal`). `.wl-content`가 `position:relative; z-index:1`이라 쌓임 맥락을 만들어, 그 안의 `z-index:60`은 맥락 안에서만 60이고 바깥 `.wl-hud`(20)보다 아래로 깔린다 — 어두운 막이 HUD만 비껴가 자원 줄이 혼자 밝게 남는다. App.tsx가 직접 여는 시트는 `.wl-content` 바깥이라 해당 없음
 - **전역 `.dot{position:absolute}`** 이 행성 장식용으로 존재. 목록용 점은 `.cat-dot` 사용
 - 달력 점 색 클래스(`.planned`/`.income`/`.spent`)는 이름이 흔해 다른 곳과 부딪힌다. `.calendar-amount`/`.calendar-legend` 안으로 한정해 뒀으니 전역으로 되돌리지 말 것(예전엔 `!important` 전역이라 거래 내역 수입 원 배경까지 덮었다)
 - `.category-card p{font-size:12px}`가 카드 안 모든 `p`를 이김. 카드 안에 작은 글씨를 넣으려면 `.category-card .클래스`로 선택자를 올릴 것

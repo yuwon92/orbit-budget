@@ -1054,6 +1054,10 @@ ul { padding: 0; list-style: none; }
 }
 
 @media (max-width: 560px) {
+  .obs-shortcuts { gap: 6px; }
+  .obs-shortcuts button { min-height: 86px; padding: 12px 6px; }
+  .obs-shortcut-icon { font-size: 24px; }
+  .obs-shortcuts small { font-size: 9px; }
   .hud-resources { gap: 6px; }
   .hud-resources li { padding: 8px; flex-direction: column; align-items: flex-start; gap: 3px; }
   .hud-resources strong { font-size: 13px; }
@@ -1251,30 +1255,37 @@ ul { padding: 0; list-style: none; }
 }
 .back-button:hover { color: var(--text-primary); }
 
-.obs-links {
-  margin-top: 16px;
+/* 관측소 제목 바로 밑 진입 줄. 세로로 긴 화면 맨 아래 목록이었을 때는
+   꾸미기·상점이 스크롤 끝까지 내려야 보였다 */
+.obs-shortcuts {
+  margin: -6px 0 2px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.obs-shortcuts button {
+  min-height: 96px;
+  padding: 14px 8px;
   border: 1px solid var(--border);
   border-radius: 18px;
-  overflow: hidden;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 7px;
   background: var(--surface);
-}
-.obs-links li + li { border-top: 1px solid var(--border); }
-.obs-links button {
-  width: 100%;
-  min-height: 64px;
-  padding: 13px 16px;
-  border: 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  text-align: left;
-  background: none;
   cursor: pointer;
 }
-.obs-links button > span { min-width: 0; flex: 1; display: grid; gap: 5px; }
-.obs-links strong { font-size: 14px; }
-.obs-links small { font-size: 11px; font-weight: 400; color: var(--text-tertiary); }
-.obs-links svg { flex: 0 0 auto; color: var(--text-tertiary); }
+.obs-shortcuts button:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+.obs-shortcuts button:active { transform: scale(.985); }
+/* 탭·자원 아이콘과 같은 Mona12 컬러 이모지. 기본 표시가 '이모지'인 문자만 쓴다 —
+   ⚙(U+2699)처럼 기본이 '텍스트'인 것은 Mona가 VS16을 선언하지 않아 흑백으로 뜬다 */
+.obs-shortcut-icon { font-family: var(--font-emoji); font-variant-emoji: emoji; font-size: 27px; line-height: 1; }
+.obs-shortcuts strong { font-size: 13px; }
+.obs-shortcuts small { font-size: 10px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+
+/* 하위 화면 머리의 좌우 두 문. 왼쪽은 관측소로, 오른쪽은 짝이 되는 화면으로 */
+.sub-head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sub-head-row .ghost-button { margin-bottom: 10px; }
 
 /* ── 꾸미기 ────────────────────────────────────────── */
 
