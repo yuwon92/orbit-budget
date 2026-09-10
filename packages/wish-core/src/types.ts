@@ -74,7 +74,7 @@ export interface OwnedItem {
   sourceId: string
 }
 
-/** 장착 상태. 카테고리당 한 줄이고 해제는 줄 삭제 */
+/** 장착 상태. 카테고리당 한 줄이고 해제는 줄 삭제. 행성 색은 필수라 해제하지 않는다. */
 export interface Equipped {
   category: string
   itemId: string

@@ -300,31 +300,35 @@ export async function equipItem(category: string, itemId: string) {
   })
 }
 
-/** 해제는 그 카테고리의 장착 줄을 지운다 */
+/** 해제는 그 카테고리의 장착 줄을 지운다. 행성 색은 필수라 해제하지 않는다. */
 export async function unequipItem(category: string) {
+  if (category === 'planetColor') return
   await wishDb.equipped.delete(category)
 }
 
 /**
  * Lv.1 `관측자 스타터 세트`. 처음 앱을 열 때 기본 아이템을 보유·장착 상태로 만든다.
  *
- * **처음 지급하는 것만 장착한다.** 이미 보유한 것을 매번 다시 장착하면 사용자가
- * 해제하거나 바꿔 둔 자리를 앱을 열 때마다 되돌리게 된다. 해제는 줄 삭제라
- * 「해제해 뒀다」는 흔적이 남지 않으므로, 보유 여부를 그 흔적 대신 쓴다.
+ * **처음 지급하는 것만 장착한다.** 단, 필수 슬롯인 행성 색의 장착 줄이 없으면
+ * 기본 태양색을 복구한다. 다른 슬롯은 사용자가 해제한 상태를 그대로 둔다.
  */
 export async function ensureStarterSet() {
   const now = Date.now()
   await wishDb.transaction('rw', wishDb.ownedItems, wishDb.equipped, async () => {
     const existing = await wishDb.ownedItems.bulkGet(STARTER_ITEMS)
     const fresh = STARTER_ITEMS.filter((_, index) => existing[index] === undefined)
-    if (!fresh.length) return
-    await wishDb.ownedItems.bulkAdd(fresh.map((itemId) => ({
-      itemId, acquiredAt: now, sourceType: 'level' as const, sourceId: 'level:1',
-    })))
+    if (fresh.length) {
+      await wishDb.ownedItems.bulkAdd(fresh.map((itemId) => ({
+        itemId, acquiredAt: now, sourceType: 'level' as const, sourceId: 'level:1',
+      })))
+    }
     const equips = fresh.flatMap((itemId) => {
       const category = equipTargetOf(itemId)
       return category ? [{ category, itemId, updatedAt: now }] : []
     })
+    if (!(await wishDb.equipped.get('planetColor'))) {
+      equips.push({ category: 'planetColor', itemId: 'planet-color-solar', updatedAt: now })
+    }
     if (equips.length) await wishDb.equipped.bulkPut(equips)
   })
 }

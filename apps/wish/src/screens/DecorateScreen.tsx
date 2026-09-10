@@ -4,6 +4,7 @@ import {
   CATEGORIES,
   ITEMS,
   ITEM_IDS,
+  RARITIES,
   equippedMap,
   itemsOfCategory,
   type ItemCategory,
@@ -27,6 +28,10 @@ export function DecorateScreen({ owned, equipped, onEquip, onUnequip, back }: {
   const items = equippedMap(equipped)
   const ownedIds = new Set(owned.map((item) => item.itemId))
   const current = items[category]
+  const sortedItemIds = itemsOfCategory(category).sort((a, b) => {
+    const rarity = RARITIES.indexOf(ITEMS[a].rarity) - RARITIES.indexOf(ITEMS[b].rarity)
+    return rarity || ITEM_LABELS[a].name.localeCompare(ITEM_LABELS[b].name, 'ko-KR')
+  })
 
   return (
     <main className="obs-sub">
@@ -61,14 +66,14 @@ export function DecorateScreen({ owned, equipped, onEquip, onUnequip, back }: {
             <span className="pixel-label">{category.toUpperCase()}</span>
             <h2>{CATEGORY_LABELS[category].name}</h2>
           </div>
-          {current
+          {current && category !== 'planetColor'
             ? <button className="ghost-button" onClick={() => onUnequip(category)}>해제</button>
-            : <span className="panel-count">장착 없음</span>}
+            : <span className="panel-count">{category === 'planetColor' ? '필수 장착' : '장착 없음'}</span>}
         </div>
         <p className="panel-note">{CATEGORY_LABELS[category].detail}</p>
 
         <div className="item-grid">
-          {itemsOfCategory(category).map((itemId) => {
+          {sortedItemIds.map((itemId) => {
             const def = ITEMS[itemId]
             const label = ITEM_LABELS[itemId]
             const isOwned = ownedIds.has(itemId)
@@ -80,9 +85,15 @@ export function DecorateScreen({ owned, equipped, onEquip, onUnequip, back }: {
                 className={`item-cell${isEquipped ? ' equipped' : ''}${isOwned ? '' : ' locked'}`}
                 aria-pressed={isEquipped}
                 disabled={!isOwned}
-                // 장착한 것을 다시 누르면 해제한다. 위쪽 해제 버튼까지 올라가지 않아도
-                // 되고, 같은 자리에서 켰다 껐다 비교할 수 있다
-                onClick={() => (isEquipped ? onUnequip(category) : onEquip(category, itemId))}
+                // 장착한 것을 다시 누르면 해제한다. 단, 행성 색은 필수 슬롯이라
+                // 현재 색을 다시 눌러도 유지하고 다른 색을 눌렀을 때만 교체한다.
+                onClick={() => {
+                  if (isEquipped) {
+                    if (category !== 'planetColor') onUnequip(category)
+                    return
+                  }
+                  onEquip(category, itemId)
+                }}
               >
                 <span className="item-thumb">
                   <PixelPlanet {...previewProps(items, itemId, 56)} dim={!isOwned} />

@@ -170,5 +170,8 @@ export function equippedMap(
     const fits = ITEMS[row.itemId as ItemId]?.category === category
     map[category] = fits ? (row.itemId as ItemId) : defaultItemFor(category)
   }
+  // 행성 색은 해제할 수 없는 필수 슬롯이다. 예전 데이터에 장착 줄이 없더라도
+  // 기본 태양색으로 즉시 그리고, 저장소는 ensureStarterSet이 복구한다.
+  map.planetColor ??= defaultItemFor('planetColor')
   return map
 }

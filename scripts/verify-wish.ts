@@ -459,19 +459,22 @@ const claim = (date: string, missionId: string): Claim => ({
   // 장착 상태 펴기 — 카탈로그에 없는 id는 기본값으로 대신 그린다. 줄은 지우지 않는다
   assert.deepEqual(
     equippedMap([{ category: 'ring', itemId: 'ring-double' }]),
-    { ring: 'ring-double' },
+    { ring: 'ring-double', planetColor: defaultItemFor('planetColor') },
   )
   assert.deepEqual(
     equippedMap([{ category: 'ring', itemId: 'ring-사라짐' }]),
-    { ring: defaultItemFor('ring') },
+    { ring: defaultItemFor('ring'), planetColor: defaultItemFor('planetColor') },
   )
   // 카테고리가 어긋난 줄도 그 카테고리의 기본값으로 떨어진다
   assert.deepEqual(
     equippedMap([{ category: 'ring', itemId: 'planet-color-coral' }]),
-    { ring: defaultItemFor('ring') },
+    { ring: defaultItemFor('ring'), planetColor: defaultItemFor('planetColor') },
   )
-  assert.deepEqual(equippedMap([{ category: '없는칸', itemId: 'ring-single' }]), {})
-  assert.deepEqual(equippedMap([]), {})
+  assert.deepEqual(
+    equippedMap([{ category: '없는칸', itemId: 'ring-single' }]),
+    { planetColor: defaultItemFor('planetColor') },
+  )
+  assert.deepEqual(equippedMap([]), { planetColor: defaultItemFor('planetColor') })
   console.log('아이템 카탈로그 통과')
 }
 
