@@ -45,13 +45,23 @@ export interface PalettePreset {
 }
 
 /**
- * 효과 애니메이션 갈래. 12px 격자라 부드러운 페이드는 흐릿하게 뭉개진다 — 셋 다
- * 값이 뚝뚝 끊기는 계단이고, CSS는 같은 값을 두 지점에 걸쳐 두는 방식으로 만든다.
+ * 효과 애니메이션 갈래. 12px 격자라 부드러운 보간은 흐릿하게 뭉개진다 — 전부 값이
+ * 뚝뚝 끊기는 계단이고, CSS는 같은 값을 두 지점에 걸쳐 두는 방식으로 만든다.
+ * 픽셀아트 스프라이트를 몇 장 넘기는 것과 같은 결과다.
  *
- * `twinkle` 별이 밝았다 어두워짐 · `pulse` 호가 숨쉬듯 부풀었다 가라앉음 ·
- * `drift` 밝은 마디가 묶음 번호 순서대로 흘러감(꼬리 → 머리)
+ * 투명도만 바꾸면 밋밋하다. 크기(`scale`)·이동(`translate`)·밝기(`brightness`)를
+ * 함께 쓰되 **회전은 쓰지 않는다** — `shape-rendering: crispEdges`가 안티에일리어싱을
+ * 끄고 있어서 비스듬한 변이 톱니로 깨진다.
+ *
+ * | 갈래 | 움직임 | 쓰는 곳 |
+ * |---|---|---|
+ * | `twinkle` | 사그라들었다 팍 터짐 | 십자 별 |
+ * | `rise` | 떠오르며 스러짐 | 별가루 조각 |
+ * | `float` | 천천히 흔들리며 커졌다 작아짐 | 잔별빛 마름모 |
+ * | `pulse` | 행성 둘레로 부풀었다 가라앉음 | 빛무리 호 |
+ * | `drift` | 밝은 마디가 묶음 번호 순서로 달려감(꼬리 → 머리) | 별똥별·혜성 궤적 |
  */
-export type CosmeticAnim = 'twinkle' | 'pulse' | 'drift'
+export type CosmeticAnim = 'twinkle' | 'rise' | 'float' | 'pulse' | 'drift'
 
 export interface PixelPreset {
   id: string
@@ -495,7 +505,7 @@ export const EFFECT_PRESETS = [
     id: 'effect-stardust',
     // 별가루. 1px 점은 32px에서 사라지므로 2칸 조각으로만 흩뿌린다.
     // 조각이 하나씩 따로 떠서 묶음 번호를 안 준다 — 칸 순서가 그대로 박자가 된다.
-    anim: 'twinkle',
+    anim: 'rise',
     accent: '#FFD98A', soft: '#FFF7DC', ink: '#D9A62E',
     pixels: [
       { x: 2, y: 6, w: 2, fill: 'accent' }, { x: 5, y: 3, w: 2, fill: 'soft' },
@@ -546,7 +556,7 @@ export const EFFECT_PRESETS = [
   {
     id: 'effect-glimmer',
     // 3×3 마름모 다섯. 십자보다 부드러워 보이게 가운데 줄만 3칸으로 넓힌다.
-    anim: 'twinkle',
+    anim: 'float',
     accent: '#C7B8F0', soft: '#F2ECFF', ink: '#8A76C4',
     pixels: [
       { x: 4, y: 3, fill: 'soft', g: 0 }, { x: 3, y: 4, w: 3, fill: 'accent', g: 0 }, { x: 4, y: 5, fill: 'ink', g: 0 },
