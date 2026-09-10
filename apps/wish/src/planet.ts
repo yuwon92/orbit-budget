@@ -20,7 +20,12 @@ export function planetRadius(progress: number): number {
 }
 
 /** 행성 무늬. 몸통 명암·반지름을 함께 봐야 해서 좌표표가 아니라 여기서 그린다 */
-export const PATTERN_IDS = ['planet-pattern-crater', 'planet-pattern-stripe', 'planet-pattern-crystal'] as const
+export const PATTERN_IDS = [
+  'planet-pattern-crater',
+  'planet-pattern-stripe',
+  'planet-pattern-crystal',
+  'planet-pattern-swirl',
+] as const
 export type PatternId = (typeof PATTERN_IDS)[number]
 
 export interface PlanetBuildOptions {
@@ -180,6 +185,7 @@ function putPattern(
 ) {
   if (patternId === 'planet-pattern-stripe') return putStripes(shade, context)
   if (patternId === 'planet-pattern-crystal') return putCrystals(put, context)
+  if (patternId === 'planet-pattern-swirl') return putSwirl(shade, context)
   return putCraters(put, context)
 }
 
@@ -220,6 +226,23 @@ function putStripes(shade: (x: number, y: number) => void, context: PatternConte
       if (Math.hypot(dx, dy) > radius - 0.6) continue
       shade(x, y)
     }
+  }
+}
+
+/**
+ * 소용돌이. 중심에서 두 바퀴 도는 나선을 한 단씩 어둡게 한다. 줄무늬처럼 아래 색을
+ * 낮추는 방식이라 구면 명암이 남는다.
+ *
+ * 씨앗을 쓰지 않는다 — 감는 방향이 위시마다 달라지면 같은 아이템으로 보이지 않는다.
+ * y를 0.85로 눌러 정면에서 본 원반처럼 기울인다.
+ */
+function putSwirl(shade: (x: number, y: number) => void, context: PatternContext) {
+  const { radius } = context
+  const turns = radius < 6 ? 1.5 : 2
+  const span = Math.PI * 2 * turns
+  for (let t = 0.6; t < span; t += 0.04) {
+    const reach = (t / span) * (radius - 1.2)
+    shade(Math.round(16 + Math.cos(t) * reach), Math.round(16 + Math.sin(t) * reach * 0.85))
   }
 }
 

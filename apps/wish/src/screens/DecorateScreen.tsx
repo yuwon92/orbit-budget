@@ -13,11 +13,7 @@ import type { Equipped, OwnedItem } from '@orbit/wish-core/types'
 import { PixelPlanet } from '../components/PixelPlanet'
 import { UniversePreview } from '../components/UniversePreview'
 import { CATEGORY_LABELS, ITEM_LABELS, RARITY_DOTS, RARITY_LABELS, SOURCE_LABELS } from '../lib/items'
-
-/** 미리보기는 성계 단계로 고정한다. 링·동료·효과가 각각 다른 단계부터 나와서
- *  진행 중 단계로 그리면 장착해도 아무 변화가 없는 칸이 생긴다. */
-const PREVIEW_PROGRESS = 100
-const PREVIEW_SEED = 7
+import { PREVIEW_PROGRESS, PREVIEW_SEED, previewProps } from '../lib/preview'
 
 /** 관측소 하위 화면. 탭 뷰 전체를 대체하고 하단 탭은 그대로 둔다 */
 export function DecorateScreen({ owned, equipped, onEquip, onUnequip, back }: {
@@ -89,25 +85,14 @@ export function DecorateScreen({ owned, equipped, onEquip, onUnequip, back }: {
                 onClick={() => (isEquipped ? onUnequip(category) : onEquip(category, itemId))}
               >
                 <span className="item-thumb">
-                  <PixelPlanet
-                    progress={PREVIEW_PROGRESS}
-                    seed={PREVIEW_SEED}
-                    size={56}
-                    dim={!isOwned}
-                    planetColorId={category === 'planetColor' ? itemId : items.planetColor}
-                    planetPatternId={category === 'planetPattern' ? itemId : items.planetPattern}
-                    ringId={category === 'ring' ? itemId : items.ring}
-                    backgroundId={category === 'background' ? itemId : items.background}
-                    companionId={category === 'companion' ? itemId : items.companion}
-                    effectId={category === 'effect' ? itemId : items.effect}
-                  />
+                  <PixelPlanet {...previewProps(items, itemId, 56)} dim={!isOwned} />
                 </span>
                 <strong>{label.name}</strong>
                 <span className="item-rarity">
                   <i style={{ background: RARITY_DOTS[def.rarity] }} aria-hidden="true" />
                   {RARITY_LABELS[def.rarity]}
                 </span>
-                <small>{isEquipped ? '장착 중 · 다시 눌러 해제' : isOwned ? label.detail : `${SOURCE_LABELS[def.source]} 전용`}</small>
+                <small>{isEquipped ? '장착 중' : isOwned ? label.detail : `${SOURCE_LABELS[def.source]} 전용`}</small>
               </button>
             )
           })}

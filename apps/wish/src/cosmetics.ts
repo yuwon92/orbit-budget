@@ -185,6 +185,57 @@ export const COMPANION_PRESETS = [
       { x: 20, y: 6, w: 2, h: 2, fill: 'dark' },
     ],
   },
+  {
+    id: 'companion-pebble',
+    accent: '#BFB6A4', soft: '#EDE7D8', ink: '#847C6C',
+    pixels: [
+      // 5×4 자갈 하나 + 떨어져 있는 조각 하나. 위성보다 작게 둬서 등급 차이가 보이게.
+      { x: 25, y: 3, w: 3, fill: 'accent' },
+      { x: 24, y: 4, w: 5, fill: 'accent' },
+      { x: 24, y: 5, w: 5, fill: 'accent' },
+      { x: 25, y: 6, w: 3, fill: 'accent' },
+      { x: 25, y: 3, w: 2, fill: 'soft' },
+      { x: 24, y: 4, w: 2, fill: 'soft' },
+      { x: 27, y: 5, w: 2, fill: 'ink' },
+      { x: 26, y: 6, w: 2, fill: 'ink' },
+      { x: 21, y: 7, w: 2, h: 2, fill: 'accent' }, { x: 21, y: 7, fill: 'soft' },
+    ],
+  },
+  {
+    id: 'companion-comet',
+    // 얼음 머리는 청록, 꼬리는 뒤로 갈수록 어둡게. 머리를 오른쪽에 둬서 행성 반대편으로
+    // 날아가는 방향이 된다 — 안쪽을 향하면 부딪히는 것처럼 보인다.
+    accent: '#8FD8F0', soft: '#EAFBFF', ink: '#3E7E9C',
+    pixels: [
+      { x: 27, y: 3, w: 3, fill: 'accent' },
+      { x: 26, y: 4, w: 5, fill: 'accent' },
+      { x: 27, y: 5, w: 3, fill: 'accent' },
+      { x: 27, y: 3, w: 2, fill: 'soft' },
+      { x: 27, y: 4, w: 2, fill: 'soft' },
+      { x: 29, y: 5, w: 2, fill: 'ink' },
+      { x: 24, y: 4, w: 2, fill: 'accent' },
+      { x: 22, y: 5, w: 2, fill: 'accent' },
+      { x: 20, y: 6, w: 2, fill: 'ink' },
+      { x: 24, y: 3, w: 2, fill: 'ink' },
+      { x: 22, y: 3, fill: 'ink' },
+    ],
+  },
+  {
+    id: 'companion-shuttle',
+    accent: '#D8DEE9', soft: '#FFFFFF', ink: '#7A8698',
+    pixels: [
+      // 코 → 본체 → 날개 → 배기. 창은 ink 한 칸으로만 찍는다. 2칸이면 32px에서
+      // 본체가 뚫린 것처럼 보인다.
+      { x: 26, y: 2, fill: 'soft' },
+      { x: 25, y: 3, w: 3, fill: 'accent' }, { x: 25, y: 3, fill: 'soft' },
+      { x: 25, y: 4, w: 3, fill: 'accent' }, { x: 26, y: 4, fill: 'ink' },
+      { x: 24, y: 5, w: 5, fill: 'accent' },
+      { x: 24, y: 6, w: 5, fill: 'ink' },
+      { x: 23, y: 5, fill: 'ink' }, { x: 29, y: 5, fill: 'ink' },
+      { x: 25, y: 7, w: 3, fill: 'soft' },
+      { x: 26, y: 8, fill: 'accent' },
+    ],
+  },
 ] as const satisfies readonly PixelPreset[]
 
 // 성계 배경은 고리 띠(x 3~29 · y 11~21)를 피해 위아래 모서리에만 놓는다.
@@ -243,6 +294,80 @@ export const BACKGROUND_PRESETS = [
       { x: 28, y: 24, w: 2, h: 2, fill: 'soft' }, { x: 26, y: 22, fill: 'highlight' },
     ],
   },
+  {
+    id: 'background-dust-cloud',
+    // 흙먼지 뭉치. 일반 등급이라 두 뭉치로 절제한다.
+    accent: '#E8D9B8', soft: '#FFF6E0', ink: '#B8A47C',
+    pixels: [
+      { x: 2, y: 3, w: 5, fill: 'ink' },
+      { x: 1, y: 4, w: 7, fill: 'accent' },
+      { x: 3, y: 5, w: 4, fill: 'soft' },
+      { x: 4, y: 6, w: 3, fill: 'ink' },
+      { x: 24, y: 27, w: 5, fill: 'ink' },
+      { x: 23, y: 28, w: 7, fill: 'accent' },
+      { x: 25, y: 29, w: 4, fill: 'soft' },
+      { x: 9, y: 2, w: 2, h: 2, fill: 'accent' },
+      { x: 20, y: 26, w: 2, h: 2, fill: 'accent' },
+    ],
+  },
+  {
+    id: 'background-deepspace',
+    // 영웅 등급. 성간의 보라와 먼 은하 나선을 대각으로 두 덩이 놓아 변화 폭을 크게 준다.
+    accent: '#5B4B8A', soft: '#B9A7E0', ink: '#332656',
+    pixels: [
+      { x: 2, y: 2, w: 6, fill: 'ink' },
+      { x: 1, y: 3, w: 8, fill: 'accent' },
+      { x: 3, y: 4, w: 4, fill: 'soft' },
+      { x: 2, y: 5, w: 6, fill: 'accent' },
+      { x: 4, y: 6, w: 3, fill: 'ink' },
+      { x: 23, y: 26, w: 6, fill: 'ink' },
+      { x: 22, y: 27, w: 8, fill: 'accent' },
+      { x: 24, y: 28, w: 4, fill: 'soft' },
+      { x: 23, y: 29, w: 6, fill: 'accent' },
+      { x: 12, y: 2, w: 2, h: 2, fill: 'soft' },
+      { x: 16, y: 29, w: 2, h: 2, fill: 'soft' },
+      { x: 6, y: 27, w: 2, h: 2, fill: 'accent' },
+    ],
+  },
+  {
+    id: 'background-lunar',
+    // 아래를 지평선으로 통째로 덮는다. 고리 띠(y 11~21) 아래에서 시작해야 고리가 땅에
+    // 묻히지 않는다. 위쪽은 먼 별 둘만 남겨 하늘을 비운다.
+    accent: '#CFC8B4', soft: '#F2EEE2', ink: '#8E8676',
+    pixels: [
+      { x: 0, y: 27, w: 32, fill: 'ink' },
+      { x: 0, y: 28, w: 32, fill: 'accent' },
+      { x: 0, y: 29, w: 32, fill: 'accent' },
+      { x: 0, y: 30, w: 32, h: 2, fill: 'ink' },
+      { x: 4, y: 26, w: 5, fill: 'ink' }, { x: 5, y: 25, w: 3, fill: 'accent' },
+      { x: 20, y: 26, w: 7, fill: 'ink' }, { x: 22, y: 25, w: 3, fill: 'accent' },
+      { x: 12, y: 28, w: 5, fill: 'soft' }, { x: 13, y: 29, w: 3, fill: 'ink' },
+      { x: 3, y: 3, w: 2, h: 2, fill: 'soft' },
+      { x: 16, y: 4, w: 2, h: 2, fill: 'soft' },
+    ],
+  },
+  {
+    id: 'background-twin-moons',
+    // 달 둘은 왼쪽·가운데 위에만 둔다. 오른쪽 위(x 20~31 · y 1~9)는 동료 자리라 비운다.
+    accent: '#C9D6E8', soft: '#F0F5FF', ink: '#8194AD',
+    pixels: [
+      { x: 4, y: 2, w: 3, fill: 'accent' },
+      { x: 3, y: 3, w: 5, fill: 'accent' },
+      { x: 2, y: 4, w: 7, fill: 'accent' },
+      { x: 2, y: 5, w: 7, fill: 'accent' },
+      { x: 3, y: 6, w: 5, fill: 'accent' },
+      { x: 4, y: 7, w: 3, fill: 'accent' },
+      { x: 4, y: 2, w: 2, fill: 'soft' }, { x: 3, y: 3, w: 3, fill: 'soft' },
+      { x: 6, y: 6, w: 2, fill: 'ink' }, { x: 5, y: 7, w: 2, fill: 'ink' },
+      { x: 13, y: 4, w: 2, fill: 'accent' },
+      { x: 12, y: 5, w: 4, fill: 'accent' },
+      { x: 12, y: 6, w: 4, fill: 'accent' },
+      { x: 13, y: 7, w: 2, fill: 'accent' },
+      { x: 13, y: 4, w: 2, fill: 'soft' }, { x: 14, y: 6, w: 2, fill: 'ink' },
+      { x: 6, y: 27, w: 2, h: 2, fill: 'soft' },
+      { x: 24, y: 29, w: 2, h: 2, fill: 'accent' },
+    ],
+  },
 ] as const satisfies readonly PixelPreset[]
 
 // 효과는 완주(성계 단계)에서만 뜬다. 고리 띠를 피하고, 배경이 덮어 버린 기존 완주 별
@@ -271,6 +396,74 @@ export const EFFECT_PRESETS = [
       { x: 4, y: 4, w: 2, fill: 'ink' },
       { x: 2, y: 3, w: 2, fill: 'ink' },
       { x: 1, y: 2, fill: 'ink' },
+    ],
+  },
+  {
+    id: 'effect-twinkle',
+    // 기본 반짝임과 헷갈리지 않게 은백색 고정으로 두고 십자 셋만 쓴다.
+    accent: '#DCE6F0', soft: '#FFFFFF', ink: '#A9B8CC',
+    pixels: [
+      { x: 5, y: 5, w: 3, fill: 'accent' }, { x: 6, y: 4, h: 3, fill: 'soft' },
+      { x: 24, y: 27, w: 3, fill: 'accent' }, { x: 25, y: 26, h: 3, fill: 'soft' },
+      { x: 14, y: 29, w: 3, fill: 'accent' }, { x: 15, y: 28, h: 3, fill: 'soft' },
+    ],
+  },
+  {
+    id: 'effect-stardust',
+    // 별가루. 1px 점은 32px에서 사라지므로 2칸 조각으로만 흩뿌린다.
+    accent: '#FFD98A', soft: '#FFF7DC', ink: '#D9A62E',
+    pixels: [
+      { x: 2, y: 6, w: 2, fill: 'accent' }, { x: 5, y: 3, w: 2, fill: 'soft' },
+      { x: 8, y: 7, w: 2, fill: 'ink' }, { x: 11, y: 4, w: 2, fill: 'accent' },
+      { x: 14, y: 8, w: 2, fill: 'soft' }, { x: 3, y: 24, w: 2, fill: 'accent' },
+      { x: 7, y: 27, w: 2, fill: 'soft' }, { x: 11, y: 25, w: 2, fill: 'ink' },
+      { x: 15, y: 28, w: 2, fill: 'accent' }, { x: 19, y: 26, w: 2, fill: 'soft' },
+      { x: 23, y: 29, w: 2, fill: 'accent' }, { x: 27, y: 27, w: 2, fill: 'ink' },
+      { x: 29, y: 24, w: 2, fill: 'accent' },
+    ],
+  },
+  {
+    id: 'effect-shooting-star',
+    // 영웅 등급. 긴 대각 궤적을 왼쪽 위에 둔다 — 오른쪽 위로 그으면 동료와 겹친다.
+    accent: '#FFC64D', soft: '#FFF3C4', ink: '#C97A1E',
+    pixels: [
+      { x: 2, y: 2, w: 2, fill: 'ink' },
+      { x: 3, y: 3, w: 2, fill: 'ink' },
+      { x: 4, y: 4, w: 2, fill: 'accent' },
+      { x: 5, y: 5, w: 2, fill: 'accent' },
+      { x: 6, y: 6, w: 2, fill: 'soft' },
+      { x: 7, y: 7, w: 2, fill: 'soft' },
+      { x: 8, y: 8, w: 2, fill: 'soft' }, { x: 7, y: 8, fill: 'accent' },
+      { x: 22, y: 25, w: 2, fill: 'ink' },
+      { x: 23, y: 26, w: 2, fill: 'accent' },
+      { x: 24, y: 27, w: 2, fill: 'soft' },
+      { x: 25, y: 28, w: 2, fill: 'soft' },
+    ],
+  },
+  {
+    id: 'effect-halo',
+    // 위아래 호. 행성을 감싸는 모양이지만 고리 띠(y 11~21)를 넘지 않게 y 8~9와
+    // y 22~23에만 둔다. 오른쪽은 x 19에서 끊어 동료 자리를 비운다.
+    accent: '#FFE9A8', soft: '#FFFFFF', ink: '#E0B44A',
+    pixels: [
+      { x: 11, y: 8, w: 9, fill: 'ink' },
+      { x: 9, y: 9, w: 3, fill: 'accent' }, { x: 17, y: 9, w: 3, fill: 'accent' },
+      { x: 12, y: 9, w: 5, fill: 'soft' },
+      { x: 11, y: 23, w: 9, fill: 'ink' },
+      { x: 9, y: 22, w: 3, fill: 'accent' }, { x: 17, y: 22, w: 3, fill: 'accent' },
+      { x: 12, y: 22, w: 5, fill: 'soft' },
+    ],
+  },
+  {
+    id: 'effect-glimmer',
+    // 3×3 마름모 다섯. 십자보다 부드러워 보이게 가운데 줄만 3칸으로 넓힌다.
+    accent: '#C7B8F0', soft: '#F2ECFF', ink: '#8A76C4',
+    pixels: [
+      { x: 4, y: 3, fill: 'soft' }, { x: 3, y: 4, w: 3, fill: 'accent' }, { x: 4, y: 5, fill: 'ink' },
+      { x: 12, y: 5, fill: 'soft' }, { x: 11, y: 6, w: 3, fill: 'accent' }, { x: 12, y: 7, fill: 'ink' },
+      { x: 6, y: 26, fill: 'soft' }, { x: 5, y: 27, w: 3, fill: 'accent' }, { x: 6, y: 28, fill: 'ink' },
+      { x: 25, y: 24, fill: 'soft' }, { x: 24, y: 25, w: 3, fill: 'accent' }, { x: 25, y: 26, fill: 'ink' },
+      { x: 17, y: 28, fill: 'soft' }, { x: 16, y: 29, w: 3, fill: 'accent' }, { x: 17, y: 30, fill: 'ink' },
     ],
   },
 ] as const satisfies readonly PixelPreset[]

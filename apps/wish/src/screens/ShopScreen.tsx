@@ -7,10 +7,7 @@ import type { Equipped, OwnedItem } from '@orbit/wish-core/types'
 import { PixelPlanet } from '../components/PixelPlanet'
 import { PurchaseSheet } from '../components/Sheets'
 import { CATEGORY_LABELS, ITEM_LABELS, RARITY_DOTS, RARITY_LABELS } from '../lib/items'
-
-/** 상점 미리보기도 꾸미기와 같은 성계 기준이다. 단계가 다르면 같은 아이템이 달라 보인다 */
-const PREVIEW_PROGRESS = 100
-const PREVIEW_SEED = 7
+import { previewProps } from '../lib/preview'
 
 type Filter = ItemCategory | 'all'
 
@@ -27,22 +24,6 @@ export function ShopScreen({ owned, equipped, stardust, onBuy, back }: {
   const items = equippedMap(equipped)
   const entries = shopItems(owned.map((item) => item.itemId))
   const shown = filter === 'all' ? entries : entries.filter((entry) => ITEMS[entry.itemId].category === filter)
-
-  /** 그 아이템까지 얹은 미리보기. 장착 상태를 바탕으로 해당 칸만 갈아 끼운다 */
-  const planetProps = (itemId: ItemId, size: number) => {
-    const category = ITEMS[itemId].category
-    return {
-      progress: PREVIEW_PROGRESS,
-      seed: PREVIEW_SEED,
-      size,
-      planetColorId: category === 'planetColor' ? itemId : items.planetColor,
-      planetPatternId: category === 'planetPattern' ? itemId : items.planetPattern,
-      ringId: category === 'ring' ? itemId : items.ring,
-      backgroundId: category === 'background' ? itemId : items.background,
-      companionId: category === 'companion' ? itemId : items.companion,
-      effectId: category === 'effect' ? itemId : items.effect,
-    }
-  }
 
   return (
     <main className="obs-sub">
@@ -85,8 +66,6 @@ export function ShopScreen({ owned, equipped, stardust, onBuy, back }: {
           <div><span className="pixel-label">FOR SALE</span><h2>판매 중</h2></div>
           <span className="panel-count">{shown.length}종</span>
         </div>
-        <p className="panel-note">상자·레벨 전용 아이템은 상점에 없음 · 전체 목록은 꾸미기</p>
-
         {shown.length === 0
           ? <p className="shop-empty">이 분류에 판매 상품 없음</p>
           : (
@@ -104,7 +83,7 @@ export function ShopScreen({ owned, equipped, stardust, onBuy, back }: {
                     onClick={() => setConfirming(entry.itemId)}
                   >
                     <span className="item-thumb">
-                      <PixelPlanet {...planetProps(entry.itemId, 56)} dim={entry.owned} />
+                      <PixelPlanet {...previewProps(items, entry.itemId, 56)} dim={entry.owned} />
                     </span>
                     <strong>{label.name}</strong>
                     <span className="item-rarity">
@@ -127,7 +106,7 @@ export function ShopScreen({ owned, equipped, stardust, onBuy, back }: {
           detail={`${CATEGORY_LABELS[ITEMS[confirming].category].name} · ${RARITY_LABELS[ITEMS[confirming].rarity]}`}
           price={ITEMS[confirming].price ?? 0}
           balance={stardust}
-          planet={planetProps(confirming, 124)}
+          planet={previewProps(items, confirming, 124)}
           onClose={() => setConfirming(null)}
           onBuy={() => { onBuy(confirming); setConfirming(null) }}
         />

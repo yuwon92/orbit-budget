@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { wishDb } from '@orbit/wish-bridge/db'
 import type { DustRow } from '@orbit/wish-core/dust'
-import type { Claim, Equipped, OwnedItem, Player, Wish, WishEvent } from '@orbit/wish-core/types'
+import type { Claim, Equipped, LevelClaim, OwnedItem, Player, Wish, WishEvent } from '@orbit/wish-core/types'
 
 // App에서 한 번만 구독해 prop으로 내린다. HUD가 모든 화면에서 같은 값을 쓰므로
 // 화면마다 따로 구독하면 같은 테이블을 네다섯 번 읽게 된다.
@@ -35,3 +35,7 @@ export const useOwnedItems = (): OwnedItem[] | undefined =>
 /** 장착 상태. 카테고리당 한 줄이고 해제한 카테고리는 줄이 없다 */
 export const useEquipped = (): Equipped[] | undefined =>
   useLiveQuery(() => wishDb.equipped.toArray(), [])
+
+/** 레벨 보상 수령 기록. 없는 레벨이 미수령이다 */
+export const useLevelClaims = (): LevelClaim[] | undefined =>
+  useLiveQuery(() => wishDb.levelClaims.toArray(), [])

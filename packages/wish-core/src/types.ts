@@ -87,10 +87,13 @@ export interface LevelClaim {
   claimedAt: number
 }
 
-/** 아직 열지 않은 상자도 보유물이라 따로 남긴다 */
+/**
+ * 아직 열지 않은 상자도 보유물이라 따로 남긴다.
+ * premium은 Lv.20 보상 하나뿐이다 — rare로 눌러 담으면 그 등급이 사라진다.
+ */
 export interface OwnedBox {
   boxId: string
-  type: 'normal' | 'rare'
+  type: 'normal' | 'rare' | 'premium'
   acquiredAt: number
   openedAt: number | null
 }

@@ -6,6 +6,14 @@
 // `TITLE_IDS`(core) / `TITLES`(app)와 같은 갈래다.
 //
 // 두 곳의 키가 어긋나면 `Record<ItemId, …>` 타입이 빌드 단계에서 막는다.
+//
+// 획득처 규칙 — 레벨 보상표(`reward.ts`)와 상점 재고가 겹치지 않게 가른다.
+//
+// - `level`: 스타터 5종 + 확정 보상 아이템(Lv.5·7·10·11·15·17·20). 상점에 오르지 않는다.
+//   레벨을 올려야만 얻는 것이 있어야 보상표가 무게를 갖는다
+// - `shop`: 선택형 보상 풀(Lv.2·3·6·8·9·12·18)에 든 것 전부. 레벨에서 하나를 공짜로
+//   고르거나 별가루로 산다. 상점 재고가 여기서 나온다
+// - `box`·`rareBox`·`region`: 아직 없다. Phase 5가 상자 추첨표와 함께 전용 아이템을 넣는다
 
 /** 동시 장착은 카테고리당 하나. 해제는 그 카테고리의 장착 줄을 지운다 */
 export const CATEGORIES = [
@@ -55,26 +63,39 @@ const CATALOG = {
   'planet-pattern-crater': { category: 'planetPattern', rarity: 'common', source: 'level' },
   'planet-pattern-stripe': { category: 'planetPattern', rarity: 'common', source: 'shop', price: PRICES.common },
   'planet-pattern-crystal': { category: 'planetPattern', rarity: 'rare', source: 'shop', price: PRICES.rare },
+  'planet-pattern-swirl': { category: 'planetPattern', rarity: 'rare', source: 'shop', price: PRICES.rare },
 
   // ── 궤도 링 ──
   'ring-single': { category: 'ring', rarity: 'common', source: 'level' },
-  'ring-double': { category: 'ring', rarity: 'rare', source: 'shop', price: PRICES.rare },
-  'ring-debris': { category: 'ring', rarity: 'rare', source: 'box' },
+  'ring-double': { category: 'ring', rarity: 'rare', source: 'level' },
+  'ring-debris': { category: 'ring', rarity: 'rare', source: 'shop', price: PRICES.rare },
 
   // ── 배경 ──
   'background-starfield': { category: 'background', rarity: 'common', source: 'level' },
+  'background-dust-cloud': { category: 'background', rarity: 'common', source: 'shop', price: PRICES.common },
   'background-constellation': { category: 'background', rarity: 'rare', source: 'shop', price: PRICES.rare },
+  'background-twin-moons': { category: 'background', rarity: 'rare', source: 'shop', price: PRICES.rare },
   'background-nebula': { category: 'background', rarity: 'epic', source: 'shop', price: PRICES.epic },
+  'background-deepspace': { category: 'background', rarity: 'epic', source: 'shop', price: PRICES.epic },
+  'background-lunar': { category: 'background', rarity: 'rare', source: 'level' },
 
   // ── 위성·동료 ──
-  'companion-moonlet': { category: 'companion', rarity: 'common', source: 'shop', price: PRICES.common },
+  'companion-pebble': { category: 'companion', rarity: 'common', source: 'shop', price: PRICES.common },
   'companion-star-cluster': { category: 'companion', rarity: 'common', source: 'shop', price: PRICES.common },
   'companion-probe': { category: 'companion', rarity: 'rare', source: 'shop', price: PRICES.rare },
-  'companion-meteor': { category: 'companion', rarity: 'rare', source: 'box' },
+  'companion-meteor': { category: 'companion', rarity: 'rare', source: 'shop', price: PRICES.rare },
+  'companion-shuttle': { category: 'companion', rarity: 'rare', source: 'shop', price: PRICES.rare },
+  'companion-moonlet': { category: 'companion', rarity: 'common', source: 'level' },
+  'companion-comet': { category: 'companion', rarity: 'rare', source: 'level' },
 
   // ── 효과·흔적 ──
   'effect-sparkles': { category: 'effect', rarity: 'common', source: 'level' },
-  'effect-comet-trail': { category: 'effect', rarity: 'rare', source: 'shop', price: PRICES.rare },
+  'effect-twinkle': { category: 'effect', rarity: 'common', source: 'shop', price: PRICES.common },
+  'effect-halo': { category: 'effect', rarity: 'rare', source: 'shop', price: PRICES.rare },
+  'effect-glimmer': { category: 'effect', rarity: 'rare', source: 'shop', price: PRICES.rare },
+  'effect-shooting-star': { category: 'effect', rarity: 'epic', source: 'shop', price: PRICES.epic },
+  'effect-stardust': { category: 'effect', rarity: 'rare', source: 'level' },
+  'effect-comet-trail': { category: 'effect', rarity: 'rare', source: 'level' },
 } as const satisfies Record<string, ItemDef>
 
 export type ItemId = keyof typeof CATALOG

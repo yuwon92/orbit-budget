@@ -5,8 +5,9 @@ import { canPurchase, monthlyDeposit, seedFromId } from '@orbit/wish-core/wish'
 import { claimIdOf, type MissionUnit } from '@orbit/wish-core/xp'
 import { missionDustGrants, stardustBalance, type DustRow } from '@orbit/wish-core/dust'
 import { canBuy, purchaseRows, type BuyRefusal } from '@orbit/wish-core/shop'
+import { LEVEL_REWARDS, isValidChoice, itemsOfLevel, levelDustId } from '@orbit/wish-core/reward'
 import { STARTER_ITEMS, equipTargetOf } from '@orbit/wish-core/items'
-import type { Claim, OwnedItem, Player, Wish, WishEvent } from '@orbit/wish-core/types'
+import type { Claim, OwnedBox, OwnedItem, Player, Wish, WishEvent } from '@orbit/wish-core/types'
 import { wishDb } from './db'
 
 const newId = () => crypto.randomUUID()
@@ -327,6 +328,61 @@ export async function ensureStarterSet() {
     if (equips.length) await wishDb.equipped.bulkPut(equips)
   })
 }
+
+export type ClaimOutcome = 'ok' | 'claimed' | 'unknownLevel' | 'needsChoice'
+
+/**
+ * 레벨 보상 수령. 수령 기록 + 별가루 줄 + 아이템 + 상자를 한 트랜잭션에 넣는다.
+ * 넷이 갈라지면 「기록만 남고 보상은 없는」 레벨이 생기고, 그 레벨은 다시 받을 수
+ * 없어 영영 못 받는다. 미션 수령이 영수증과 별가루를 함께 묶는 것과 같은 이유다.
+ *
+ * 선택형은 고른 것이 그 레벨의 풀에 있는지 저장 창구에서 다시 확인한다 — 화면을
+ * 우회해 아무 아이템이나 들어오는 것을 막는다.
+ *
+ * 상자는 지급만 하고 열지 않는다(§5). 개봉은 Phase 5.
+ */
+export async function claimLevelReward(level: number, selectedItemId?: string): Promise<ClaimOutcome> {
+  const reward = LEVEL_REWARDS[level]
+  if (!reward) return 'unknownLevel'
+  if (!isValidChoice(level, selectedItemId)) return 'needsChoice'
+  const now = Date.now()
+  const sourceId = levelDustId(level)
+
+  return wishDb.transaction(
+    'rw',
+    wishDb.levelClaims, wishDb.dustLedger, wishDb.ownedItems, wishDb.boxes,
+    async () => {
+      // 이미 있는 수령 기록이면 아무것도 하지 않는다. 버튼을 두 번 눌러도 결과가 같다
+      if (await wishDb.levelClaims.get(level)) return 'claimed'
+      await wishDb.levelClaims.add({ level, claimedAt: now })
+
+      if (reward.dust > 0) {
+        await addDustRows([{
+          id: sourceId, type: 'earn', amount: reward.dust, sourceType: 'level', sourceId, createdAt: now,
+        }])
+      }
+      await addOwnedItems(itemsOfLevel(level, selectedItemId).map((itemId) => ({
+        itemId, acquiredAt: now, sourceType: 'level' as const, sourceId,
+      })))
+
+      // 상자 id에 순번을 넣는다 — Lv.16처럼 한 번에 두 장이 나오는 레벨이 있고,
+      // 시각을 섞으면 수령을 두 번 시도했을 때 상자가 불어난다
+      const boxes: OwnedBox[] = (reward.boxes ?? []).flatMap((slot) =>
+        Array.from({ length: slot.count }, (_, index) => ({
+          boxId: `${sourceId}:${slot.type}:${index + 1}`,
+          type: slot.type,
+          acquiredAt: now,
+          openedAt: null,
+        })),
+      )
+      if (boxes.length) await wishDb.boxes.bulkPut(boxes)
+      return 'ok'
+    },
+  )
+}
+
+/** 수령한 레벨 목록. 없는 레벨이 미수령이다 */
+export const listLevelClaims = () => wishDb.levelClaims.toArray()
 
 export type BuyOutcome = 'ok' | BuyRefusal
 

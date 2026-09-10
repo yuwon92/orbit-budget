@@ -13,21 +13,34 @@ export const ITEM_LABELS: Record<ItemId, { name: string; detail: string }> = {
   'planet-pattern-crater': { name: '크레이터', detail: '씨앗별 표면 자국' },
   'planet-pattern-stripe': { name: '줄무늬', detail: '위도 방향 띠' },
   'planet-pattern-crystal': { name: '결정', detail: '각진 마름모 면' },
+  'planet-pattern-swirl': { name: '소용돌이', detail: '두 바퀴 감기는 나선' },
 
   'ring-single': { name: '기본 링', detail: '단일 고리' },
   'ring-double': { name: '별빛 궤도 링', detail: '안팎 두 겹' },
   'ring-debris': { name: '파편 링', detail: '끊긴 점선 조각' },
 
   'background-starfield': { name: '기본 별밭', detail: '십자별 · 네모별' },
+  'background-dust-cloud': { name: '먼지 구름', detail: '흙먼지 두 뭉치' },
   'background-constellation': { name: '별자리', detail: '연결선 두 갈래' },
+  'background-twin-moons': { name: '쌍둥이 달', detail: '큰 달 · 작은 달' },
   'background-nebula': { name: '성운', detail: '푸른 띠 · 흩어진 별' },
+  'background-deepspace': { name: '심우주', detail: '보라 성간 · 먼 은하' },
+  'background-lunar': { name: '고요한 월면', detail: '아래를 덮는 지평선' },
 
-  'companion-moonlet': { name: '꼬마 위성', detail: '흙색 6×6 원판' },
+  'companion-pebble': { name: '조각돌', detail: '작은 자갈 둘' },
   'companion-star-cluster': { name: '작은 별 무리', detail: '행성 색을 따르는 별 셋' },
   'companion-probe': { name: '탐사 안테나', detail: '접시 · 태양 날개' },
   'companion-meteor': { name: '유성 조각', detail: '돌덩이 · 불꼬리' },
+  'companion-shuttle': { name: '우주선', detail: '창 하나 · 배기 불꽃' },
+  'companion-moonlet': { name: '꼬마 위성', detail: '흙색 6×6 원판' },
+  'companion-comet': { name: '작은 혜성', detail: '얼음 머리 · 청록 꼬리' },
 
   'effect-sparkles': { name: '반짝이는 별', detail: '완주 뒤 십자 반짝임' },
+  'effect-twinkle': { name: '작은 반짝임', detail: '은백색 십자 셋' },
+  'effect-halo': { name: '빛무리', detail: '위아래 두 겹 호' },
+  'effect-glimmer': { name: '잔별빛', detail: '보라 마름모 다섯' },
+  'effect-shooting-star': { name: '별똥별', detail: '긴 대각 궤적' },
+  'effect-stardust': { name: '반짝이는 별가루', detail: '흩뿌린 금빛 조각' },
   'effect-comet-trail': { name: '혜성의 궤적', detail: '완주 뒤 긴 꼬리' },
 }
 

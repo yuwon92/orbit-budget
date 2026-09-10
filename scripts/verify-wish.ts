@@ -54,7 +54,16 @@ import {
   itemsOfCategory,
 } from '../packages/wish-core/src/items.ts'
 import { canBuy, priceOf, purchaseRows, shopItems } from '../packages/wish-core/src/shop.ts'
-import { unclaimedLevels } from '../packages/wish-core/src/reward.ts'
+import {
+  LEVEL_REWARDS,
+  MAX_REWARD_LEVEL,
+  isValidChoice,
+  itemsOfLevel,
+  levelDustId,
+  needsChoice,
+  nextMajorReward,
+  unclaimedLevels,
+} from '../packages/wish-core/src/reward.ts'
 import type { Claim, Wish, WishEvent, WishStatus } from '../packages/wish-core/src/types.ts'
 
 const wish = (over: Partial<Wish> = {}): Wish => ({
@@ -477,22 +486,23 @@ const claim = (date: string, missionId: string): Claim => ({
   })
   // 순서는 카탈로그 순서다. 보유한 것을 뒤로 밀면 구매 직후 격자가 튄다
   assert.deepEqual(
-    shopItems(['ring-double']).map((entry) => entry.itemId),
+    shopItems(['ring-debris']).map((entry) => entry.itemId),
     entries.map((entry) => entry.itemId),
   )
-  assert.equal(shopItems(['ring-double']).find((e) => e.itemId === 'ring-double')?.owned, true)
+  assert.equal(shopItems(['ring-debris']).find((e) => e.itemId === 'ring-debris')?.owned, true)
 
-  assert.equal(priceOf('ring-double'), ITEMS['ring-double'].price)
-  // 레벨 전용·없는 아이템은 가격이 없다
+  assert.equal(priceOf('ring-debris'), ITEMS['ring-debris'].price)
+  // 레벨 전용·없는 아이템은 가격이 없다. 별빛 궤도 링은 Lv.5 확정 보상이라 상점에 없다
   assert.equal(priceOf('planet-color-aurora'), undefined)
+  assert.equal(priceOf('ring-double'), undefined)
   assert.equal(priceOf('없는-아이템'), undefined)
 
-  const rare = ITEMS['ring-double'].price!
-  assert.equal(canBuy(rare, 'ring-double', []).ok, true)
-  assert.equal(canBuy(rare - 1, 'ring-double', []).ok, false)
-  assert.equal(canBuy(rare - 1, 'ring-double', []).ok === false
-    && canBuy(rare - 1, 'ring-double', []).reason, 'poor')
-  const ownedCheck = canBuy(9999, 'ring-double', ['ring-double'])
+  const rare = ITEMS['ring-debris'].price!
+  assert.equal(canBuy(rare, 'ring-debris', []).ok, true)
+  assert.equal(canBuy(rare - 1, 'ring-debris', []).ok, false)
+  assert.equal(canBuy(rare - 1, 'ring-debris', []).ok === false
+    && canBuy(rare - 1, 'ring-debris', []).reason, 'poor')
+  const ownedCheck = canBuy(9999, 'ring-debris', ['ring-debris'])
   assert.equal(ownedCheck.ok === false && ownedCheck.reason, 'owned')
   // 팔지 않는 물건은 보유 여부보다 먼저 걸린다 — 「보유 중」이라고 답하면 상점에
   // 있는 물건처럼 읽힌다
@@ -514,6 +524,77 @@ const claim = (date: string, missionId: string): Claim => ({
   console.log('상점 통과')
 }
 
+// ── 레벨 보상표 ───────────────────────────────────────
+{
+  const levels = Array.from({ length: MAX_REWARD_LEVEL }, (_, index) => index + 1)
+
+  // §13 완료 기준 — Lv.1~20 전부 무언가를 준다
+  levels.forEach((level) => {
+    const reward = LEVEL_REWARDS[level]
+    assert.ok(reward, `Lv.${level} 보상 없음`)
+    assert.equal(reward.level, level, `Lv.${level} level 필드 불일치`)
+    assert.ok(
+      reward.dust > 0 || reward.fixed?.length || reward.choice || reward.boxes?.length,
+      `Lv.${level} 빈 보상`,
+    )
+  })
+  assert.equal(LEVEL_REWARDS[MAX_REWARD_LEVEL + 1], undefined)
+
+  // 선택형은 고를 것이 둘 이상이어야 한다. 하나면 고르는 의미가 없다
+  Object.values(LEVEL_REWARDS).forEach((reward) => {
+    if (reward.choice) assert.ok(reward.choice.of.length >= 2, `Lv.${reward.level} 선택지 부족`)
+  })
+
+  // 보상표의 모든 아이템이 카탈로그에 있다. 오타 하나면 그 레벨 수령이 빈손이 된다
+  const rewardItems = Object.values(LEVEL_REWARDS)
+    .flatMap((reward) => [...(reward.fixed ?? []), ...(reward.choice?.of ?? [])])
+  rewardItems.forEach((id) => assert.ok(ITEMS[id], `카탈로그에 없는 보상 ${id}`))
+
+  // 같은 아이템이 두 레벨에 걸리면 두 번째 지급이 「이미 보유」로 조용히 사라진다
+  assert.equal(new Set(rewardItems).size, rewardItems.length, '보상 아이템 중복')
+
+  // 확정 보상은 레벨 전용, 선택형 풀은 상점 재고. 카탈로그의 획득처와 맞아야 한다
+  Object.values(LEVEL_REWARDS).forEach((reward) => {
+    for (const id of reward.fixed ?? []) {
+      assert.equal(ITEMS[id].source, 'level', `확정 보상인데 레벨 전용이 아닌 ${id}`)
+    }
+    for (const id of reward.choice?.of ?? []) {
+      assert.equal(ITEMS[id].source, 'shop', `선택형 풀인데 상점에 없는 ${id}`)
+    }
+  })
+
+  // 스타터 세트는 Lv.1 확정 보상과 같아야 한다. 갈라지면 첫 지급이 두 갈래가 된다
+  assert.deepEqual([...(LEVEL_REWARDS[1].fixed ?? [])].sort(), [...STARTER_ITEMS].sort())
+
+  assert.equal(levelDustId(14), 'level:14')
+  // 이름표에 시각을 섞지 않는다. 두 번 수령해도 같은 줄로 걸려야 한다
+  assert.equal(levelDustId(14), levelDustId(14))
+
+  assert.equal(needsChoice(3), true)
+  assert.equal(needsChoice(5), false)
+  // 선택형은 풀에 있는 것만 받는다. 화면을 우회한 값을 저장 창구가 막는 근거
+  assert.equal(isValidChoice(3, 'planet-color-mint'), true)
+  assert.equal(isValidChoice(3, 'planet-color-aurora'), false)
+  assert.equal(isValidChoice(3, undefined), false)
+  // 선택형이 아닌 레벨에 값을 주면 거른다
+  assert.equal(isValidChoice(5, undefined), true)
+  assert.equal(isValidChoice(5, 'ring-debris'), false)
+
+  assert.deepEqual(itemsOfLevel(5), ['ring-double'])
+  assert.deepEqual(itemsOfLevel(3, 'planet-color-coral'), ['planet-color-coral'])
+  // 고르지 않은 선택형은 확정분만 나간다 — 저장 창구가 needsChoice로 먼저 막는다
+  assert.deepEqual(itemsOfLevel(3), [])
+  assert.deepEqual(itemsOfLevel(13), [])
+  assert.deepEqual(itemsOfLevel(99), [])
+
+  assert.equal(nextMajorReward(4)?.level, 5)
+  // 재화만 주는 레벨(13·19)은 다음 보상 미리보기에서 건너뛴다
+  assert.equal(nextMajorReward(12)?.level, 14)
+  assert.equal(nextMajorReward(18)?.level, 20)
+  assert.equal(nextMajorReward(20), undefined)
+  console.log('레벨 보상표 통과')
+}
+
 // ── 레벨 보상 소급 ────────────────────────────────────
 {
   // 이미 레벨이 오른 채로 보상 기능을 만나면 지난 레벨이 전부 미수령으로 쌓인다
@@ -522,6 +603,9 @@ const claim = (date: string, missionId: string): Claim => ({
   assert.deepEqual(unclaimedLevels(1, [1]), [])
   // 아직 오르지 않은 레벨은 미수령이 아니다
   assert.ok(unclaimedLevels(3, []).every((level) => level <= 3))
+  // 보상표가 끝난 뒤로는 미수령이 늘지 않는다. Lv.20이 마지막 보상이다
+  assert.deepEqual(unclaimedLevels(25, []), Array.from({ length: MAX_REWARD_LEVEL }, (_, i) => i + 1))
+  assert.deepEqual(unclaimedLevels(25, Array.from({ length: MAX_REWARD_LEVEL }, (_, i) => i + 1)), [])
   assert.deepEqual(unclaimedLevels(0, []), [])
   // 순서를 건너뛰고 받은 기록이 있어도 남은 것만 낸다
   assert.deepEqual(unclaimedLevels(4, [2, 4]), [1, 3])

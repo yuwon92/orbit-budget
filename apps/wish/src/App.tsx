@@ -9,7 +9,6 @@ import {
   vaultTotal,
 } from '@orbit/wish-core/wish'
 import {
-  UNLOCKS,
   XP,
   earnedTitles,
   levelFromXp,
@@ -26,6 +25,7 @@ import {
   stardustBalance,
 } from '@orbit/wish-core/dust'
 import type { ItemCategory, ItemId } from '@orbit/wish-core/items'
+import { LEVEL_REWARDS, unclaimedLevels } from '@orbit/wish-core/reward'
 import type { Wish, WishEvent } from '@orbit/wish-core/types'
 import {
   chooseWait,
@@ -35,6 +35,7 @@ import {
   claimMission,
   createWish,
   buyItem,
+  claimLevelReward,
   deposit,
   ensureStarterSet,
   equipItem,
@@ -59,7 +60,12 @@ import { ObservatoryScreen, type ObsSub } from './screens/ObservatoryScreen'
 import { buildMissions, type Mission } from './missions'
 import { TITLES } from './lib/labels'
 import { pad2, todayString } from './lib/format'
-import { useClaims, useDustLedger, useEquipped, useOwnedItems, usePlayer, useWishEvents, useWishes } from './lib/hooks'
+import { ITEM_LABELS } from './lib/items'
+import { titleOfLevel } from './lib/rewards'
+import { SAMPLE_REWARDS, readDevXp, writeDevXp } from './lib/dev'
+import {
+  useClaims, useDustLedger, useEquipped, useLevelClaims, useOwnedItems, usePlayer, useWishEvents, useWishes,
+} from './lib/hooks'
 import { loadBudgetView, type BudgetView } from './lib/budget'
 
 type Screen = 'hub' | 'quests' | 'codex' | 'observatory'
@@ -112,17 +118,19 @@ export default function App() {
   const storedDust = useDustLedger()
   const storedOwned = useOwnedItems()
   const storedEquipped = useEquipped()
+  const storedLevelClaims = useLevelClaims()
   const player = usePlayer()
   const loaded =
     storedWishes !== undefined && storedEvents !== undefined && storedClaims !== undefined
     && storedDust !== undefined && storedOwned !== undefined && storedEquipped !== undefined
-    && player !== undefined
+    && storedLevelClaims !== undefined && player !== undefined
   const wishes = useMemo(() => storedWishes ?? [], [storedWishes])
   const events = useMemo(() => storedEvents ?? [], [storedEvents])
   const claims = useMemo(() => storedClaims ?? [], [storedClaims])
   const dustRows = useMemo(() => storedDust ?? [], [storedDust])
   const owned = useMemo(() => storedOwned ?? [], [storedOwned])
   const equipped = useMemo(() => storedEquipped ?? [], [storedEquipped])
+  const levelClaims = useMemo(() => storedLevelClaims ?? [], [storedLevelClaims])
 
   const [activeId, setActiveId] = useState<string | null>(null)
 
@@ -144,6 +152,8 @@ export default function App() {
   const [xpPop, setXpPop] = useState<{ xp: number; dust: number } | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [dark, setDark] = useState(readTheme)
+  // 개발용 XP 가산. 프로덕션에서는 0으로 접히고 아래 계산이 그대로 남는다
+  const [devXp, setDevXp] = useState(() => (import.meta.env.DEV ? readDevXp() : 0))
   const [switcherOpen, setSwitcherOpen] = useState(false)
 
   useEffect(() => {
@@ -203,9 +213,20 @@ export default function App() {
    * 이 줄은 「누를 때마다 하나 더」가 목적이다.
    */
   const handleTestDust = useCallback(() => {
+    // 가드를 본문 안에 둔다. 넘기는 자리만 접으면 이 본문과 문구가 프로덕션 번들에 남는다
+    if (!import.meta.env.DEV) return
     const id = `devtest:${Date.now()}`
     void grantDust([{ id, type: 'earn', amount: 500, sourceType: 'bonus', sourceId: id, createdAt: Date.now() }])
     setToast('개발용 별가루 +500')
+  }, [])
+
+  const handleDevXp = useCallback((amount: number) => {
+    if (!import.meta.env.DEV) return
+    setDevXp((current) => {
+      const next = writeDevXp(amount === 0 ? 0 : current + amount)
+      setToast(next === 0 ? '개발용 XP 되돌림' : `개발용 XP ${next.toLocaleString('ko-KR')}`)
+      return next
+    })
   }, [])
 
   // 실패 사유는 전부 화면이 이미 막고 있는 경우다. 그래도 다른 탭에서 먼저 구매가
@@ -231,7 +252,12 @@ export default function App() {
     [wishes],
   )
   const doneWishes = useMemo(() => wishes.filter((wish) => wish.status === 'done'), [wishes])
-  const totalXp = useMemo(() => totalXpOf(wishes, events, claims), [wishes, events, claims])
+  // 개발용 가산값을 여기서 한 번만 더한다. 레벨·미수령 보상·레벨업 연출이 전부 이
+  // 값에서 파생되므로 실제 경로를 그대로 타게 된다
+  const totalXp = useMemo(
+    () => totalXpOf(wishes, events, claims) + devXp,
+    [wishes, events, claims, devXp],
+  )
   const level = levelFromXp(totalXp)
   const slots = slotCount(level.level, doneWishes.length)
   // 슬롯을 차지하는 것은 기간을 정한 위시뿐이다. 기간 없는 위시는 하루 몫 미션도
@@ -259,17 +285,49 @@ export default function App() {
 
   const pushReward = useCallback((next: Reward) => setRewards((current) => [...current, next]), [])
 
+  // 개발용 칭호 연출은 누를 때마다 실제 칭호표 순서로 하나씩 돌려 본다.
+  const previewTitleIndex = useRef(0)
+  const handlePreviewTitle = useCallback(() => {
+    if (!import.meta.env.DEV) return
+    const title = TITLES[previewTitleIndex.current % TITLES.length]
+    previewTitleIndex.current += 1
+    pushReward({ kind: 'title', name: title.name, detail: title.detail, icon: title.icon })
+  }, [pushReward])
+
+  // 미수령 레벨 보상. 지난 레벨을 자동 지급하지 않는다 — 고르는 보상이 섞여 있어서
+  // 대신 골라 주면 안 된다(§11)
+  const unclaimedRewards = useMemo(
+    () => unclaimedLevels(level.level, levelClaims.map((row) => row.level)),
+    [level.level, levelClaims],
+  )
+
+  const handleClaimReward = useCallback((value: number, selectedItemId?: ItemId) => {
+    void claimLevelReward(value, selectedItemId).then((outcome) => {
+      if (outcome !== 'ok') {
+        return setToast(outcome === 'claimed' ? '이미 수령한 레벨' : '보상을 고르지 않음')
+      }
+      const reward = LEVEL_REWARDS[value]
+      pushReward({
+        kind: 'levelReward',
+        level: value,
+        dust: reward?.dust ?? 0,
+        itemName: selectedItemId ? ITEM_LABELS[selectedItemId]?.name : undefined,
+      })
+    })
+  }, [pushReward])
+
   // XP는 파생값이라 레벨업은 "지급"이 아니라 문턱을 넘었는지 감시해서 잡는다.
   // 어디까지 연출을 봤는지는 Player에 남긴다. 안 그러면 새로고침마다 다시 뜬다.
   useEffect(() => {
     if (!loaded || !player || level.level <= player.celebratedLevel) return
-    const unlock = UNLOCKS.find((item) => item.level === level.level)
     pushReward({
       kind: 'levelup',
       from: player.celebratedLevel,
       to: level.level,
       title: level.title,
-      unlock: unlock?.name ?? null,
+      // 해금 문구는 이제 레벨 보상표에서 뽑는다. 두 표가 같은 레벨에 다른 것을
+      // 약속하지 않게 UNLOCKS를 없앤 결과다
+      unlock: LEVEL_REWARDS[level.level] ? titleOfLevel(level.level) : null,
     })
     void markCelebratedLevel(level.level)
   }, [loaded, player, level.level, level.title, pushReward])
@@ -489,6 +547,13 @@ export default function App() {
             stardust={stardust}
             onBuy={handleBuy}
             onTestDust={import.meta.env.DEV ? handleTestDust : undefined}
+            devXp={import.meta.env.DEV ? devXp : undefined}
+            onDevXp={import.meta.env.DEV ? handleDevXp : undefined}
+            onPreviewReward={import.meta.env.DEV ? pushReward : undefined}
+            onPreviewTitle={import.meta.env.DEV ? handlePreviewTitle : undefined}
+            sampleRewards={import.meta.env.DEV ? SAMPLE_REWARDS : undefined}
+            unclaimedRewards={unclaimedRewards}
+            onClaimReward={handleClaimReward}
             sub={obsSub}
             onSub={setObsSub}
           />

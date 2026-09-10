@@ -1,15 +1,20 @@
+import { useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { money } from '@orbit/budget-core/format'
-import { UNLOCKS, earnedTitles, levelFromXp, observerStats } from '@orbit/wish-core/xp'
-import type { ItemCategory, ItemId } from '@orbit/wish-core/items'
+import { earnedTitles, levelFromXp, observerStats } from '@orbit/wish-core/xp'
+import { MAX_REWARD_LEVEL, nextMajorReward } from '@orbit/wish-core/reward'
+import { equippedMap, type ItemCategory, type ItemId } from '@orbit/wish-core/items'
 import type { Equipped, OwnedItem } from '@orbit/wish-core/types'
+import { LevelRewardCard } from '../components/LevelRewardCard'
 import { UniversePreview } from '../components/UniversePreview'
 import { PixelBar } from '../components/PixelBar'
 import { TITLES } from '../lib/labels'
 import { pad2 } from '../lib/format'
 import { type BudgetView } from '../lib/budget'
+import { summarizeReward, titleOfLevel } from '../lib/rewards'
 import { DecorateScreen } from './DecorateScreen'
-import { ObservatorySettings } from './ObservatorySettings'
+import { LevelRewardScreen } from './LevelRewardScreen'
+import { ObservatorySettings, type DevSettings } from './ObservatorySettings'
 import { ShopScreen } from './ShopScreen'
 
 /**
@@ -17,11 +22,12 @@ import { ShopScreen } from './ShopScreen'
  * 대체한다(Orbit의 settingsSub와 같은 방식). 하단 탭과 HUD는 그대로 둔다 —
  * 모바일에서 .wl-nav는 셸의 flex 아이템이라 숨기면 스크롤 위치가 튄다.
  */
-export type ObsSub = 'decorate' | 'shop' | 'settings' | null
+export type ObsSub = 'rewards' | 'decorate' | 'shop' | 'settings' | null
 
 export function ObservatoryScreen({
   level, totalXp, pendingXp, stats, titles, budget, dark, onThemeChange,
-  owned, equipped, onEquip, onUnequip, stardust, onBuy, onTestDust, sub, onSub,
+  owned, equipped, onEquip, onUnequip, stardust, onBuy,
+  unclaimedRewards, onClaimReward, sub, onSub, ...dev
 }: {
   level: ReturnType<typeof levelFromXp>
   totalXp: number
@@ -37,11 +43,25 @@ export function ObservatoryScreen({
   onUnequip: (category: ItemCategory) => void
   stardust: number
   onBuy: (itemId: ItemId) => void
-  /** 개발 빌드에서만 들어온다. 설정 화면의 별가루 버튼 */
-  onTestDust?: () => void
+  unclaimedRewards: number[]
+  onClaimReward: (level: number, selectedItemId?: ItemId) => void
   sub: ObsSub
   onSub: (sub: ObsSub) => void
-}) {
+} & DevSettings) {
+  // 홈 카드의 선택형 보상에서 고른 값. 수령하면 비운다 — 다음 레벨 카드가 앞의
+  // 선택을 물려받으면 엉뚱한 아이템이 골라진 채로 보인다
+  const [pick, setPick] = useState<ItemId | undefined>(undefined)
+
+  if (sub === 'rewards') {
+    return (
+      <LevelRewardScreen
+        unclaimed={unclaimedRewards}
+        equipped={equipped}
+        onClaim={onClaimReward}
+        back={() => onSub(null)}
+      />
+    )
+  }
   if (sub === 'decorate') {
     return (
       <DecorateScreen
@@ -70,14 +90,16 @@ export function ObservatoryScreen({
         budget={budget}
         dark={dark}
         onThemeChange={onThemeChange}
-        onTestDust={onTestDust}
         back={() => onSub(null)}
+        {...dev}
       />
     )
   }
 
   const earned = new Set(titles)
-  const next = UNLOCKS.find((item) => item.level > level.level)
+  const upcoming = nextMajorReward(level.level)
+  const nextClaim = unclaimedRewards[0]
+  const items = equippedMap(equipped)
 
   return (
     <main className="observatory-screen">
@@ -109,27 +131,43 @@ export function ObservatoryScreen({
               누적 {totalXp.toLocaleString('ko-KR')} · 다음 레벨까지 {level.max ? 0 : level.need - level.into}
               {pendingXp > 0 && ` · 미수령 ${pendingXp}`}
             </p>
-            <p className="observer-xp-sub">
-              {next ? `다음 보상 Lv.${pad2(next.level)} ${next.name}` : '해금 전부 완료'}
-            </p>
           </div>
         </div>
       </section>
 
       <section className="panel">
-        <div className="panel-head"><div><span className="pixel-label">UNLOCKS</span><h2>궤도 해금</h2></div></div>
-        <ul className="unlock-track">
-          {UNLOCKS.map((item) => {
-            const open = level.level >= item.level
-            return (
-              <li key={item.level} className={open ? 'open' : 'closed'}>
-                <span className="pixel-label">LV. {pad2(item.level)}</span>
-                <strong>{item.name}</strong>
-                <span>{open ? '해금됨' : item.detail}</span>
-              </li>
-            )
-          })}
-        </ul>
+        <div className="panel-head">
+          <div><span className="pixel-label">REWARDS</span><h2>레벨 보상</h2></div>
+          {unclaimedRewards.length > 0
+            ? <span className="panel-count">미수령 {unclaimedRewards.length}</span>
+            : <span className="panel-count">Lv.{pad2(Math.min(level.level, MAX_REWARD_LEVEL))} 까지 수령</span>}
+        </div>
+        {/* 미수령이 있으면 여기서 바로 받는다. 화면을 옮기지 않는 것이 기본이고,
+            둘 이상 밀렸을 때만(§11 소급) 목록 화면을 연다 */}
+        {nextClaim !== undefined ? (
+          <>
+            <LevelRewardCard
+              level={nextClaim}
+              items={items}
+              pick={pick}
+              onPick={setPick}
+              onClaim={() => { onClaimReward(nextClaim, pick); setPick(undefined) }}
+            />
+            {unclaimedRewards.length > 1 && (
+              <button className="reward-more" onClick={() => onSub('rewards')}>
+                나머지 {unclaimedRewards.length - 1}개 ›
+              </button>
+            )}
+          </>
+        ) : upcoming ? (
+          <div className="reward-next">
+            <span className="pixel-label">LV. {pad2(upcoming.level)}</span>
+            <strong>{titleOfLevel(upcoming.level)}</strong>
+            <span>{summarizeReward(upcoming)}</span>
+          </div>
+        ) : (
+          <p className="shop-empty">Lv.{MAX_REWARD_LEVEL} 보상까지 전부 수령</p>
+        )}
       </section>
 
       <section className="stat-grid">

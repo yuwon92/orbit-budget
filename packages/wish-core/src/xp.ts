@@ -50,16 +50,11 @@ export const LEVEL_TITLES = [
   'STARWEAVER', 'LIGHTKEEPER', 'GALAXIAN', 'COSMOCRAFTER',
 ]
 
-/** 레벨별 해금. 슬롯은 레벨 또는 완주 횟수 중 먼저 도달한 쪽으로 열린다 */
-export const UNLOCKS = [
-  { level: 2, name: '위시 슬롯 2', detail: '또는 완주 1개' },
-  { level: 3, name: '행성 색 선택', detail: '궤도 팔레트 개방' },
-  { level: 4, name: '위시 슬롯 3', detail: '또는 완주 3개' },
-  { level: 5, name: '행성 링 패턴', detail: '궤도 장식' },
-  { level: 6, name: '성계 배경', detail: '도감 테마' },
-  { level: 7, name: '목표 이미지', detail: '위시에 사진 첨부' },
-  { level: 8, name: '행성 커스터마이즈', detail: '픽셀 직접 편집' },
-]
+// 레벨별 해금표(UNLOCKS)는 없앴다. Lv.2~8만 덮는데 `reward.ts`의 LEVEL_REWARDS가
+// 같은 레벨에 다른 것을 약속해서 두 표가 공존하면 사용자가 헷갈린다. 레벨이 무엇을
+// 열어 주는지는 이제 보상표 한 곳에서만 정한다.
+//
+// 슬롯은 여전히 아래 slotCount가 유일한 판정자다 — 보상표의 slot은 표시용이다.
 
 export interface LevelInfo {
   level: number
