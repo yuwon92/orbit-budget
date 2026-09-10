@@ -1362,3 +1362,51 @@ ul { padding: 0; list-style: none; }
   color: var(--text-tertiary);
 }
 .item-rarity i { width: 6px; height: 6px; border-radius: 50%; }
+
+/* ── 상점 ──────────────────────────────────────────── */
+
+.shop-balance {
+  margin-bottom: 12px;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+}
+.shop-balance strong { font-size: 16px; }
+.shop-balance > span:last-child { font-size: 11px; color: var(--text-tertiary); }
+
+.shop-empty { padding: 18px 0; font-size: 12px; color: var(--text-tertiary); text-align: center; }
+
+/* 살 수 없는 가격은 색으로만 구분한다. 글자에 바탕색을 깔지 않는다 */
+.item-cell small.short { color: var(--danger); }
+
+.purchase-preview {
+  margin: 4px 0 14px;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+.purchase-preview p { font-size: 11px; color: var(--text-tertiary); }
+
+.purchase-rows {
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.purchase-rows li {
+  padding: 11px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+.purchase-rows li + li { border-top: 1px solid var(--border); }
+.purchase-rows span { color: var(--text-secondary); }
+.purchase-rows .total { background: var(--surface-sub); }
+.purchase-rows .total strong { font-size: 15px; }

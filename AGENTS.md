@@ -39,7 +39,7 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `apps/wish/src/lib/hooks.ts` | `useWishes`/`useWishEvents`/`useClaims`/`useDustLedger`/`useOwnedItems`/`useEquipped`/`usePlayer`. **App에서만 구독하고 prop으로 내림** |
 | `apps/wish/src/lib/budget.ts` | Orbit 예산 요약을 읽는 통로. 저장소가 나뉘는 환경에서는 **이 파일만 서버 조회로 교체** |
 | `apps/wish/src/lib/format.ts` | `todayString`·`formatDate`·`pad2` |
-| `apps/wish/src/components/` | `PixelPlanet`(행성·궤도 링), `UniversePreview`(장착 합성), `PixelBar`, `OrbitMap`, `RewardOverlay`, `Sheets` |
+| `apps/wish/src/components/` | `PixelPlanet`(행성·궤도 링), `UniversePreview`(장착 합성), `PixelBar`, `OrbitMap`, `RewardOverlay`, `Sheets`(구매 확인 시트 포함) |
 | `apps/wish/src/components/PlanetCosmeticsPreview.tsx` | 꾸미기 프리셋 개발용 비교 화면. `npm run dev` → `/apps/wish/?cosmetics-preview`. 프로덕션 번들에서는 트리셰이킹으로 빠진다 |
 | `apps/wish/src/index.css` | Wish 전역 CSS 한 파일. 밝은 노랑 우주 |
 | `packages/wish-core/src/types.ts` | Wish·WishEvent·Claim·Player 타입 |
@@ -47,6 +47,7 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `packages/wish-core/src/xp.ts` | XP 배점표·Lv.20 곡선·미션 수령 단위·연속 기록·통계·칭호. **순수 함수만** |
 | `packages/wish-core/src/dust.ts` | 별가루 배점표·원장 합계·지급 이름표 생성. **순수 함수만** |
 | `packages/wish-core/src/items.ts` | 아이템 카탈로그 — id·카테고리·희귀도·획득처·가격, 기본 아이템, 스타터 세트, 장착 상태 펴기. **순수 함수만** |
+| `packages/wish-core/src/shop.ts` | 상점 목록·가격·구매 가능 판정·구매 원장 줄. **순수 함수만** |
 | `packages/wish-core/src/reward.ts` | 레벨 보상 미수령 판정. **순수 함수만** |
 | `packages/wish-bridge/src/db.ts` | `orbital-wish` Dexie 인스턴스와 v1·v2 스키마 |
 | `packages/wish-bridge/src/index.ts` | **위시 데이터의 유일한 쓰기 창구.** 이벤트와 savedAmount를 한 트랜잭션에서 갱신 |
@@ -63,7 +64,7 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 
 **설치되는 PWA는 하나다.** iOS가 홈 화면 앱마다 저장소를 나누기 때문에, 아이콘을 두 개 만들면 Wish가 Orbit 예산을 읽지 못한다(기기 확인 완료). manifest·서비스 워커는 `apps/orbit`에만 있고 Wish는 같은 앱의 `/wish/` 화면이다. 코드베이스는 그대로 분리돼 있어 나중에 도메인을 나눌 때 manifest만 되살리면 된다.
 
-Wish는 게임 허브 흐름이다. 자원 HUD 상시 노출, 오늘의 미션과 보상 수령, 퀘스트 로그·우주 도감 분리, 관측소 하위 화면은 꾸미기·설정. 제품 규칙과 수치는 `orbit-wish-spec.md`, 디자인은 `orbit-wish-ui-design-guide.md`(둘 다 gitignore된 로컬 문서).
+Wish는 게임 허브 흐름이다. 자원 HUD 상시 노출, 오늘의 미션과 보상 수령, 퀘스트 로그·우주 도감 분리, 관측소 하위 화면은 꾸미기·상점·설정. 제품 규칙과 수치는 `orbit-wish-spec.md`, 디자인은 `orbit-wish-ui-design-guide.md`(둘 다 gitignore된 로컬 문서).
 
 **관측소 하위 화면은 `.wl-content` 안에서 탭 뷰 전체를 대체한다.** 바텀시트가 아니고 하단 탭·HUD는 그대로 둔다 — 680px 이하에서 `.wl-nav`는 셸의 flex 아이템이라 숨기면 스크롤이 튄다. 상태는 `App.tsx`의 `obsSub` 하나이고, 탭 이동은 `goScreen()`을 거쳐 `obsSub`를 반드시 비운다(안 그러면 다른 탭에 갔다 돌아왔을 때 하위 화면이 그대로 뜬다). 뒤로가기는 각 화면 헤더의 `.back-button`뿐 — 라우터가 없어 브라우저·스와이프 뒤로가기는 미지원. 알려진 격차.
 
@@ -73,6 +74,12 @@ Wish는 게임 허브 흐름이다. 자원 HUD 상시 노출, 오늘의 미션�
 - **장착 상태는 관측소 미리보기·꾸미기에만 적용한다.** 허브·퀘스트·도감의 위시 행성은 그 위시 고유의 모습
 - **배경을 장착하면 기존 완주 별이 배경 모서리 자리에 묻힌다.** 그래서 완주 표시는 효과 아이템이 맡고 스타터 세트에 기본 효과가 들어 있다. 스타터에서 효과를 빼면 완주 표시가 통째로 사라진다
 - **`ensureStarterSet()`은 처음 지급하는 것만 장착한다.** 해제는 줄 삭제라 흔적이 없어서, 매번 장착하면 사용자가 해제해 둔 자리를 앱을 열 때마다 되돌린다
+
+**상점은 화면이 들고 있던 잔액을 믿지 않는다.** `buyItem`이 트랜잭션 안에서 원장을 다시 합산해 `canBuy`를 한 번 더 부른다 — 화면을 그린 뒤 다른 탭에서 구매가 일어났을 수 있다. 검증·차감 줄·아이템 지급이 한 묶음이라 「별가루만 빠지고 아이템은 없는」 상태가 없다.
+
+- **두 번 눌러도 안전한 이유** — 별가루 줄 이름표가 `purchase:buy:${itemId}`이고 `ownedItems`의 기본키가 `itemId`라 두 번째 시도는 둘 다 「이미 있음」으로 걸린다. 재구매 불가와 자연히 맞아떨어진다
+- **상점에는 `source: 'shop'`만 오른다.** 상자·레벨·지역 전용은 꾸미기 화면이 획득처와 함께 보여 준다
+- **가격은 레벨 곡선과 같은 기준 사용자로 잡는다**(하루 13.6 별가루). 둘이 다른 사용자를 가정하면 밸런스가 어긋난다. `PRICES`(`items.ts`) 한 곳에만 있다
 
 Wish는 Orbit 예산을 `getOrbitSnapshot()`으로 읽고, 구매 확정 때만 `createWishPurchaseTransaction()`으로 거래를 쓴다. `connected`는 DB가 열리는지가 아니라 데이터가 있는지로 판단한다 — 저장소가 분리된 환경에서는 빈 DB가 새로 만들어질 뿐이라 존재 여부로는 알 수 없다. 위시 저금은 이번 달 순저금 합계로 자유비용에서 실제 차감한다. 스냅샷의 `carryoverAmount`는 어제 끝난 예산 기간에서 자유비용으로 넘어온 잔액 합계(`releasedLeftovers`)이며, 카테고리별 내역은 `carryoverRows`에 그대로 실어 보낸다. 남은 자유비용을 넘지 않게 자른다 — 스냅샷이 이번 달 거래만 읽으므로 매달 1일은 기준일이 지난달이라 0이고 `carryoverDate`도 null이다.
 

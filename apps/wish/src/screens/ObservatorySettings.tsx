@@ -3,10 +3,12 @@ import { money } from '@orbit/budget-core/format'
 import { sinceLabel, type BudgetView } from '../lib/budget'
 
 /** 관측소 하위 화면. 탭 뷰 전체를 대체하고 하단 탭은 그대로 둔다 */
-export function ObservatorySettings({ budget, dark, onThemeChange, back }: {
+export function ObservatorySettings({ budget, dark, onThemeChange, onTestDust, back }: {
   budget: BudgetView | null
   dark: boolean
   onThemeChange: (value: boolean) => void
+  /** 개발 빌드에서만 들어온다. 프로덕션에서는 아래 블록이 통째로 빠진다 */
+  onTestDust?: () => void
   back: () => void
 }) {
   return (
@@ -47,6 +49,15 @@ export function ObservatorySettings({ budget, dark, onThemeChange, back }: {
             <div><strong>프로토타입</strong></div>
             <span className="version-label">WISH 0.1</span>
           </div>
+          {import.meta.env.DEV && onTestDust && (
+            <div className="setting-row">
+              <div>
+                <strong>개발용 별가루</strong>
+                <span>상점·보상 확인용 · 프로덕션 빌드에서 빠짐</span>
+              </div>
+              <button className="ghost-button" onClick={onTestDust}>+500</button>
+            </div>
+          )}
         </div>
       </section>
     </main>

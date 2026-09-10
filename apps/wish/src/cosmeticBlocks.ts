@@ -1,8 +1,10 @@
 import { GRID, type Block } from './planet'
 import type { CosmeticFill, PixelPreset, PlanetPalette, RingPreset } from './cosmetics'
 
+// 고정색은 자기 색이 있는 프리셋만 갖는다. 없는 값을 찍으라고 하면 팔레트 중간톤으로
+// 떨어뜨린다 — 색이 undefined로 나가면 그 칸이 검게 찍힌다.
 const colorOf = (preset: PixelPreset, palette: PlanetPalette, fill: CosmeticFill) => {
-  if (fill === 'accent' || fill === 'soft' || fill === 'ink') return preset[fill]
+  if (fill === 'accent' || fill === 'soft' || fill === 'ink') return preset[fill] ?? palette.mid
   return palette[fill]
 }
 

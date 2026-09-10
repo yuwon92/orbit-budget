@@ -34,6 +34,7 @@ import {
   claimAll as claimAllWrite,
   claimMission,
   createWish,
+  buyItem,
   deposit,
   ensureStarterSet,
   equipItem,
@@ -90,6 +91,19 @@ export default function App() {
   // 돌아왔을 때 하위 화면이 그대로 떠 있다
   const [obsSub, setObsSub] = useState<ObsSub>(null)
   const goScreen = useCallback((next: Screen) => { setObsSub(null); setScreen(next) }, [])
+
+  // 하위 화면에 들어갈 때 스크롤을 위로 되돌린다. 탭 뷰 전체를 대체하는 전환이라
+  // 이전 화면의 스크롤 위치가 남으면 새 화면이 헤더(뒤로가기)가 화면 밖인 상태로 시작한다.
+  // 680px 이하에서는 .wl-content가 스크롤 컨테이너이고 그보다 넓으면 문서가 스크롤돼서
+  // 둘을 함께 되돌린다.
+  //
+  // 관측소로 돌아올 때(null)는 되돌리지 않는다 — 진입 행이 화면 아래쪽에 있어서
+  // 꾸미기와 상점을 오갈 때마다 다시 내려야 한다.
+  useEffect(() => {
+    if (obsSub === null) return
+    document.querySelector<HTMLElement>('.wl-content')?.scrollTo({ top: 0 })
+    window.scrollTo({ top: 0 })
+  }, [obsSub])
 
   // 저장소 구독은 여기 한 곳뿐. 화면들은 prop으로 받는다
   const storedWishes = useWishes()
@@ -178,6 +192,30 @@ export default function App() {
     void equipItem(category, itemId)
   }, [])
   const handleUnequip = useCallback((category: ItemCategory) => { void unequipItem(category) }, [])
+
+  /**
+   * 개발용 별가루. 상점·상자·레벨 보상은 잔액이 있어야 확인되는데 정상 경로로 모으려면
+   * 며칠이 걸린다. `import.meta.env.DEV`가 빌드 때 false로 접히면서 이 핸들러를 넘기는
+   * 자리와 설정 화면의 버튼이 함께 빠진다.
+   *
+   * 이름표에 시각을 섞는다 — 지급 함수는 이미 있는 이름표를 건너뛰므로 고정값이면
+   * 두 번째 누름부터 아무 일도 일어나지 않는다. 결정적이어야 하는 실제 지급과 달리
+   * 이 줄은 「누를 때마다 하나 더」가 목적이다.
+   */
+  const handleTestDust = useCallback(() => {
+    const id = `devtest:${Date.now()}`
+    void grantDust([{ id, type: 'earn', amount: 500, sourceType: 'bonus', sourceId: id, createdAt: Date.now() }])
+    setToast('개발용 별가루 +500')
+  }, [])
+
+  // 실패 사유는 전부 화면이 이미 막고 있는 경우다. 그래도 다른 탭에서 먼저 구매가
+  // 일어나면 여기로 온다 — 조용히 넘기지 않고 이유를 띄운다
+  const handleBuy = useCallback((itemId: ItemId) => {
+    void buyItem(itemId).then((outcome) => {
+      if (outcome === 'ok') return setToast('아이템 획득 · 꾸미기에서 장착')
+      setToast(outcome === 'poor' ? '별가루 부족' : outcome === 'owned' ? '이미 보유 중' : '상점에 없는 아이템')
+    })
+  }, [])
 
   // 화면에 필요한 값은 전부 이벤트와 수령 기록에서 파생한다. 저장하는 XP는 없다.
   const openWishes = useMemo(
@@ -448,6 +486,9 @@ export default function App() {
             equipped={equipped}
             onEquip={handleEquip}
             onUnequip={handleUnequip}
+            stardust={stardust}
+            onBuy={handleBuy}
+            onTestDust={import.meta.env.DEV ? handleTestDust : undefined}
             sub={obsSub}
             onSub={setObsSub}
           />

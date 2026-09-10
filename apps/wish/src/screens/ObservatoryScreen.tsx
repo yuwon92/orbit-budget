@@ -10,17 +10,18 @@ import { pad2 } from '../lib/format'
 import { type BudgetView } from '../lib/budget'
 import { DecorateScreen } from './DecorateScreen'
 import { ObservatorySettings } from './ObservatorySettings'
+import { ShopScreen } from './ShopScreen'
 
 /**
  * 관측소 하위 화면. 바텀시트가 아니라 .wl-content 안에서 탭 뷰 전체를
  * 대체한다(Orbit의 settingsSub와 같은 방식). 하단 탭과 HUD는 그대로 둔다 —
  * 모바일에서 .wl-nav는 셸의 flex 아이템이라 숨기면 스크롤 위치가 튄다.
  */
-export type ObsSub = 'decorate' | 'settings' | null
+export type ObsSub = 'decorate' | 'shop' | 'settings' | null
 
 export function ObservatoryScreen({
   level, totalXp, pendingXp, stats, titles, budget, dark, onThemeChange,
-  owned, equipped, onEquip, onUnequip, sub, onSub,
+  owned, equipped, onEquip, onUnequip, stardust, onBuy, onTestDust, sub, onSub,
 }: {
   level: ReturnType<typeof levelFromXp>
   totalXp: number
@@ -34,6 +35,10 @@ export function ObservatoryScreen({
   equipped: Equipped[]
   onEquip: (category: ItemCategory, itemId: ItemId) => void
   onUnequip: (category: ItemCategory) => void
+  stardust: number
+  onBuy: (itemId: ItemId) => void
+  /** 개발 빌드에서만 들어온다. 설정 화면의 별가루 버튼 */
+  onTestDust?: () => void
   sub: ObsSub
   onSub: (sub: ObsSub) => void
 }) {
@@ -48,8 +53,27 @@ export function ObservatoryScreen({
       />
     )
   }
+  if (sub === 'shop') {
+    return (
+      <ShopScreen
+        owned={owned}
+        equipped={equipped}
+        stardust={stardust}
+        onBuy={onBuy}
+        back={() => onSub(null)}
+      />
+    )
+  }
   if (sub === 'settings') {
-    return <ObservatorySettings budget={budget} dark={dark} onThemeChange={onThemeChange} back={() => onSub(null)} />
+    return (
+      <ObservatorySettings
+        budget={budget}
+        dark={dark}
+        onThemeChange={onThemeChange}
+        onTestDust={onTestDust}
+        back={() => onSub(null)}
+      />
+    )
   }
 
   const earned = new Set(titles)
@@ -143,6 +167,12 @@ export function ObservatoryScreen({
         <li>
           <button onClick={() => onSub('decorate')}>
             <span><strong>꾸미기</strong><small>행성 색 · 무늬 · 링 · 배경 · 동료 · 효과</small></span>
+            <ChevronRight size={17} />
+          </button>
+        </li>
+        <li>
+          <button onClick={() => onSub('shop')}>
+            <span><strong>상점</strong><small>별가루 {stardust.toLocaleString('ko-KR')} · 꾸미기 아이템 구매</small></span>
             <ChevronRight size={17} />
           </button>
         </li>

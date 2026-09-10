@@ -42,9 +42,16 @@ export interface PixelPreset {
   id: string
   pixels: readonly CosmeticPixel[]
   lines?: readonly CosmeticLine[]
-  accent: string
-  soft: string
-  ink: string
+  /**
+   * 프리셋 고정색. 자기 색이 있는 아이템만 갖는다 — 성운의 푸른 띠, 위성의 흙색처럼
+   * 행성과 별개의 물체이거나 이름이 색을 뜻하는 것들.
+   *
+   * 기본 아이템(기본 별밭·반짝이는 별)은 이 세 값을 두지 않고 팔레트 4단만 쓴다.
+   * 행성 색을 바꿨는데 주변 별만 노랑으로 남으면 색이 반만 바뀐 것처럼 보인다.
+   */
+  accent?: string
+  soft?: string
+  ink?: string
 }
 
 /** 고리 한 겹. 중심 (16,16)에서 rx·ry 타원을 tilt만큼 기울여 훑는다. */
@@ -169,7 +176,6 @@ export const COMPANION_PRESETS = [
     // 별 무리만 팔레트 4단으로만 그린다. 행성에서 떨어져 나온 조각이라는 뜻이고,
     // 고정색을 한 칸이라도 섞으면 팔레트를 바꿨을 때 그 칸만 남아 튄다.
     id: 'companion-star-cluster',
-    accent: '#FFD43B', soft: '#FFF1AC', ink: '#EA8A00',
     pixels: [
       { x: 24, y: 2, h: 5, fill: 'light' },
       { x: 23, y: 4, w: 3, fill: 'light' },
@@ -184,16 +190,17 @@ export const COMPANION_PRESETS = [
 // 성계 배경은 고리 띠(x 3~29 · y 11~21)를 피해 위아래 모서리에만 놓는다.
 export const BACKGROUND_PRESETS = [
   {
+    // 기본 배경은 팔레트 4단만 쓴다. mid·light·dark가 원래 고정색과 같은 값이라
+    // 기본 태양색에서는 모습이 그대로이고, 색을 바꾸면 주변 별도 함께 물든다.
     id: 'background-starfield',
-    accent: '#FFB126', soft: '#FFD43B', ink: '#EA8A00',
     pixels: [
       // 십자 별 셋 + 2×2 별 셋. 1px 점은 32px에서 사라져 쓰지 않고, 동료 구역은 비운다.
-      { x: 3, y: 4, w: 3, fill: 'accent' }, { x: 4, y: 3, h: 3, fill: 'soft' },
-      { x: 8, y: 3, w: 3, fill: 'accent' }, { x: 9, y: 2, h: 3, fill: 'soft' },
-      { x: 5, y: 25, w: 3, fill: 'accent' }, { x: 6, y: 24, h: 3, fill: 'soft' },
-      { x: 14, y: 2, w: 2, h: 2, fill: 'ink' }, { x: 14, y: 2, fill: 'accent' },
-      { x: 27, y: 25, w: 2, h: 2, fill: 'accent' }, { x: 27, y: 25, fill: 'soft' },
-      { x: 12, y: 28, w: 2, h: 2, fill: 'ink' }, { x: 12, y: 28, fill: 'accent' },
+      { x: 3, y: 4, w: 3, fill: 'mid' }, { x: 4, y: 3, h: 3, fill: 'light' },
+      { x: 8, y: 3, w: 3, fill: 'mid' }, { x: 9, y: 2, h: 3, fill: 'light' },
+      { x: 5, y: 25, w: 3, fill: 'mid' }, { x: 6, y: 24, h: 3, fill: 'light' },
+      { x: 14, y: 2, w: 2, h: 2, fill: 'dark' }, { x: 14, y: 2, fill: 'mid' },
+      { x: 27, y: 25, w: 2, h: 2, fill: 'mid' }, { x: 27, y: 25, fill: 'light' },
+      { x: 12, y: 28, w: 2, h: 2, fill: 'dark' }, { x: 12, y: 28, fill: 'mid' },
     ],
   },
   {
@@ -242,14 +249,15 @@ export const BACKGROUND_PRESETS = [
 // 자리를 대신 채운다 — 그래서 스타터 세트에 기본 효과가 들어 있다.
 export const EFFECT_PRESETS = [
   {
+    // 기본 효과도 팔레트 4단만 쓴다. 원래 고정색 soft(#FFF1AC)가 기본 태양색의
+    // highlight와 같은 값이라 기본 모습은 그대로다.
     id: 'effect-sparkles',
-    accent: '#FFD43B', soft: '#FFF1AC', ink: '#EA8A00',
     pixels: [
-      { x: 3, y: 4, w: 3, fill: 'soft' }, { x: 4, y: 3, h: 3, fill: 'highlight' },
-      { x: 12, y: 3, w: 3, fill: 'soft' }, { x: 13, y: 2, h: 3, fill: 'light' },
-      { x: 4, y: 25, w: 3, fill: 'light' }, { x: 5, y: 24, h: 3, fill: 'soft' },
-      { x: 25, y: 26, w: 3, fill: 'soft' }, { x: 26, y: 25, h: 3, fill: 'highlight' },
-      { x: 16, y: 28, w: 3, fill: 'soft' }, { x: 17, y: 27, h: 3, fill: 'light' },
+      { x: 3, y: 4, w: 3, fill: 'highlight' }, { x: 4, y: 3, h: 3, fill: 'highlight' },
+      { x: 12, y: 3, w: 3, fill: 'highlight' }, { x: 13, y: 2, h: 3, fill: 'light' },
+      { x: 4, y: 25, w: 3, fill: 'light' }, { x: 5, y: 24, h: 3, fill: 'highlight' },
+      { x: 25, y: 26, w: 3, fill: 'highlight' }, { x: 26, y: 25, h: 3, fill: 'highlight' },
+      { x: 16, y: 28, w: 3, fill: 'highlight' }, { x: 17, y: 27, h: 3, fill: 'light' },
     ],
   },
   {

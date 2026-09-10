@@ -3,7 +3,8 @@
 // 둘이 어긋나면 진행률과 이벤트 원장이 갈라진다.
 import { canPurchase, monthlyDeposit, seedFromId } from '@orbit/wish-core/wish'
 import { claimIdOf, type MissionUnit } from '@orbit/wish-core/xp'
-import { missionDustGrants, type DustRow } from '@orbit/wish-core/dust'
+import { missionDustGrants, stardustBalance, type DustRow } from '@orbit/wish-core/dust'
+import { canBuy, purchaseRows, type BuyRefusal } from '@orbit/wish-core/shop'
 import { STARTER_ITEMS, equipTargetOf } from '@orbit/wish-core/items'
 import type { Claim, OwnedItem, Player, Wish, WishEvent } from '@orbit/wish-core/types'
 import { wishDb } from './db'
@@ -324,6 +325,30 @@ export async function ensureStarterSet() {
       return category ? [{ category, itemId, updatedAt: now }] : []
     })
     if (equips.length) await wishDb.equipped.bulkPut(equips)
+  })
+}
+
+export type BuyOutcome = 'ok' | BuyRefusal
+
+/**
+ * 상점 구매. 검증 → 별가루 차감 줄 → 아이템 지급이 한 트랜잭션이다.
+ * 중간에 앱이 꺼지면 전부 취소된다 — 「별가루만 빠지고 아이템은 없는」 상태를 막는다(§7).
+ *
+ * **화면이 들고 있던 잔액을 믿지 않는다.** 트랜잭션 안에서 원장을 다시 합산한다 —
+ * 화면을 그린 뒤 다른 탭에서 구매가 일어났을 수 있다.
+ */
+export async function buyItem(itemId: string): Promise<BuyOutcome> {
+  return wishDb.transaction('rw', wishDb.dustLedger, wishDb.ownedItems, async () => {
+    const balance = stardustBalance(await wishDb.dustLedger.toArray())
+    const owned = (await wishDb.ownedItems.toArray()).map((row) => row.itemId)
+    const check = canBuy(balance, itemId, owned)
+    if (!check.ok) return check.reason
+    const { dust } = purchaseRows(itemId, Date.now())
+    await addDustRows([dust])
+    await addOwnedItems([{
+      itemId, acquiredAt: dust.createdAt, sourceType: 'shop', sourceId: dust.id,
+    }])
+    return 'ok'
   })
 }
 

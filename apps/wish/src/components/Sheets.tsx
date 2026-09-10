@@ -7,6 +7,7 @@ import { XP } from '@orbit/wish-core/xp'
 import { addDays, canPurchase, daysBetween, purchaseUnlockDate, remainingDays } from '@orbit/wish-core/wish'
 import type { Wish } from '@orbit/wish-core/types'
 import { useSheetFocus, useSheetViewport } from '../lib/sheet'
+import { PixelPlanet } from './PixelPlanet'
 
 /** 미션 수행 시트. 하루 몫이 프리필된 상태로 열린다. */
 export function CollectSheet({ wishName, dailyShare, availableAmount, onClose, onCollect, onSkip }: {
@@ -411,6 +412,58 @@ export function WishSheet({ today, wish, creationMode = 'list', existingShare, f
           </section>
         )}
       </form>
+    </div>
+  )
+}
+
+/**
+ * 구매 확인 시트. 잔액·가격·구매 후 잔액을 함께 보여 준다(스펙 §7).
+ *
+ * 한 번 누르면 바로 확정되는 흐름을 두지 않는다 — 별가루는 되돌릴 수단이 없다.
+ * 미리보기는 꾸미기와 같은 그림이다. 상점에서 본 모습과 장착한 뒤 모습이 달라선 안 된다.
+ */
+export function PurchaseSheet({ name, detail, price, balance, planet, onClose, onBuy }: {
+  name: string
+  detail: string
+  price: number
+  balance: number
+  /** 이 아이템까지 얹은 미리보기 인자. 꾸미기 격자와 같은 값을 받는다 */
+  planet: Parameters<typeof PixelPlanet>[0]
+  onClose: () => void
+  onBuy: () => void
+}) {
+  useSheetViewport()
+  const after = balance - price
+  const poor = after < 0
+
+  return (
+    <div className="sheet-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <section className="wl-sheet" role="dialog" aria-modal="true" aria-labelledby="purchase-title">
+        <div className="sheet-handle" />
+        <header className="sheet-header">
+          <div>
+            <span className="pixel-label">SHOP · PURCHASE</span>
+            <h2 id="purchase-title">{name}</h2>
+          </div>
+          <button className="icon-button" onClick={onClose} aria-label="닫기"><X size={20} /></button>
+        </header>
+
+        <div className="purchase-preview">
+          <PixelPlanet {...planet} />
+          <p>{detail}</p>
+        </div>
+
+        <ul className="purchase-rows">
+          <li><span>보유 별가루</span><strong>{money(balance)}</strong></li>
+          <li><span>가격</span><strong>−{money(price)}</strong></li>
+          <li className="total"><span>구매 후 잔액</span><strong>{money(after)}</strong></li>
+        </ul>
+
+        <button className="primary-button full" disabled={poor} onClick={onBuy}>
+          {poor ? `별가루 ${money(-after)} 부족` : '이 아이템 구매'}
+        </button>
+        <button className="quiet-button full" onClick={onClose}>그만두기</button>
+      </section>
     </div>
   )
 }

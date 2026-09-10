@@ -53,6 +53,7 @@ import {
   equippedMap,
   itemsOfCategory,
 } from '../packages/wish-core/src/items.ts'
+import { canBuy, priceOf, purchaseRows, shopItems } from '../packages/wish-core/src/shop.ts'
 import { unclaimedLevels } from '../packages/wish-core/src/reward.ts'
 import type { Claim, Wish, WishEvent, WishStatus } from '../packages/wish-core/src/types.ts'
 
@@ -463,6 +464,54 @@ const claim = (date: string, missionId: string): Claim => ({
   assert.deepEqual(equippedMap([{ category: '없는칸', itemId: 'ring-single' }]), {})
   assert.deepEqual(equippedMap([]), {})
   console.log('아이템 카탈로그 통과')
+}
+
+// ── 상점 ─────────────────────────────────────────────
+{
+  const entries = shopItems([])
+  assert.ok(entries.length > 0)
+  // 상점에 오르는 것은 전부 shop 획득처다. 상자·레벨 전용이 섞이면 살 수 없는 값이 뜬다
+  entries.forEach((entry) => {
+    assert.equal(ITEMS[entry.itemId].source, 'shop')
+    assert.ok(entry.price > 0, `가격 없는 상품 ${entry.itemId}`)
+  })
+  // 순서는 카탈로그 순서다. 보유한 것을 뒤로 밀면 구매 직후 격자가 튄다
+  assert.deepEqual(
+    shopItems(['ring-double']).map((entry) => entry.itemId),
+    entries.map((entry) => entry.itemId),
+  )
+  assert.equal(shopItems(['ring-double']).find((e) => e.itemId === 'ring-double')?.owned, true)
+
+  assert.equal(priceOf('ring-double'), ITEMS['ring-double'].price)
+  // 레벨 전용·없는 아이템은 가격이 없다
+  assert.equal(priceOf('planet-color-aurora'), undefined)
+  assert.equal(priceOf('없는-아이템'), undefined)
+
+  const rare = ITEMS['ring-double'].price!
+  assert.equal(canBuy(rare, 'ring-double', []).ok, true)
+  assert.equal(canBuy(rare - 1, 'ring-double', []).ok, false)
+  assert.equal(canBuy(rare - 1, 'ring-double', []).ok === false
+    && canBuy(rare - 1, 'ring-double', []).reason, 'poor')
+  const ownedCheck = canBuy(9999, 'ring-double', ['ring-double'])
+  assert.equal(ownedCheck.ok === false && ownedCheck.reason, 'owned')
+  // 팔지 않는 물건은 보유 여부보다 먼저 걸린다 — 「보유 중」이라고 답하면 상점에
+  // 있는 물건처럼 읽힌다
+  const levelOnly = canBuy(9999, 'planet-color-aurora', ['planet-color-aurora'])
+  assert.equal(levelOnly.ok === false && levelOnly.reason, 'notForSale')
+  const missing = canBuy(9999, '없는-아이템', [])
+  assert.equal(missing.ok === false && missing.reason, 'notForSale')
+
+  const rows = purchaseRows('background-nebula', 0)
+  assert.equal(rows.dust.type, 'spend')
+  assert.equal(rows.dust.id, 'purchase:buy:background-nebula')
+  assert.equal(rows.dust.sourceType, 'purchase')
+  assert.equal(rows.dust.amount, ITEMS['background-nebula'].price)
+  // 이름표에 now를 섞지 않는다. 두 번 눌러도 두 번째가 이미 있는 줄로 걸려야 한다
+  assert.equal(purchaseRows('background-nebula', 1_700_000_000_000).dust.id, rows.dust.id)
+  // 잔액은 원장 합계다. 차감 줄이 들어오면 그만큼 줄어든다
+  const earned = { id: 'e', type: 'earn' as const, amount: 1_000, sourceType: 'bonus' as const, sourceId: 'e', createdAt: 0 }
+  assert.equal(stardustBalance([earned, rows.dust]), 1_000 - ITEMS['background-nebula'].price!)
+  console.log('상점 통과')
 }
 
 // ── 레벨 보상 소급 ────────────────────────────────────

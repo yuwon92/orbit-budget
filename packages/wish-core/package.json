@@ -7,6 +7,7 @@
     "./dust": "./src/dust.ts",
     "./items": "./src/items.ts",
     "./reward": "./src/reward.ts",
+    "./shop": "./src/shop.ts",
     "./types": "./src/types.ts",
     "./wish": "./src/wish.ts",
     "./xp": "./src/xp.ts"

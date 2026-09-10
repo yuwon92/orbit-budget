@@ -84,7 +84,9 @@ export function DecorateScreen({ owned, equipped, onEquip, onUnequip, back }: {
                 className={`item-cell${isEquipped ? ' equipped' : ''}${isOwned ? '' : ' locked'}`}
                 aria-pressed={isEquipped}
                 disabled={!isOwned}
-                onClick={() => onEquip(category, itemId)}
+                // 장착한 것을 다시 누르면 해제한다. 위쪽 해제 버튼까지 올라가지 않아도
+                // 되고, 같은 자리에서 켰다 껐다 비교할 수 있다
+                onClick={() => (isEquipped ? onUnequip(category) : onEquip(category, itemId))}
               >
                 <span className="item-thumb">
                   <PixelPlanet
@@ -105,7 +107,7 @@ export function DecorateScreen({ owned, equipped, onEquip, onUnequip, back }: {
                   <i style={{ background: RARITY_DOTS[def.rarity] }} aria-hidden="true" />
                   {RARITY_LABELS[def.rarity]}
                 </span>
-                <small>{isEquipped ? '장착 중' : isOwned ? label.detail : `${SOURCE_LABELS[def.source]} 전용`}</small>
+                <small>{isEquipped ? '장착 중 · 다시 눌러 해제' : isOwned ? label.detail : `${SOURCE_LABELS[def.source]} 전용`}</small>
               </button>
             )
           })}

@@ -37,10 +37,11 @@ export interface ItemDef {
  * 기준 사용자(하루 몫 매일 5 + 넘기기 주 2회 30/7 + 연속 7일 30/7)가 하루 약 13.6을
  * 모으므로 하루 14로 잡고 목표 기간을 곱한 값이다.
  *
- * common 5일 · rare 18일 · epic 28일. legendary는 값을 두지 않는다 —
- * 레벨·지역 이정표 전용이라 상점에 오르지 않는다.
+ * common 4~7일(54~95) · rare 2~3주(190~285) · epic 3~5주(285~476). 각 구간의
+ * 가운데를 잡았다. legendary는 값을 두지 않는다 — 레벨·지역 이정표 전용이라
+ * 상점에 오르지 않는다.
  */
-export const PRICES = { common: 70, rare: 250, epic: 400 } as const
+export const PRICES = { common: 80, rare: 240, epic: 400 } as const
 
 const CATALOG = {
   // ── 행성 색상 ──
