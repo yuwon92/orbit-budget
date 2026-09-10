@@ -233,7 +233,7 @@ export default function App() {
   // 일어나면 여기로 온다 — 조용히 넘기지 않고 이유를 띄운다
   const handleBuy = useCallback((itemId: ItemId) => {
     void buyItem(itemId).then((outcome) => {
-      if (outcome === 'ok') return setToast('아이템 획득 · 꾸미기에서 장착')
+      if (outcome === 'ok') return setToast('아이템 획득')
       setToast(outcome === 'poor' ? '별가루 부족' : outcome === 'owned' ? '이미 보유 중' : '상점에 없는 아이템')
     })
   }, [])

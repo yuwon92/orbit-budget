@@ -54,6 +54,27 @@ export function summarizeReward(reward: LevelReward): string {
   return parts.join(' · ')
 }
 
+/**
+ * 그 아이템을 주는 레벨. 확정 지급과 선택형 풀을 함께 본다.
+ *
+ * 꾸미기에서 미보유 아이템을 눌렀을 때 「어디서 얻는가」를 답하는 데 쓴다. 카탈로그의
+ * `source`는 갈래만 알려 주지 몇 레벨인지는 모른다 — 보상표를 거꾸로 읽는 곳이 여기다.
+ * 같은 아이템이 두 레벨에 걸리지 않는 것은 검산이 지킨다(`verify-wish.ts`).
+ */
+const LEVEL_OF_ITEM = new Map<string, number>()
+for (const reward of Object.values(LEVEL_REWARDS)) {
+  for (const itemId of reward.fixed ?? []) LEVEL_OF_ITEM.set(itemId, reward.level)
+  for (const itemId of reward.choice?.of ?? []) LEVEL_OF_ITEM.set(itemId, reward.level)
+}
+
+export const levelOfItem = (itemId: ItemId): number | undefined => LEVEL_OF_ITEM.get(itemId)
+
+/** 그 레벨에서 고르는 보상인가. 「3종 중 하나로 선택」과 확정 지급을 가른다 */
+export const isChoiceItem = (itemId: ItemId): boolean => {
+  const level = LEVEL_OF_ITEM.get(itemId)
+  return level !== undefined && Boolean(LEVEL_REWARDS[level]?.choice?.of.includes(itemId))
+}
+
 export const summarizeLevel = (level: number): string => {
   const reward = LEVEL_REWARDS[level]
   return reward ? summarizeReward(reward) : ''

@@ -1283,9 +1283,27 @@ ul { padding: 0; list-style: none; }
 .obs-shortcuts strong { font-size: 13px; }
 .obs-shortcuts small { font-size: 10px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
 
-/* 하위 화면 머리의 좌우 두 문. 왼쪽은 관측소로, 오른쪽은 짝이 되는 화면으로 */
-.sub-head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.sub-head-row .ghost-button { margin-bottom: 10px; }
+/* 하위 화면 제목 줄. 오른쪽 끝에 짝이 되는 화면으로 건너가는 아이콘을 둔다 —
+   상점 ↔ 꾸미기는 오가며 쓰는 짝이라 관측소를 거칠 이유가 없다 */
+.sub-head-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sub-head-jump {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 15px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-emoji);
+  font-variant-emoji: emoji;
+  font-size: 24px;
+  line-height: 1;
+  background: var(--surface);
+  cursor: pointer;
+}
+.sub-head-jump:hover { transform: translateY(-1px); }
+.sub-head-jump:active { transform: scale(.97); }
 
 /* ── 꾸미기 ────────────────────────────────────────── */
 
@@ -1371,7 +1389,11 @@ ul { padding: 0; list-style: none; }
 }
 /* 장착 표시는 테두리로만 한다. 글자에 배경색 칩을 깔지 않는다 */
 .item-cell.equipped { border-color: var(--text-primary); border-width: 2px; padding: 9px 7px 10px; }
-.item-cell.locked { opacity: 0.5; cursor: default; }
+/* 미보유는 흐리게 두되 누를 수는 있다 — 시트가 큰 미리보기와 획득 방법을 답한다 */
+.item-cell.locked { opacity: .5; }
+.item-cell.locked:hover { opacity: .72; }
+/* 상점에서 이미 보유한 칸. 흐리게 죽이지 않는다. 눌러서 바로 장착할 수 있다 */
+.item-cell.owned { border-style: dashed; }
 .item-thumb { display: block; line-height: 0; }
 .item-cell strong { font-size: 12px; }
 .item-cell small { font-size: 10px; font-weight: 400; color: var(--text-tertiary); line-height: 1.35; }
@@ -1412,7 +1434,25 @@ ul { padding: 0; list-style: none; }
   justify-items: center;
   gap: 6px;
 }
-.purchase-preview p { font-size: 11px; color: var(--text-tertiary); }
+.purchase-preview p { font-size: 11px; color: var(--text-tertiary); text-align: center; }
+/* 희귀도 색 점 + 분류. 바탕색을 깔지 않는다 */
+.item-sheet-meta { display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 11px; color: var(--text-secondary) !important; }
+.item-sheet-meta i { flex: 0 0 auto; width: 6px; height: 6px; border-radius: 50%; }
+
+/* 미보유 + 상점에 없는 아이템의 획득 방법 */
+.item-sheet-source {
+  margin-bottom: 14px;
+  padding: 13px 15px;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  display: grid;
+  gap: 5px;
+  background: var(--surface-sub);
+}
+.item-sheet-source strong { font-size: 14px; }
+.item-sheet-source > span:not(.pixel-label) { font-size: 11px; color: var(--text-tertiary); }
+
+.item-sheet-state { padding: 4px 0 2px; font-size: 12px; color: var(--text-secondary); text-align: center; }
 
 .purchase-rows {
   margin-bottom: 14px;

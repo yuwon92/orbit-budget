@@ -6,7 +6,7 @@ import { claimIdOf, type MissionUnit } from '@orbit/wish-core/xp'
 import { missionDustGrants, stardustBalance, type DustRow } from '@orbit/wish-core/dust'
 import { canBuy, purchaseRows, type BuyRefusal } from '@orbit/wish-core/shop'
 import { LEVEL_REWARDS, isValidChoice, itemsOfLevel, levelDustId } from '@orbit/wish-core/reward'
-import { STARTER_ITEMS, equipTargetOf } from '@orbit/wish-core/items'
+import { MANDATORY_CATEGORIES, STARTER_ITEMS, defaultItemFor, equipTargetOf, isMandatory } from '@orbit/wish-core/items'
 import type { Claim, OwnedBox, OwnedItem, Player, Wish, WishEvent } from '@orbit/wish-core/types'
 import { wishDb } from './db'
 
@@ -300,17 +300,17 @@ export async function equipItem(category: string, itemId: string) {
   })
 }
 
-/** 해제는 그 카테고리의 장착 줄을 지운다. 행성 색은 필수라 해제하지 않는다. */
+/** 해제는 그 카테고리의 장착 줄을 지운다. 필수 자리는 해제하지 않는다. */
 export async function unequipItem(category: string) {
-  if (category === 'planetColor') return
+  if (isMandatory(category)) return
   await wishDb.equipped.delete(category)
 }
 
 /**
  * Lv.1 `관측자 스타터 세트`. 처음 앱을 열 때 기본 아이템을 보유·장착 상태로 만든다.
  *
- * **처음 지급하는 것만 장착한다.** 단, 필수 슬롯인 행성 색의 장착 줄이 없으면
- * 기본 태양색을 복구한다. 다른 슬롯은 사용자가 해제한 상태를 그대로 둔다.
+ * **처음 지급하는 것만 장착한다.** 단, 필수 자리(행성 색·무늬·궤도 링)의 장착 줄이
+ * 없으면 기본 아이템을 복구한다. 나머지는 사용자가 해제한 상태를 그대로 둔다.
  */
 export async function ensureStarterSet() {
   const now = Date.now()
@@ -326,8 +326,10 @@ export async function ensureStarterSet() {
       const category = equipTargetOf(itemId)
       return category ? [{ category, itemId, updatedAt: now }] : []
     })
-    if (!(await wishDb.equipped.get('planetColor'))) {
-      equips.push({ category: 'planetColor', itemId: 'planet-color-solar', updatedAt: now })
+    for (const category of MANDATORY_CATEGORIES) {
+      if (equips.some((row) => row.category === category)) continue
+      if (await wishDb.equipped.get(category)) continue
+      equips.push({ category, itemId: defaultItemFor(category), updatedAt: now })
     }
     if (equips.length) await wishDb.equipped.bulkPut(equips)
   })

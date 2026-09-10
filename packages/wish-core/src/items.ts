@@ -138,6 +138,18 @@ export function defaultItemFor(category: ItemCategory): ItemId {
   return DEFAULTS[category]
 }
 
+/**
+ * 해제할 수 없는 자리. 행성 자체를 이루는 층이라 비우면 그릴 것이 사라진다 —
+ * 색이 없으면 팔레트가 없고, 무늬가 없으면 표면이 민무늬가 되고, 링이 없으면
+ * 고리 단계부터의 모습이 통째로 빠진다. 세 자리는 스타터 세트가 처음부터 채운다.
+ *
+ * 배경·동료·효과는 빈 자리가 그 자체로 성립해서 해제할 수 있다.
+ */
+export const MANDATORY_CATEGORIES: ItemCategory[] = ['planetColor', 'planetPattern', 'ring']
+
+export const isMandatory = (category: string): boolean =>
+  MANDATORY_CATEGORIES.includes(category as ItemCategory)
+
 const DEFAULTS: Record<ItemCategory, ItemId> = {
   planetColor: 'planet-color-solar',
   planetPattern: 'planet-pattern-crater',
@@ -170,8 +182,8 @@ export function equippedMap(
     const fits = ITEMS[row.itemId as ItemId]?.category === category
     map[category] = fits ? (row.itemId as ItemId) : defaultItemFor(category)
   }
-  // 행성 색은 해제할 수 없는 필수 슬롯이다. 예전 데이터에 장착 줄이 없더라도
-  // 기본 태양색으로 즉시 그리고, 저장소는 ensureStarterSet이 복구한다.
-  map.planetColor ??= defaultItemFor('planetColor')
+  // 필수 자리는 예전 데이터에 장착 줄이 없더라도 기본 아이템으로 즉시 그린다.
+  // 저장소 쪽 복구는 ensureStarterSet이 맡는다.
+  for (const category of MANDATORY_CATEGORIES) map[category] ??= defaultItemFor(category)
   return map
 }

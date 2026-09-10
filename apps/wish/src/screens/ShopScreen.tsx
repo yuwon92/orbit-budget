@@ -1,40 +1,43 @@
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft } from 'lucide-react'
 import { money } from '@orbit/budget-core/format'
 import { CATEGORIES, ITEMS, equippedMap, type ItemCategory, type ItemId } from '@orbit/wish-core/items'
 import { shopItems } from '@orbit/wish-core/shop'
 import type { Equipped, OwnedItem } from '@orbit/wish-core/types'
 import { PixelPlanet } from '../components/PixelPlanet'
-import { PurchaseSheet } from '../components/Sheets'
+import { ItemSheet } from '../components/Sheets'
 import { CATEGORY_LABELS, ITEM_LABELS, RARITY_DOTS, RARITY_LABELS } from '../lib/items'
 import { previewProps } from '../lib/preview'
 
 type Filter = ItemCategory | 'all'
 
 /** 관측소 하위 화면. 탭 뷰 전체를 대체하고 하단 탭은 그대로 둔다 */
-export function ShopScreen({ owned, equipped, stardust, onBuy, onDecorate, back }: {
+export function ShopScreen({ owned, equipped, stardust, onBuy, onEquip, onUnequip, onDecorate, back }: {
   owned: OwnedItem[]
   equipped: Equipped[]
   stardust: number
   onBuy: (itemId: ItemId) => void
+  onEquip: (category: ItemCategory, itemId: ItemId) => void
+  onUnequip: (category: ItemCategory) => void
   onDecorate: () => void
   back: () => void
 }) {
   const [filter, setFilter] = useState<Filter>('all')
   const [confirming, setConfirming] = useState<ItemId | null>(null)
   const items = equippedMap(equipped)
+  const ownedIds = new Set(owned.map((item) => item.itemId))
   const entries = shopItems(owned.map((item) => item.itemId))
   const shown = filter === 'all' ? entries : entries.filter((entry) => ITEMS[entry.itemId].category === filter)
 
   return (
     <main className="obs-sub">
       <header className="screen-head">
-        <div className="sub-head-row">
-          <button className="back-button" onClick={back}><ChevronLeft size={15} /> 관측소</button>
-          <button className="ghost-button" onClick={onDecorate}>꾸미기 <ChevronRight size={13} /></button>
-        </div>
+        <button className="back-button" onClick={back}><ChevronLeft size={15} /> 관측소</button>
         <span className="pixel-label">SHOP</span>
-        <h1>상점</h1>
+        <div className="sub-head-title">
+          <h1>상점</h1>
+          <button className="sub-head-jump" onClick={onDecorate} aria-label="꾸미기로 이동">🎨</button>
+        </div>
       </header>
 
       <p className="shop-balance">
@@ -82,12 +85,11 @@ export function ShopScreen({ owned, equipped, stardust, onBuy, onDecorate, back 
                   <button
                     key={entry.itemId}
                     type="button"
-                    className={`item-cell${entry.owned ? ' locked' : ''}`}
-                    disabled={entry.owned}
+                    className={`item-cell${entry.owned ? ' owned' : ''}`}
                     onClick={() => setConfirming(entry.itemId)}
                   >
                     <span className="item-thumb">
-                      <PixelPlanet {...previewProps(items, entry.itemId, 56)} dim={entry.owned} />
+                      <PixelPlanet {...previewProps(items, entry.itemId, 56)} />
                     </span>
                     <strong>{label.name}</strong>
                     <span className="item-rarity">
@@ -95,7 +97,7 @@ export function ShopScreen({ owned, equipped, stardust, onBuy, onDecorate, back 
                       {RARITY_LABELS[def.rarity]}
                     </span>
                     {entry.owned
-                      ? <small>보유 중</small>
+                      ? <small>{items[ITEMS[entry.itemId].category] === entry.itemId ? '장착 중' : '보유 중'}</small>
                       : <small className={poor ? 'short' : undefined}>✨ {money(entry.price)}</small>}
                   </button>
                 )
@@ -105,14 +107,15 @@ export function ShopScreen({ owned, equipped, stardust, onBuy, onDecorate, back 
       </section>
 
       {confirming !== null && (
-        <PurchaseSheet
-          name={ITEM_LABELS[confirming].name}
-          detail={`${CATEGORY_LABELS[ITEMS[confirming].category].name} · ${RARITY_LABELS[ITEMS[confirming].rarity]}`}
-          price={ITEMS[confirming].price ?? 0}
-          balance={stardust}
-          planet={previewProps(items, confirming, 124)}
+        <ItemSheet
+          itemId={confirming}
+          items={items}
+          owned={ownedIds.has(confirming)}
+          stardust={stardust}
+          onBuy={onBuy}
+          onEquip={onEquip}
+          onUnequip={onUnequip}
           onClose={() => setConfirming(null)}
-          onBuy={() => { onBuy(confirming); setConfirming(null) }}
         />
       )}
     </main>

@@ -46,11 +46,13 @@ import {
   CATEGORIES,
   ITEMS,
   ITEM_IDS,
+  MANDATORY_CATEGORIES,
   RARITIES,
   STARTER_ITEMS,
   defaultItemFor,
   equipTargetOf,
   equippedMap,
+  isMandatory,
   itemsOfCategory,
 } from '../packages/wish-core/src/items.ts'
 import { canBuy, priceOf, purchaseRows, shopItems } from '../packages/wish-core/src/shop.ts'
@@ -456,25 +458,37 @@ const claim = (date: string, missionId: string): Claim => ({
   assert.ok(starterCategories.includes('background'))
   assert.ok(starterCategories.includes('effect'))
 
+  // 필수 자리는 스타터 세트가 전부 채운다. 하나라도 빠지면 처음 연 사람의 행성에서
+  // 그 층이 통째로 없는 채로 시작하고, 해제도 못 하니 채울 방법이 없다
+  MANDATORY_CATEGORIES.forEach((category) => {
+    assert.ok(starterCategories.includes(category), `필수 자리에 스타터 없음 ${category}`)
+    assert.equal(ITEMS[defaultItemFor(category)].source, 'level', `필수 자리 기본값이 상점 물건 ${category}`)
+  })
+
+  // 필수 자리의 기본값만 담은 바닥. equippedMap은 언제나 여기서부터 시작한다
+  const floor = Object.fromEntries(MANDATORY_CATEGORIES.map((c) => [c, defaultItemFor(c)]))
+
   // 장착 상태 펴기 — 카탈로그에 없는 id는 기본값으로 대신 그린다. 줄은 지우지 않는다
   assert.deepEqual(
     equippedMap([{ category: 'ring', itemId: 'ring-double' }]),
-    { ring: 'ring-double', planetColor: defaultItemFor('planetColor') },
+    { ...floor, ring: 'ring-double' },
   )
   assert.deepEqual(
     equippedMap([{ category: 'ring', itemId: 'ring-사라짐' }]),
-    { ring: defaultItemFor('ring'), planetColor: defaultItemFor('planetColor') },
+    { ...floor, ring: defaultItemFor('ring') },
   )
   // 카테고리가 어긋난 줄도 그 카테고리의 기본값으로 떨어진다
   assert.deepEqual(
     equippedMap([{ category: 'ring', itemId: 'planet-color-coral' }]),
-    { ring: defaultItemFor('ring'), planetColor: defaultItemFor('planetColor') },
+    { ...floor, ring: defaultItemFor('ring') },
   )
-  assert.deepEqual(
-    equippedMap([{ category: '없는칸', itemId: 'ring-single' }]),
-    { planetColor: defaultItemFor('planetColor') },
-  )
-  assert.deepEqual(equippedMap([]), { planetColor: defaultItemFor('planetColor') })
+  assert.deepEqual(equippedMap([{ category: '없는칸', itemId: 'ring-single' }]), floor)
+  assert.deepEqual(equippedMap([]), floor)
+
+  // 해제할 수 있는 자리는 바닥에 끼어들지 않는다. 배경·동료·효과는 빈 채로 성립한다
+  CATEGORIES.filter((c) => !isMandatory(c)).forEach((category) => {
+    assert.equal(equippedMap([])[category], undefined, `해제 가능한데 기본값이 붙는 ${category}`)
+  })
   console.log('아이템 카탈로그 통과')
 }
 

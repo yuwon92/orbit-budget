@@ -1,13 +1,17 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Clock3, Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react'
+import { Clock3, Minus, Plus, ShoppingBag, Sparkles, Trash2, X } from 'lucide-react'
 import { money } from '@orbit/budget-core/format'
 import type { ReleasedLeftover } from '@orbit/budget-core/budget'
 import type { Category } from '@orbit/budget-core/types'
 import { XP } from '@orbit/wish-core/xp'
 import { addDays, canPurchase, daysBetween, purchaseUnlockDate, remainingDays } from '@orbit/wish-core/wish'
 import type { Wish } from '@orbit/wish-core/types'
+import { ITEMS, isMandatory, type ItemCategory, type ItemId } from '@orbit/wish-core/items'
 import { useSheetFocus, useSheetViewport } from '../lib/sheet'
+import { CATEGORY_LABELS, ITEM_LABELS, RARITY_DOTS, RARITY_LABELS, SOURCE_LABELS } from '../lib/items'
+import { previewProps, type EquippedItems } from '../lib/preview'
+import { isChoiceItem, levelOfItem, titleOfLevel } from '../lib/rewards'
 import { PixelPlanet } from './PixelPlanet'
 
 /**
@@ -430,55 +434,108 @@ export function WishSheet({ today, wish, creationMode = 'list', existingShare, f
 }
 
 /**
- * 구매 확인 시트. 잔액·가격·구매 후 잔액을 함께 보여 준다(스펙 §7).
+ * 아이템 한 장 시트. 상점과 꾸미기가 같은 것을 쓴다.
  *
- * 한 번 누르면 바로 확정되는 흐름을 두지 않는다 — 별가루는 되돌릴 수단이 없다.
- * 미리보기는 꾸미기와 같은 그림이다. 상점에서 본 모습과 장착한 뒤 모습이 달라선 안 된다.
+ * 한 시트가 네 상태를 모두 답한다 — 살 수 있는가 · 어디서 얻는가 · 장착했는가 ·
+ * 지금 장착하면 어떻게 보이는가. 상점 전용 시트와 꾸미기 전용 시트를 나누면 같은
+ * 아이템을 두 화면에서 다르게 설명하게 된다.
+ *
+ * **미리보기는 지금 장착한 모습에 이 아이템만 얹은 그림이다.** 아직 사지 않은 것도
+ * 크게 볼 수 있어야 살지 말지를 정할 수 있다(스펙 §6 「상점에서 본 모습과 장착한 뒤
+ * 모습이 달라선 안 된다」).
+ *
+ * 구매해도 시트를 닫지 않는다. `owned`가 뒤집히며 버튼이 바로 「장착」으로 바뀐다 —
+ * 사고 나서 꾸미기를 다시 찾아 들어가지 않게.
  */
-export function PurchaseSheet({ name, detail, price, balance, planet, onClose, onBuy }: {
-  name: string
-  detail: string
-  price: number
-  balance: number
-  /** 이 아이템까지 얹은 미리보기 인자. 꾸미기 격자와 같은 값을 받는다 */
-  planet: Parameters<typeof PixelPlanet>[0]
+export function ItemSheet({ itemId, items, owned, stardust, onBuy, onEquip, onUnequip, onClose }: {
+  itemId: ItemId
+  /** 지금 장착 상태. 미리보기와 「장착 중」 판정에 함께 쓴다 */
+  items: EquippedItems
+  owned: boolean
+  stardust: number
+  onBuy: (itemId: ItemId) => void
+  onEquip: (category: ItemCategory, itemId: ItemId) => void
+  onUnequip: (category: ItemCategory) => void
   onClose: () => void
-  onBuy: () => void
 }) {
   useSheetViewport()
-  const after = balance - price
+  const def = ITEMS[itemId]
+  const label = ITEM_LABELS[itemId]
+  const category = def.category
+  const equipped = items[category] === itemId
+  const forSale = def.source === 'shop'
+  const price = def.price ?? 0
+  const after = stardust - price
   const poor = after < 0
+  const level = levelOfItem(itemId)
 
   return (
     <SheetPortal>
-    <div className="sheet-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section className="wl-sheet" role="dialog" aria-modal="true" aria-labelledby="purchase-title">
-        <div className="sheet-handle" />
-        <header className="sheet-header">
-          <div>
-            <span className="pixel-label">SHOP · PURCHASE</span>
-            <h2 id="purchase-title">{name}</h2>
+      <div className="sheet-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+        <section className="wl-sheet" role="dialog" aria-modal="true" aria-labelledby="item-title">
+          <div className="sheet-handle" />
+          <header className="sheet-header">
+            <div>
+              <span className="pixel-label">{owned ? 'ITEM · OWNED' : forSale ? 'ITEM · FOR SALE' : 'ITEM · LOCKED'}</span>
+              <h2 id="item-title">{label.name}</h2>
+            </div>
+            <button className="icon-button" onClick={onClose} aria-label="닫기"><X size={20} /></button>
+          </header>
+
+          <div className="purchase-preview">
+            <PixelPlanet {...previewProps(items, itemId, 132)} />
+            <p className="item-sheet-meta">
+              <i style={{ background: RARITY_DOTS[def.rarity] }} aria-hidden="true" />
+              {CATEGORY_LABELS[category].name} · {RARITY_LABELS[def.rarity]} · {label.detail}
+            </p>
           </div>
-          <button className="icon-button" onClick={onClose} aria-label="닫기"><X size={20} /></button>
-        </header>
 
-        <div className="purchase-preview">
-          <PixelPlanet {...planet} />
-          <p>{detail}</p>
-        </div>
+          {/* 미보유 + 판매 중이면 값을, 아니면 어디서 얻는지를 답한다 */}
+          {!owned && forSale && (
+            <ul className="purchase-rows">
+              <li><span>보유 별가루</span><strong>{money(stardust)}</strong></li>
+              <li><span>가격</span><strong>−{money(price)}</strong></li>
+              <li className="total"><span>구매 후 잔액</span><strong>{money(after)}</strong></li>
+            </ul>
+          )}
+          {!owned && !forSale && (
+            <p className="item-sheet-source">
+              <span className="pixel-label">HOW TO GET</span>
+              <strong>
+                {level !== undefined
+                  ? `Lv.${level} 「${titleOfLevel(level)}」`
+                  : SOURCE_LABELS[def.source]}
+              </strong>
+              <span>
+                {level !== undefined
+                  ? isChoiceItem(itemId) ? '레벨 보상에서 여러 종 중 하나로 선택' : '레벨 보상으로 확정 지급'
+                  : '상점에 오르지 않는 아이템 · 개봉 기능 준비 중'}
+              </span>
+            </p>
+          )}
 
-        <ul className="purchase-rows">
-          <li><span>보유 별가루</span><strong>{money(balance)}</strong></li>
-          <li><span>가격</span><strong>−{money(price)}</strong></li>
-          <li className="total"><span>구매 후 잔액</span><strong>{money(after)}</strong></li>
-        </ul>
+          {owned ? (
+            equipped ? (
+              <>
+                <p className="item-sheet-state">장착 중</p>
+                {!isMandatory(category) && (
+                  <button className="secondary-button full" onClick={() => onUnequip(category)}>장착 해제</button>
+                )}
+              </>
+            ) : (
+              <button className="primary-button full" onClick={() => onEquip(category, itemId)}>
+                <Sparkles size={16} /> 장착
+              </button>
+            )
+          ) : forSale ? (
+            <button className="primary-button full" disabled={poor} onClick={() => onBuy(itemId)}>
+              <ShoppingBag size={16} /> {poor ? `별가루 ${money(-after)} 부족` : `별가루 ${money(price)} 지불`}
+            </button>
+          ) : null}
 
-        <button className="primary-button full" disabled={poor} onClick={onBuy}>
-          {poor ? `별가루 ${money(-after)} 부족` : '이 아이템 구매'}
-        </button>
-        <button className="quiet-button full" onClick={onClose}>그만두기</button>
-      </section>
-    </div>
+          <button className="quiet-button full" onClick={onClose}>닫기</button>
+        </section>
+      </div>
     </SheetPortal>
   )
 }

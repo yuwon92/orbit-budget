@@ -66,6 +66,8 @@ export function ObservatoryScreen({
       <DecorateScreen
         owned={owned}
         equipped={equipped}
+        stardust={stardust}
+        onBuy={onBuy}
         onEquip={onEquip}
         onUnequip={onUnequip}
         onShop={() => onSub('shop')}
@@ -80,6 +82,8 @@ export function ObservatoryScreen({
         equipped={equipped}
         stardust={stardust}
         onBuy={onBuy}
+        onEquip={onEquip}
+        onUnequip={onUnequip}
         onDecorate={() => onSub('decorate')}
         back={() => onSub(null)}
       />

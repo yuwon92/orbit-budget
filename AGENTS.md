@@ -36,20 +36,20 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `apps/wish/src/cosmeticBlocks.ts` | 꾸미기 데이터를 SVG `rect` 블록으로 변환하고 seed 기반 결정적 배치를 만드는 렌더러 |
 | `apps/wish/src/lib/labels.ts` | 단계 이름·칭호 문구·도감 칸 수 |
 | `apps/wish/src/lib/items.ts` | 아이템·카테고리·희귀도·획득처 한국어 카피 + 희귀도 색 점 |
-| `apps/wish/src/lib/rewards.ts` | 레벨 보상 이름·상자 이름·한 줄 요약 |
+| `apps/wish/src/lib/rewards.ts` | 레벨 보상 이름·상자 이름·한 줄 요약 + 아이템 → 레벨 역인덱스(`levelOfItem`) |
 | `apps/wish/src/lib/preview.ts` | 아이템 미리보기 인자. 꾸미기·상점·보상이 같은 그림을 쓴다 |
 | `apps/wish/src/lib/dev.ts` | 개발용 XP 가산·연출 표본. `import.meta.env.DEV` 안에서만 호출 |
 | `apps/wish/src/lib/hooks.ts` | `useWishes`/`useWishEvents`/`useClaims`/`useDustLedger`/`useOwnedItems`/`useEquipped`/`useLevelClaims`/`usePlayer`. **App에서만 구독하고 prop으로 내림** |
 | `apps/wish/src/lib/budget.ts` | Orbit 예산 요약을 읽는 통로. 저장소가 나뉘는 환경에서는 **이 파일만 서버 조회로 교체** |
 | `apps/wish/src/lib/format.ts` | `todayString`·`formatDate`·`pad2` |
-| `apps/wish/src/components/` | `PixelPlanet`(행성·궤도 링), `UniversePreview`(장착 합성), `LevelRewardCard`(수령 카드), `PixelBar`, `OrbitMap`, `RewardOverlay`, `Sheets`(구매 확인 시트 포함) |
+| `apps/wish/src/components/` | `PixelPlanet`(행성·궤도 링), `UniversePreview`(장착 합성), `LevelRewardCard`(수령 카드), `PixelBar`, `OrbitMap`, `RewardOverlay`, `Sheets`(상점·꾸미기 공용 `ItemSheet` 포함) |
 | `apps/wish/src/components/PlanetCosmeticsPreview.tsx` | 꾸미기 프리셋 개발용 비교 화면. `npm run dev` → `/apps/wish/?cosmetics-preview`. 프로덕션 번들에서는 트리셰이킹으로 빠진다 |
 | `apps/wish/src/index.css` | Wish 전역 CSS 한 파일. 밝은 노랑 우주 |
 | `packages/wish-core/src/types.ts` | Wish·WishEvent·Claim·Player 타입 |
 | `packages/wish-core/src/wish.ts` | 하루 몫·남은 일수·하루 판정·월 저금 합계·구매 잠금. **순수 함수만** |
 | `packages/wish-core/src/xp.ts` | XP 배점표·Lv.20 곡선·슬롯 판정·미션 수령 단위·연속 기록·통계·칭호. **순수 함수만**. 해금표(`UNLOCKS`)는 보상표로 합쳐 없앴다 |
 | `packages/wish-core/src/dust.ts` | 별가루 배점표·원장 합계·지급 이름표 생성. **순수 함수만** |
-| `packages/wish-core/src/items.ts` | 아이템 카탈로그 — id·카테고리·희귀도·획득처·가격, 기본 아이템, 스타터 세트, 장착 상태 펴기. **순수 함수만** |
+| `packages/wish-core/src/items.ts` | 아이템 카탈로그 — id·카테고리·희귀도·획득처·가격, 기본 아이템, 스타터 세트, 필수 자리, 장착 상태 펴기. **순수 함수만** |
 | `packages/wish-core/src/shop.ts` | 상점 목록·가격·구매 가능 판정·구매 원장 줄. **순수 함수만** |
 | `packages/wish-core/src/reward.ts` | Lv.1~20 보상표·미수령 판정·선택 유효성·다음 보상. **순수 함수만** |
 | `packages/wish-bridge/src/db.ts` | `orbital-wish` Dexie 인스턴스와 v1·v2 스키마 |
@@ -79,6 +79,9 @@ Wish는 게임 허브 흐름이다. 자원 HUD 상시 노출, 오늘의 미션�
 - **장착 상태는 관측소 미리보기·꾸미기에만 적용한다.** 허브·퀘스트·도감의 위시 행성은 그 위시 고유의 모습
 - **배경을 장착하면 기존 완주 별이 배경 모서리 자리에 묻힌다.** 그래서 완주 표시는 효과 아이템이 맡고 스타터 세트에 기본 효과가 들어 있다. 스타터에서 효과를 빼면 완주 표시가 통째로 사라진다
 - **`ensureStarterSet()`은 처음 지급하는 것만 장착한다.** 해제는 줄 삭제라 흔적이 없어서, 매번 장착하면 사용자가 해제해 둔 자리를 앱을 열 때마다 되돌린다
+- **필수 자리는 행성 색·무늬·궤도 링 셋**(`MANDATORY_CATEGORIES`). 행성 자체를 이루는 층이라 비우면 그릴 것이 사라진다. `unequipItem`이 막고, `equippedMap`이 화면 쪽 바닥을 깔고, `ensureStarterSet`이 저장소를 복구한다 — 세 곳이 같은 목록을 본다. 배경·동료·효과는 빈 자리가 그 자체로 성립해 해제할 수 있다
+- **아이템 한 장은 `ItemSheet` 하나로 답한다** — 살 수 있는가 · 어디서 얻는가 · 장착했는가 · 장착하면 어떻게 보이는가. 상점과 꾸미기가 같은 것을 쓴다. 구매해도 시트를 닫지 않는다: `owned`가 뒤집히며 버튼이 「장착」으로 바뀐다
+- **꾸미기 격자의 미보유 칸은 눌린다.** 흐리게 두되 막지 않는다 — 눌러도 아무 일이 없으면 왜 안 되는지 알 수 없다. 상점 전용은 값, 레벨 전용은 `Lv.N 보상`을 칸에서 바로 보여 준다
 
 **상점은 화면이 들고 있던 잔액을 믿지 않는다.** `buyItem`이 트랜잭션 안에서 원장을 다시 합산해 `canBuy`를 한 번 더 부른다 — 화면을 그린 뒤 다른 탭에서 구매가 일어났을 수 있다. 검증·차감 줄·아이템 지급이 한 묶음이라 「별가루만 빠지고 아이템은 없는」 상태가 없다.
 
