@@ -1650,3 +1650,13 @@ ul { padding: 0; list-style: none; }
   letter-spacing: 0;
   line-height: 1.4;
 }
+
+/* ── 레벨 로드맵 시트 스크롤 ───────────────────────── */
+
+/* 세로 flex의 기본 shrink로 긴 목록이 시트 안에서 줄어든 뒤 overflow:hidden에
+   잘리지 않게 한다. 실제 넘침은 .wl-sheet가 받아 모바일에서도 끝까지 스크롤한다. */
+.roadmap-sheet > * { flex-shrink: 0; }
+.roadmap-sheet {
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}

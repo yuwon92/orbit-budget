@@ -570,7 +570,7 @@ export function LevelRoadmapSheet({ level, totalXp, onClose }: {
   return (
     <SheetPortal>
       <div className="sheet-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-        <section className="wl-sheet" role="dialog" aria-modal="true" aria-labelledby="roadmap-title">
+        <section className="wl-sheet roadmap-sheet" role="dialog" aria-modal="true" aria-labelledby="roadmap-title">
           <div className="sheet-handle" />
           <header className="sheet-header">
             <div>
