@@ -5,6 +5,7 @@ import { MAX_REWARD_LEVEL, nextMajorReward } from '@orbit/wish-core/reward'
 import { ITEM_IDS, equippedMap, type ItemCategory, type ItemId } from '@orbit/wish-core/items'
 import type { Equipped, OwnedItem } from '@orbit/wish-core/types'
 import { LevelRewardCard } from '../components/LevelRewardCard'
+import { LevelRoadmapSheet } from '../components/Sheets'
 import { UniversePreview } from '../components/UniversePreview'
 import { PixelBar } from '../components/PixelBar'
 import { TITLES } from '../lib/labels'
@@ -50,6 +51,8 @@ export function ObservatoryScreen({
   // 홈 카드의 선택형 보상에서 고른 값. 수령하면 비운다 — 다음 레벨 카드가 앞의
   // 선택을 물려받으면 엉뚱한 아이템이 골라진 채로 보인다
   const [pick, setPick] = useState<ItemId | undefined>(undefined)
+  // 앞으로의 보상표. 카드 하나는 바로 다음 것만 말해 줘서 그 앞이 안 보인다
+  const [roadmap, setRoadmap] = useState(false)
 
   if (sub === 'rewards') {
     return (
@@ -183,13 +186,17 @@ export function ObservatoryScreen({
                 나머지 {unclaimedRewards.length - 1}개 ›
               </button>
             )}
+            <button className="reward-more" onClick={() => setRoadmap(true)}>앞으로의 보상 ›</button>
           </>
         ) : upcoming ? (
-          <div className="reward-next">
+          // 누르면 Lv.20까지의 표가 열린다. 카드 하나로는 지금 모으는 XP가 무엇으로
+          // 돌아오는지 그 앞을 볼 수 없다
+          <button className="reward-next" onClick={() => setRoadmap(true)}>
             <span className="pixel-label">LV. {pad2(upcoming.level)}</span>
             <strong>{titleOfLevel(upcoming.level)}</strong>
             <span>{summarizeReward(upcoming)}</span>
-          </div>
+            <small>앞으로의 보상 전부 보기 ›</small>
+          </button>
         ) : (
           <p className="shop-empty">Lv.{MAX_REWARD_LEVEL} 보상까지 전부 수령</p>
         )}
@@ -226,6 +233,9 @@ export function ObservatoryScreen({
         </div>
       </section>
 
+      {roadmap && (
+        <LevelRoadmapSheet level={level.level} totalXp={totalXp} onClose={() => setRoadmap(false)} />
+      )}
     </main>
   )
 }

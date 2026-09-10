@@ -42,7 +42,7 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `apps/wish/src/lib/hooks.ts` | `useWishes`/`useWishEvents`/`useClaims`/`useDustLedger`/`useOwnedItems`/`useEquipped`/`useLevelClaims`/`usePlayer`. **App에서만 구독하고 prop으로 내림** |
 | `apps/wish/src/lib/budget.ts` | Orbit 예산 요약을 읽는 통로. 저장소가 나뉘는 환경에서는 **이 파일만 서버 조회로 교체** |
 | `apps/wish/src/lib/format.ts` | `todayString`·`formatDate`·`pad2` |
-| `apps/wish/src/components/` | `PixelPlanet`(행성·궤도 링), `UniversePreview`(장착 합성), `LevelRewardCard`(수령 카드), `PixelBar`, `OrbitMap`, `RewardOverlay`, `Sheets`(상점·꾸미기 공용 `ItemSheet` 포함) |
+| `apps/wish/src/components/` | `PixelPlanet`(행성·궤도 링), `UniversePreview`(장착 합성), `LevelRewardCard`(수령 카드), `PixelBar`, `OrbitMap`, `RewardOverlay`, `Sheets`(상점·꾸미기 공용 `ItemSheet`, 레벨 보상표 `LevelRoadmapSheet` 포함) |
 | `apps/wish/src/components/PlanetCosmeticsPreview.tsx` | 꾸미기 프리셋 개발용 비교 화면. `npm run dev` → `/apps/wish/?cosmetics-preview`. 프로덕션 번들에서는 트리셰이킹으로 빠진다 |
 | `apps/wish/src/index.css` | Wish 전역 CSS 한 파일. 밝은 노랑 우주 |
 | `packages/wish-core/src/types.ts` | Wish·WishEvent·Claim·Player 타입 |
@@ -99,6 +99,7 @@ Wish는 게임 허브 흐름이다. 자원 HUD 상시 노출, 오늘의 미션�
 - **지난 레벨의 보상을 자동 지급하지 않는다**(§11). 고르는 보상이 섞여 있어서 대신 골라 주면 안 된다. 미수령분은 관측소 카드에 쌓아 두고 직접 받게 한다
 - **`claimLevelReward`는 수령 기록·별가루·아이템·상자를 한 트랜잭션에 넣는다.** 갈라지면 「기록만 남고 보상은 없는」 레벨이 생기고 그 레벨은 다시 받을 수 없다
 - **상자는 지급만 하고 열지 않는다**(§5). 상자 id에 순번을 넣어(`level:16:normal:2`) 두 번 시도해도 불어나지 않게 한다. 개봉은 Phase 5
+- **「다음 보상」 카드를 누르면 Lv.20까지의 보상표가 열린다**(`LevelRoadmapSheet`). 카드 하나는 바로 다음 것만 말해 줘서 지금 모으는 XP가 무엇으로 돌아오는지 그 앞이 안 보인다. 필요 XP는 `LEVEL_STEPS`의 누적값을 그대로 읽는다 — 화면이 말한 문턱과 레벨업 판정의 문턱이 어긋나면 안 된다. 지난 레벨은 넣지 않는다(받은 것은 꾸미기에 이미 있다)
 - **수령은 관측소 홈에서 한다.** `LevelRewardCard`가 홈 패널과 밀린 보상 목록 화면에 같이 들어간다. 하위 화면은 **둘 이상 밀렸을 때만**(§11 소급) 연다 — 평소 미수령은 0~1개라 화면을 옮길 이유가 없다
 
 **개발용 도구는 가드를 핸들러 본문 안에 둔다.** `import.meta.env.DEV ? handler : undefined`로 넘기는 자리만 접으면 핸들러 본문과 문구가 프로덕션 번들에 남는다. 본문 첫 줄에 `if (!import.meta.env.DEV) return`을 두면 `lib/dev.ts`까지 통째로 빠진다. 빌드 후 `dist/wish/assets/index-*.js`를 grep해 확인할 것 — `dist/assets/`는 Orbit 번들이다.

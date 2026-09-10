@@ -8,10 +8,13 @@ import { XP } from '@orbit/wish-core/xp'
 import { addDays, canPurchase, daysBetween, purchaseUnlockDate, remainingDays } from '@orbit/wish-core/wish'
 import type { Wish } from '@orbit/wish-core/types'
 import { ITEMS, isMandatory, type ItemCategory, type ItemId } from '@orbit/wish-core/items'
+import { LEVEL_STEPS } from '@orbit/wish-core/xp'
+import { LEVEL_REWARDS, MAX_REWARD_LEVEL } from '@orbit/wish-core/reward'
 import { useSheetFocus, useSheetViewport } from '../lib/sheet'
 import { CATEGORY_LABELS, ITEM_LABELS, RARITY_DOTS, RARITY_LABELS, SOURCE_LABELS } from '../lib/items'
 import { previewProps, type EquippedItems } from '../lib/preview'
-import { isChoiceItem, levelOfItem, titleOfLevel } from '../lib/rewards'
+import { isChoiceItem, levelOfItem, summarizeReward, titleOfLevel } from '../lib/rewards'
+import { pad2 } from '../lib/format'
 import { PixelPlanet } from './PixelPlanet'
 
 /**
@@ -532,6 +535,72 @@ export function ItemSheet({ itemId, items, owned, stardust, onBuy, onEquip, onUn
               <ShoppingBag size={16} /> {poor ? `별가루 ${money(-after)} 부족` : `별가루 ${money(price)} 지불`}
             </button>
           ) : null}
+
+          <button className="quiet-button full" onClick={onClose}>닫기</button>
+        </section>
+      </div>
+    </SheetPortal>
+  )
+}
+
+/**
+ * 앞으로 받을 레벨 보상표. 관측소의 「다음 보상」 카드를 누르면 열린다.
+ *
+ * 카드 하나는 바로 다음 보상만 말해 준다 — 지금 모으는 XP가 무엇으로 돌아오는지
+ * 보려면 그 앞을 한 번에 볼 수 있어야 한다(§9 보상 미리보기).
+ *
+ * **이미 지난 레벨은 넣지 않는다.** 받은 것은 보유 목록과 꾸미기에 이미 있고, 여기에
+ * 같이 늘어놓으면 스무 줄 중 어디가 지금인지 찾아야 한다.
+ *
+ * 필요 XP는 `LEVEL_STEPS`의 누적값이다 — 레벨업 판정과 같은 표를 읽어야 화면이
+ * 말한 문턱과 실제 문턱이 어긋나지 않는다.
+ */
+export function LevelRoadmapSheet({ level, totalXp, onClose }: {
+  level: number
+  totalXp: number
+  onClose: () => void
+}) {
+  useSheetViewport()
+  const rows = []
+  for (let next = level + 1; next <= MAX_REWARD_LEVEL; next += 1) {
+    const reward = LEVEL_REWARDS[next]
+    if (reward) rows.push({ reward, need: LEVEL_STEPS[next - 1] ?? 0 })
+  }
+
+  return (
+    <SheetPortal>
+      <div className="sheet-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+        <section className="wl-sheet" role="dialog" aria-modal="true" aria-labelledby="roadmap-title">
+          <div className="sheet-handle" />
+          <header className="sheet-header">
+            <div>
+              <span className="pixel-label">LEVEL REWARDS</span>
+              <h2 id="roadmap-title">앞으로의 보상</h2>
+            </div>
+            <button className="icon-button" onClick={onClose} aria-label="닫기"><X size={20} /></button>
+          </header>
+
+          <p className="roadmap-now">
+            현재 Lv.{pad2(level)} · 누적 {totalXp.toLocaleString('ko-KR')} XP
+          </p>
+
+          {rows.length === 0 ? (
+            <p className="shop-empty">Lv.{MAX_REWARD_LEVEL} 도달 · 보상표 끝</p>
+          ) : (
+            <ol className="roadmap-list">
+              {rows.map(({ reward, need }) => (
+                <li key={reward.level}>
+                  <div className="roadmap-head">
+                    <span className="pixel-label">LV. {pad2(reward.level)}</span>
+                    <span>{Math.max(0, need - totalXp).toLocaleString('ko-KR')} XP 남음</span>
+                  </div>
+                  <strong>{titleOfLevel(reward.level)}</strong>
+                  <span>{summarizeReward(reward)}</span>
+                  <small>누적 {need.toLocaleString('ko-KR')} XP</small>
+                </li>
+              ))}
+            </ol>
+          )}
 
           <button className="quiet-button full" onClick={onClose}>닫기</button>
         </section>
