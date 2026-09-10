@@ -28,6 +28,9 @@ export function buildCosmeticBlocks(preset: PixelPreset, palette: PlanetPalette,
       h: pixel.h ?? 1,
       fill: colorOf(preset, palette, pixel.fill),
       key: `${layer}:${preset.id}:${index}`,
+      anim: preset.anim,
+      // 묶음 번호가 없으면 칸 순서를 쓴다. 한 별이 여러 칸이면 프리셋이 g로 묶는다
+      group: preset.anim ? pixel.g ?? index : undefined,
     })
   }
 

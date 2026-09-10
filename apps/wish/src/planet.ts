@@ -8,7 +8,17 @@ export const DEFAULT_PLANET_PALETTE: PlanetPalette = {
 }
 export const GRID = 32
 
-export interface Block { x: number; y: number; w: number; h: number; fill: string; key: string }
+export interface Block {
+  x: number
+  y: number
+  w: number
+  h: number
+  fill: string
+  key: string
+  /** 효과 층만 갖는다. PixelPlanet이 클래스와 시작 지연으로 옮긴다 */
+  anim?: string
+  group?: number
+}
 
 const RADIUS: Record<PlanetStage, number> = {
   seed: 0, moon: 4.6, planet: 7.6, ring: 8.4, satellites: 8.4, system: 8.4,

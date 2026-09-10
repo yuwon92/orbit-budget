@@ -11,6 +11,9 @@ import {
 } from '../cosmetics'
 import { buildBlocks, buildSatelliteBlocks, DEFAULT_PLANET_PALETTE, GRID, planetRadius } from '../planet'
 
+/** 묶음 하나당 밀리는 시작 지연. 주기(CSS)의 약 1/9라 한 바퀴 안에 고루 퍼진다 */
+const ANIM_STEP_MS = 290
+
 export interface PixelPlanetProps {
   progress: number
   seed: number
@@ -95,7 +98,18 @@ export function PixelPlanet({
       aria-label={`행성 진행률 ${Math.round(progress)}%`}
     >
       {blocks.map((block) => (
-        <rect key={block.key} x={block.x} y={block.y} width={block.w} height={block.h} fill={block.fill} />
+        <rect
+          key={block.key}
+          x={block.x}
+          y={block.y}
+          width={block.w}
+          height={block.h}
+          fill={block.fill}
+          className={block.anim ? `fx fx-${block.anim}` : undefined}
+          // 묶음 번호를 시작 지연으로 옮긴다. 별끼리 박자가 어긋나야 반짝임으로
+          // 읽힌다 — 다 같이 깜빡이면 화면 전체가 점멸한다
+          style={block.anim ? { animationDelay: `${(block.group ?? 0) * ANIM_STEP_MS}ms` } : undefined}
+        />
       ))}
     </svg>
   )

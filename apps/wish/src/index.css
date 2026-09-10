@@ -187,6 +187,33 @@ ul { padding: 0; list-style: none; }
 
 .pixel-planet { image-rendering: pixelated; overflow: visible; }
 .pixel-planet.floating { animation: planet-float 4.6s ease-in-out infinite alternate; }
+
+/* 효과 아이템 애니메이션. 12px 격자라 부드러운 페이드는 흐릿하게 뭉개진다 —
+   같은 값을 두 지점에 걸쳐 둬서 값이 뚝 끊기게 만든다(steps()와 같은 결과인데
+   구간 길이를 제각각 줄 수 있다). 시작 지연은 PixelPlanet이 묶음 번호로 준다.
+
+   주기는 셋 다 2.6s. ANIM_STEP_MS(290ms) × 묶음 9개가 한 바퀴에 고루 퍼진다. */
+.pixel-planet .fx { animation-duration: 2.6s; animation-iteration-count: infinite; }
+.pixel-planet .fx-twinkle { animation-name: fx-twinkle; }
+.pixel-planet .fx-pulse { animation-name: fx-pulse; animation-duration: 3.4s; }
+.pixel-planet .fx-drift { animation-name: fx-drift; animation-duration: 2.2s; }
+
+@keyframes fx-twinkle {
+  0%, 57% { opacity: 1; }
+  58%, 79% { opacity: .3; }
+  80%, 100% { opacity: 1; }
+}
+/* 호가 숨쉰다. 완전히 꺼지면 행성 둘레가 잘린 것처럼 보여 바닥을 .55로 둔다 */
+@keyframes fx-pulse {
+  0%, 32% { opacity: .55; }
+  33%, 65% { opacity: .8; }
+  66%, 100% { opacity: 1; }
+}
+/* 밝은 마디 하나가 묶음 순서대로 지나간다. 꼬리는 그동안 .48로 남아 궤적이 끊기지 않는다 */
+@keyframes fx-drift {
+  0%, 12% { opacity: 1; }
+  13%, 100% { opacity: .48; }
+}
 .pixel-planet.dim { opacity: .5; }
 
 @keyframes planet-float {
@@ -1072,7 +1099,7 @@ ul { padding: 0; list-style: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pixel-planet.floating, .xp-pop { animation: none; }
+  .pixel-planet.floating, .pixel-planet .fx, .xp-pop { animation: none; }
   /* 파티클의 이동만 끄면 12개 사각형이 중앙에 겹쳐 주황 점으로 남는다 */
   .burst { display: none; }
 }

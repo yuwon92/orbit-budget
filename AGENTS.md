@@ -32,7 +32,7 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `apps/wish/src/screens/` | 탭 화면 4개 — `HubScreen`(오르빗 허브)/`QuestScreen`(퀘스트 로그)/`CodexScreen`(우주 도감)/`ObservatoryScreen`(관측소). 관측소 하위 화면도 여기 |
 | `apps/wish/src/missions.ts` | 오늘의 미션 문구·상태. 앱 고유 개념이라 wish-core에 두지 않음 |
 | `apps/wish/src/planet.ts` | 픽셀 행성 블록 생성. 진행률 → 티끌·위성·행성·고리·위성대·성계 + 표면 무늬 3종 |
-| `apps/wish/src/cosmetics.ts` | 꾸미기 그리기 값 — 색상 팔레트·링 타원·픽셀 좌표. id는 카탈로그의 아이템 id와 같은 값 |
+| `apps/wish/src/cosmetics.ts` | 꾸미기 그리기 값 — 색상 팔레트·링 타원·픽셀 좌표·효과 애니메이션 갈래. id는 카탈로그의 아이템 id와 같은 값 |
 | `apps/wish/src/cosmeticBlocks.ts` | 꾸미기 데이터를 SVG `rect` 블록으로 변환하고 seed 기반 결정적 배치를 만드는 렌더러 |
 | `apps/wish/src/lib/labels.ts` | 단계 이름·칭호 문구·도감 칸 수 |
 | `apps/wish/src/lib/items.ts` | 아이템·카테고리·희귀도·획득처 한국어 카피 + 희귀도 색 점 |
@@ -77,6 +77,9 @@ Wish는 게임 허브 흐름이다. 자원 HUD 상시 노출, 오늘의 미션�
 
 - **장착 아이템이 카탈로그에서 빠지면 `defaultItemFor`로 대신 그리고 저장 줄은 지우지 않는다.** 카탈로그를 되살리면 장착이 그대로 돌아오게
 - **장착 상태는 관측소 미리보기·꾸미기에만 적용한다.** 허브·퀘스트·도감의 위시 행성은 그 위시 고유의 모습
+- **배경은 넓게 깔린다.** 모서리에 뭉치 둘만 놓으면 동료·효과와 구별이 안 된다 — 폭을 가로지르거나 한 면을 통째로 덮어야 배경으로 읽힌다(`고요한 월면`이 기준). 배경은 가장 먼저 깔려 행성·고리·동료·효과가 위에 얹히므로 가운데를 지나가도 안전하다. 비워야 할 곳은 **동료 자리(x 20~31 · y 1~9)** 하나뿐
+- **크림 배경(`#FBF7EA`) 위에서는 밝은 고정색이 사라진다.** 배경 프리셋의 몸통은 `ink`로 잡고 `accent`·`soft`는 결에만 쓴다. 반대로 두면 32px에서 띠가 통째로 안 보인다
+- **움직이는 것은 효과 층뿐이다**(`PixelPreset.anim` — `twinkle`·`pulse`·`drift`). 배경·동료는 정지다. 여럿이 움직이면 어느 것이 보상으로 얻은 효과인지 구분이 안 된다. 별 하나가 여러 칸이라 `CosmeticPixel.g`로 묶어야 가로줄과 세로줄이 같이 깜빡인다(`drift`는 번호 순서가 곧 빛이 흐르는 방향). 시작 지연은 `PixelPlanet`의 `ANIM_STEP_MS`, 주기와 계단은 `index.css`의 `@keyframes fx-*`. `prefers-reduced-motion`에서 멈춘다
 - **배경을 장착하면 기존 완주 별이 배경 모서리 자리에 묻힌다.** 그래서 완주 표시는 효과 아이템이 맡고 스타터 세트에 기본 효과가 들어 있다. 스타터에서 효과를 빼면 완주 표시가 통째로 사라진다
 - **`ensureStarterSet()`은 처음 지급하는 것만 장착한다.** 해제는 줄 삭제라 흔적이 없어서, 매번 장착하면 사용자가 해제해 둔 자리를 앱을 열 때마다 되돌린다
 - **필수 자리는 행성 색·무늬·궤도 링 셋**(`MANDATORY_CATEGORIES`). 행성 자체를 이루는 층이라 비우면 그릴 것이 사라진다. `unequipItem`이 막고, `equippedMap`이 화면 쪽 바닥을 깔고, `ensureStarterSet`이 저장소를 복구한다 — 세 곳이 같은 목록을 본다. 배경·동료·효과는 빈 자리가 그 자체로 성립해 해제할 수 있다
