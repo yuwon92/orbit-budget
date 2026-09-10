@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./dust": "./src/dust.ts",
+    "./items": "./src/items.ts",
     "./reward": "./src/reward.ts",
     "./types": "./src/types.ts",
     "./wish": "./src/wish.ts",

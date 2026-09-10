@@ -42,6 +42,17 @@ import {
   missionDustRows,
   stardustBalance,
 } from '../packages/wish-core/src/dust.ts'
+import {
+  CATEGORIES,
+  ITEMS,
+  ITEM_IDS,
+  RARITIES,
+  STARTER_ITEMS,
+  defaultItemFor,
+  equipTargetOf,
+  equippedMap,
+  itemsOfCategory,
+} from '../packages/wish-core/src/items.ts'
 import { unclaimedLevels } from '../packages/wish-core/src/reward.ts'
 import type { Claim, Wish, WishEvent, WishStatus } from '../packages/wish-core/src/types.ts'
 
@@ -399,6 +410,59 @@ const claim = (date: string, missionId: string): Claim => ({
   assert.equal(bonusDustGrants([wish()], twoWeeks.slice(0, 13), 0)
     .filter((row) => row.id.startsWith('streak7:')).length, 1)
   console.log('별가루 원장 통과')
+}
+
+// ── 아이템 카탈로그 ───────────────────────────────────
+{
+  assert.equal(new Set(ITEM_IDS).size, ITEM_IDS.length)
+  ITEM_IDS.forEach((id) => assert.ok(ITEMS[id], `카탈로그 누락 ${id}`))
+
+  // 카테고리마다 대체 아이템이 있다. 없으면 장착 아이템이 사라졌을 때 그릴 것이 없다
+  CATEGORIES.forEach((category) => {
+    const fallback = defaultItemFor(category)
+    assert.ok(fallback, `기본 아이템 없음 ${category}`)
+    assert.equal(ITEMS[fallback].category, category)
+    assert.ok(itemsOfCategory(category).length > 0, `빈 카테고리 ${category}`)
+  })
+
+  // 전 희귀도가 하나씩은 있다(스펙 §6). 한 단계가 비면 상자 추첨표가 그 칸에서 막힌다
+  assert.equal(new Set(ITEM_IDS.map((id) => ITEMS[id].rarity)).size, RARITIES.length)
+
+  // 상점에 오르는 것만 가격을 갖는다. 가격 없는 상점 아이템은 구매 검증에서 0원이 된다
+  ITEM_IDS.forEach((id) => {
+    const def = ITEMS[id]
+    if (def.source === 'shop') assert.ok(def.price && def.price > 0, `가격 없는 상점 아이템 ${id}`)
+    else assert.equal(def.price, undefined, `상점 아닌데 가격이 있는 ${id}`)
+  })
+
+  assert.equal(equipTargetOf('planet-color-coral'), 'planetColor')
+  assert.equal(equipTargetOf('없는-아이템'), undefined)
+
+  // 스타터 세트는 카테고리가 겹치지 않는다. 겹치면 장착이 서로를 덮어쓴다
+  const starterCategories = STARTER_ITEMS.map((id) => ITEMS[id].category)
+  assert.equal(new Set(starterCategories).size, STARTER_ITEMS.length)
+  // 배경을 장착하면 기존 완주 별이 배경 자리에 묻힌다. 완주 표시가 통째로 사라지지
+  // 않게 스타터에 기본 효과가 함께 들어가야 한다
+  assert.ok(starterCategories.includes('background'))
+  assert.ok(starterCategories.includes('effect'))
+
+  // 장착 상태 펴기 — 카탈로그에 없는 id는 기본값으로 대신 그린다. 줄은 지우지 않는다
+  assert.deepEqual(
+    equippedMap([{ category: 'ring', itemId: 'ring-double' }]),
+    { ring: 'ring-double' },
+  )
+  assert.deepEqual(
+    equippedMap([{ category: 'ring', itemId: 'ring-사라짐' }]),
+    { ring: defaultItemFor('ring') },
+  )
+  // 카테고리가 어긋난 줄도 그 카테고리의 기본값으로 떨어진다
+  assert.deepEqual(
+    equippedMap([{ category: 'ring', itemId: 'planet-color-coral' }]),
+    { ring: defaultItemFor('ring') },
+  )
+  assert.deepEqual(equippedMap([{ category: '없는칸', itemId: 'ring-single' }]), {})
+  assert.deepEqual(equippedMap([]), {})
+  console.log('아이템 카탈로그 통과')
 }
 
 // ── 레벨 보상 소급 ────────────────────────────────────

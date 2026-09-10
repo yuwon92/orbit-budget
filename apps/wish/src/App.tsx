@@ -25,6 +25,7 @@ import {
   missionDustRows,
   stardustBalance,
 } from '@orbit/wish-core/dust'
+import type { ItemCategory, ItemId } from '@orbit/wish-core/items'
 import type { Wish, WishEvent } from '@orbit/wish-core/types'
 import {
   chooseWait,
@@ -34,12 +35,15 @@ import {
   claimMission,
   createWish,
   deposit,
+  ensureStarterSet,
+  equipItem,
   grantDust,
   markCelebratedLevel,
   markCelebratedTitles,
   purchaseWish,
   recordWaitDay,
   skipDay,
+  unequipItem,
   updateWish,
 } from '@orbit/wish-bridge'
 import { createWishPurchaseTransaction } from '@orbit/bridge'
@@ -54,7 +58,7 @@ import { ObservatoryScreen, type ObsSub } from './screens/ObservatoryScreen'
 import { buildMissions, type Mission } from './missions'
 import { TITLES } from './lib/labels'
 import { pad2, todayString } from './lib/format'
-import { useClaims, useDustLedger, usePlayer, useWishEvents, useWishes } from './lib/hooks'
+import { useClaims, useDustLedger, useEquipped, useOwnedItems, usePlayer, useWishEvents, useWishes } from './lib/hooks'
 import { loadBudgetView, type BudgetView } from './lib/budget'
 
 type Screen = 'hub' | 'quests' | 'codex' | 'observatory'
@@ -92,14 +96,19 @@ export default function App() {
   const storedEvents = useWishEvents()
   const storedClaims = useClaims()
   const storedDust = useDustLedger()
+  const storedOwned = useOwnedItems()
+  const storedEquipped = useEquipped()
   const player = usePlayer()
   const loaded =
     storedWishes !== undefined && storedEvents !== undefined && storedClaims !== undefined
-    && storedDust !== undefined && player !== undefined
+    && storedDust !== undefined && storedOwned !== undefined && storedEquipped !== undefined
+    && player !== undefined
   const wishes = useMemo(() => storedWishes ?? [], [storedWishes])
   const events = useMemo(() => storedEvents ?? [], [storedEvents])
   const claims = useMemo(() => storedClaims ?? [], [storedClaims])
   const dustRows = useMemo(() => storedDust ?? [], [storedDust])
+  const owned = useMemo(() => storedOwned ?? [], [storedOwned])
+  const equipped = useMemo(() => storedEquipped ?? [], [storedEquipped])
 
   const [activeId, setActiveId] = useState<string | null>(null)
 
@@ -157,6 +166,18 @@ export default function App() {
     if (!loaded) return
     void grantDust(bonusDustGrants(wishes, events, Date.now()))
   }, [loaded, wishes, events])
+
+  // Lv.1 스타터 세트. 이미 보유한 것이 있으면 아무것도 하지 않으므로 몇 번 열어도
+  // 지급은 한 번이고, 해제해 둔 자리를 되돌리지도 않는다.
+  useEffect(() => {
+    if (storedOwned === undefined) return
+    void ensureStarterSet()
+  }, [storedOwned])
+
+  const handleEquip = useCallback((category: ItemCategory, itemId: ItemId) => {
+    void equipItem(category, itemId)
+  }, [])
+  const handleUnequip = useCallback((category: ItemCategory) => { void unequipItem(category) }, [])
 
   // 화면에 필요한 값은 전부 이벤트와 수령 기록에서 파생한다. 저장하는 XP는 없다.
   const openWishes = useMemo(
@@ -423,6 +444,10 @@ export default function App() {
             budget={budget}
             dark={dark}
             onThemeChange={setDark}
+            owned={owned}
+            equipped={equipped}
+            onEquip={handleEquip}
+            onUnequip={handleUnequip}
             sub={obsSub}
             onSub={setObsSub}
           />

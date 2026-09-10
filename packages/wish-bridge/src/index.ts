@@ -4,7 +4,8 @@
 import { canPurchase, monthlyDeposit, seedFromId } from '@orbit/wish-core/wish'
 import { claimIdOf, type MissionUnit } from '@orbit/wish-core/xp'
 import { missionDustGrants, type DustRow } from '@orbit/wish-core/dust'
-import type { Claim, Player, Wish, WishEvent } from '@orbit/wish-core/types'
+import { STARTER_ITEMS, equipTargetOf } from '@orbit/wish-core/items'
+import type { Claim, OwnedItem, Player, Wish, WishEvent } from '@orbit/wish-core/types'
 import { wishDb } from './db'
 
 const newId = () => crypto.randomUUID()
@@ -259,6 +260,70 @@ export async function claimAll(units: MissionUnit[]) {
   await wishDb.transaction('rw', wishDb.claims, wishDb.dustLedger, async () => {
     await wishDb.claims.bulkPut(receipts)
     await addDustRows(missionDustGrants(units, receipts, now))
+  })
+}
+
+/**
+ * 아이템 지급. 이미 보유한 것은 건너뛴다.
+ *
+ * put이 아니라 add인 이유는 별가루 원장과 같다 — 덮어쓰면 최초 획득 시각과 출처가
+ * 나중 지급으로 바뀐다. 「언제 처음 얻었나」가 보관함 정렬 기준이다.
+ *
+ * 트랜잭션 안에서 부르면 그 트랜잭션에 함께 묶인다. 상점 구매·레벨 보상이 그렇게 쓴다.
+ */
+async function addOwnedItems(rows: OwnedItem[]) {
+  const unique = [...new Map(rows.map((row) => [row.itemId, row])).values()]
+  if (!unique.length) return
+  const existing = await wishDb.ownedItems.bulkGet(unique.map((row) => row.itemId))
+  const fresh = unique.filter((_, index) => existing[index] === undefined)
+  if (fresh.length) await wishDb.ownedItems.bulkAdd(fresh)
+}
+
+/** 보유 아이템 지급. sourceId는 별가루 원장의 이름표와 같은 형식 */
+export async function grantItems(itemIds: string[], sourceType: OwnedItem['sourceType'], sourceId: string) {
+  if (!itemIds.length) return
+  const now = Date.now()
+  const rows = itemIds.map((itemId) => ({ itemId, acquiredAt: now, sourceType, sourceId }))
+  await wishDb.transaction('rw', wishDb.ownedItems, () => addOwnedItems(rows))
+}
+
+/**
+ * 장착. 카테고리당 한 줄이라 같은 자리의 이전 아이템은 자동으로 밀린다.
+ * 보유하지 않은 아이템은 장착하지 않는다 — 화면이 막지만 쓰기 창구에서도 막는다.
+ */
+export async function equipItem(category: string, itemId: string) {
+  await wishDb.transaction('rw', wishDb.ownedItems, wishDb.equipped, async () => {
+    if (!(await wishDb.ownedItems.get(itemId))) return
+    await wishDb.equipped.put({ category, itemId, updatedAt: Date.now() })
+  })
+}
+
+/** 해제는 그 카테고리의 장착 줄을 지운다 */
+export async function unequipItem(category: string) {
+  await wishDb.equipped.delete(category)
+}
+
+/**
+ * Lv.1 `관측자 스타터 세트`. 처음 앱을 열 때 기본 아이템을 보유·장착 상태로 만든다.
+ *
+ * **처음 지급하는 것만 장착한다.** 이미 보유한 것을 매번 다시 장착하면 사용자가
+ * 해제하거나 바꿔 둔 자리를 앱을 열 때마다 되돌리게 된다. 해제는 줄 삭제라
+ * 「해제해 뒀다」는 흔적이 남지 않으므로, 보유 여부를 그 흔적 대신 쓴다.
+ */
+export async function ensureStarterSet() {
+  const now = Date.now()
+  await wishDb.transaction('rw', wishDb.ownedItems, wishDb.equipped, async () => {
+    const existing = await wishDb.ownedItems.bulkGet(STARTER_ITEMS)
+    const fresh = STARTER_ITEMS.filter((_, index) => existing[index] === undefined)
+    if (!fresh.length) return
+    await wishDb.ownedItems.bulkAdd(fresh.map((itemId) => ({
+      itemId, acquiredAt: now, sourceType: 'level' as const, sourceId: 'level:1',
+    })))
+    const equips = fresh.flatMap((itemId) => {
+      const category = equipTargetOf(itemId)
+      return category ? [{ category, itemId, updatedAt: now }] : []
+    })
+    if (equips.length) await wishDb.equipped.bulkPut(equips)
   })
 }
 

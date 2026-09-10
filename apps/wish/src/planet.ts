@@ -19,8 +19,14 @@ export function planetRadius(progress: number): number {
   return RADIUS[stageOf(progress)]
 }
 
+/** 행성 무늬. 몸통 명암·반지름을 함께 봐야 해서 좌표표가 아니라 여기서 그린다 */
+export const PATTERN_IDS = ['planet-pattern-crater', 'planet-pattern-stripe', 'planet-pattern-crystal'] as const
+export type PatternId = (typeof PATTERN_IDS)[number]
+
 export interface PlanetBuildOptions {
   palette?: PlanetPalette
+  /** 카탈로그에 없는 값이면 크레이터로 그린다 — 기본 무늬가 카탈로그의 기본값이다 */
+  patternId?: string
   includeLegacyRing?: boolean
   includeLegacySatellites?: boolean
   includeLegacyCompletionStars?: boolean
@@ -108,21 +114,18 @@ export function buildBlocks(progress: number, seed: number, options: PlanetBuild
     }
   }
 
-  // 표면 무늬. seed가 같으면 항상 같은 자리에 찍힌다.
-  const craters = stage === 'moon' ? 2 : 4
-  for (let i = 0; i < craters; i += 1) {
-    const angle = random() * Math.PI * 2
-    const distance = random() * radius * 0.62
-    const cx = Math.round(16 + Math.cos(angle) * distance)
-    const cy = Math.round(16 + Math.sin(angle) * distance)
-    const size = 1 + Math.round(random() * 1.6)
-    for (let y = cy; y < cy + size; y += 1) {
-      for (let x = cx; x < cx + size; x += 1) {
-        if (Math.hypot(x + 0.5 - 16, y + 0.5 - 16) > radius - 0.6) continue
-        put(x, y, MID)
-      }
-    }
+  // 몸통 위 한 칸을 한 단 어둡게 한다. 무늬가 명암을 지우지 않고 얹히게 하는 유일한
+  // 방법이다 — 고정 색으로 칠하면 구면이 평평해진다.
+  const shade = (x: number, y: number) => {
+    const current = cells.get(`${x}:${y}`)
+    const next = current === HIGHLIGHT ? LIGHT : current === LIGHT ? MID : current === MID ? DARK : undefined
+    if (next) cells.set(`${x}:${y}`, next)
   }
+
+  // 표면 무늬. seed가 같으면 항상 같은 자리에 찍힌다.
+  putPattern(options.patternId, put, shade, {
+    radius, stage, random, highlight: HIGHLIGHT, mid: MID, dark: DARK,
+  })
 
   if (includeLegacyRing && (stage === 'ring' || stage === 'satellites' || stage === 'system')) {
     // 고리는 각도를 촘촘히 훑어 그린다. 행성 뒤로 도는 절반은 가려서 깊이를 만든다.
@@ -153,6 +156,92 @@ export function buildBlocks(progress: number, seed: number, options: PlanetBuild
   }
 
   return toBlocks(cells)
+}
+
+interface PatternContext {
+  radius: number
+  stage: PlanetStage
+  /** buildBlocks의 난수열을 이어 쓴다. 같은 씨앗이면 무늬 자리가 항상 같다 */
+  random: () => number
+  highlight: string
+  mid: string
+  dark: string
+}
+
+/**
+ * 무늬는 몸통 위에만 얹는다. 가장자리 한 칸(`radius - 0.6`)은 어느 무늬도 건드리지
+ * 않는다 — 실루엣이 갉히면 32px에서 행성이 찌그러져 보인다.
+ */
+function putPattern(
+  patternId: string | undefined,
+  put: (x: number, y: number, fill: string) => void,
+  shade: (x: number, y: number) => void,
+  context: PatternContext,
+) {
+  if (patternId === 'planet-pattern-stripe') return putStripes(shade, context)
+  if (patternId === 'planet-pattern-crystal') return putCrystals(put, context)
+  return putCraters(put, context)
+}
+
+function putCraters(put: (x: number, y: number, fill: string) => void, context: PatternContext) {
+  const { radius, stage, random, mid } = context
+  const craters = stage === 'moon' ? 2 : 4
+  for (let i = 0; i < craters; i += 1) {
+    const angle = random() * Math.PI * 2
+    const distance = random() * radius * 0.62
+    const cx = Math.round(16 + Math.cos(angle) * distance)
+    const cy = Math.round(16 + Math.sin(angle) * distance)
+    const size = 1 + Math.round(random() * 1.6)
+    for (let y = cy; y < cy + size; y += 1) {
+      for (let x = cx; x < cx + size; x += 1) {
+        if (Math.hypot(x + 0.5 - 16, y + 0.5 - 16) > radius - 0.6) continue
+        put(x, y, mid)
+      }
+    }
+  }
+}
+
+/**
+ * 위도 줄무늬. 아래에 있는 색을 한 단 어둡게 하는 방식이라 몸통 명암이 그대로 남는다.
+ *
+ * 씨앗을 쓰지 않는다 — 줄 간격이 위시마다 달라지면 같은 아이템으로 보이지 않는다.
+ * 가운데 줄은 항상 적도를 지난다.
+ */
+function putStripes(shade: (x: number, y: number) => void, context: PatternContext) {
+  const { radius } = context
+  const gap = radius < 6 ? 3 : 4
+  for (let y = 0; y < GRID; y += 1) {
+    // 적도(y = 16)에서 gap 칸마다 한 줄. 중심에서의 거리로 재면 반 칸씩 어긋난
+    // 두 줄이 같은 띠에 함께 들어와 줄이 두 겹이 된다
+    if ((y - 16) % gap !== 0) continue
+    const dy = y + 0.5 - 16
+    for (let x = 0; x < GRID; x += 1) {
+      const dx = x + 0.5 - 16
+      if (Math.hypot(dx, dy) > radius - 0.6) continue
+      shade(x, y)
+    }
+  }
+}
+
+/** 결정. 중심에서 벗어난 마름모 셋. 안쪽은 MID, 테두리 한 칸은 DARK로 각을 세운다. */
+function putCrystals(put: (x: number, y: number, fill: string) => void, context: PatternContext) {
+  const { radius, stage, random, highlight, mid, dark } = context
+  const facets = stage === 'moon' ? 2 : 3
+  for (let i = 0; i < facets; i += 1) {
+    const angle = random() * Math.PI * 2
+    const distance = random() * radius * 0.45
+    const cx = 16 + Math.cos(angle) * distance
+    const cy = 16 + Math.sin(angle) * distance
+    const size = Math.max(1.6, radius * 0.4)
+    for (let y = 0; y < GRID; y += 1) {
+      for (let x = 0; x < GRID; x += 1) {
+        if (Math.hypot(x + 0.5 - 16, y + 0.5 - 16) > radius - 0.6) continue
+        const reach = Math.abs(x + 0.5 - cx) + Math.abs(y + 0.5 - cy)
+        if (reach > size) continue
+        put(x, y, reach > size - 1 ? dark : i === 0 ? highlight : mid)
+      }
+    }
+  }
 }
 
 function toBlocks(cells: Map<string, string>): Block[] {

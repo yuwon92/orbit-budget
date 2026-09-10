@@ -1,11 +1,14 @@
 import { ChevronRight } from 'lucide-react'
 import { money } from '@orbit/budget-core/format'
 import { UNLOCKS, earnedTitles, levelFromXp, observerStats } from '@orbit/wish-core/xp'
-import { OrbitRing, PixelPlanet } from '../components/PixelPlanet'
+import type { ItemCategory, ItemId } from '@orbit/wish-core/items'
+import type { Equipped, OwnedItem } from '@orbit/wish-core/types'
+import { UniversePreview } from '../components/UniversePreview'
 import { PixelBar } from '../components/PixelBar'
 import { TITLES } from '../lib/labels'
 import { pad2 } from '../lib/format'
 import { type BudgetView } from '../lib/budget'
+import { DecorateScreen } from './DecorateScreen'
 import { ObservatorySettings } from './ObservatorySettings'
 
 /**
@@ -13,9 +16,12 @@ import { ObservatorySettings } from './ObservatorySettings'
  * 대체한다(Orbit의 settingsSub와 같은 방식). 하단 탭과 HUD는 그대로 둔다 —
  * 모바일에서 .wl-nav는 셸의 flex 아이템이라 숨기면 스크롤 위치가 튄다.
  */
-export type ObsSub = 'settings' | null
+export type ObsSub = 'decorate' | 'settings' | null
 
-export function ObservatoryScreen({ level, totalXp, pendingXp, stats, titles, budget, dark, onThemeChange, sub, onSub }: {
+export function ObservatoryScreen({
+  level, totalXp, pendingXp, stats, titles, budget, dark, onThemeChange,
+  owned, equipped, onEquip, onUnequip, sub, onSub,
+}: {
   level: ReturnType<typeof levelFromXp>
   totalXp: number
   pendingXp: number
@@ -24,9 +30,24 @@ export function ObservatoryScreen({ level, totalXp, pendingXp, stats, titles, bu
   budget: BudgetView | null
   dark: boolean
   onThemeChange: (value: boolean) => void
+  owned: OwnedItem[]
+  equipped: Equipped[]
+  onEquip: (category: ItemCategory, itemId: ItemId) => void
+  onUnequip: (category: ItemCategory) => void
   sub: ObsSub
   onSub: (sub: ObsSub) => void
 }) {
+  if (sub === 'decorate') {
+    return (
+      <DecorateScreen
+        owned={owned}
+        equipped={equipped}
+        onEquip={onEquip}
+        onUnequip={onUnequip}
+        back={() => onSub(null)}
+      />
+    )
+  }
   if (sub === 'settings') {
     return <ObservatorySettings budget={budget} dark={dark} onThemeChange={onThemeChange} back={() => onSub(null)} />
   }
@@ -45,8 +66,14 @@ export function ObservatoryScreen({ level, totalXp, pendingXp, stats, titles, bu
         <div className="panel-head"><div><span className="pixel-label">MY UNIVERSE</span><h2>나의 우주</h2></div></div>
         <div className="observer-card">
           <div className="observer-planet">
-            <OrbitRing progress={level.ratio * 100} size={150} dots={20} />
-            <PixelPlanet progress={Math.min(99, level.level * 14)} seed={7} size={78} float />
+            <UniversePreview
+              equipped={equipped}
+              progress={Math.min(99, level.level * 14)}
+              seed={7}
+              size={78}
+              ring={level.ratio * 100}
+              float
+            />
           </div>
           <div className="observer-xp">
             <PixelBar ratio={level.ratio} segments={16} />
@@ -113,6 +140,12 @@ export function ObservatoryScreen({ level, totalXp, pendingXp, stats, titles, bu
       </section>
 
       <ul className="obs-links">
+        <li>
+          <button onClick={() => onSub('decorate')}>
+            <span><strong>꾸미기</strong><small>행성 색 · 무늬 · 링 · 배경 · 동료 · 효과</small></span>
+            <ChevronRight size={17} />
+          </button>
+        </li>
         <li>
           <button onClick={() => onSub('settings')}>
             <span><strong>설정</strong><small>화면 테마 · 예산 연결</small></span>

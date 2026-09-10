@@ -1263,3 +1263,102 @@ ul { padding: 0; list-style: none; }
 .obs-links strong { font-size: 14px; }
 .obs-links small { font-size: 11px; font-weight: 400; color: var(--text-tertiary); }
 .obs-links svg { flex: 0 0 auto; color: var(--text-tertiary); }
+
+/* ── 꾸미기 ────────────────────────────────────────── */
+
+/* 미리보기는 스크롤을 따라 위에 붙는다. .wl-content가 스크롤 컨테이너라
+   position:sticky가 그대로 먹는다 — 모바일 셸 규칙상 fixed 오버레이는 금지 */
+.decorate-stage {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0 -4px 12px;
+  padding: 10px 4px 8px;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  background: var(--background);
+}
+.decorate-stage-note { font-size: 11px; color: var(--text-tertiary); }
+
+.universe-preview { position: relative; display: grid; place-items: center; }
+/* 궤도 고리는 행성 뒤에 겹쳐 놓는다. 자리를 차지하면 행성이 아래로 밀린다.
+   상자가 행성 크기라 고리가 더 커서, 좌표를 주지 않으면 오른쪽 아래로 흐른다 */
+.universe-preview .orbit-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.category-tabs {
+  margin-bottom: 12px;
+  padding-bottom: 2px;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.category-tabs::-webkit-scrollbar { display: none; }
+.category-tabs button {
+  flex: 0 0 auto;
+  padding: 7px 13px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--surface);
+  cursor: pointer;
+}
+.category-tabs button.active {
+  border-color: var(--text-primary);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.panel-note { margin: -2px 0 12px; font-size: 11px; color: var(--text-tertiary); }
+
+.ghost-button {
+  padding: 5px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: none;
+  cursor: pointer;
+}
+.ghost-button:hover { color: var(--text-primary); }
+
+.item-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+.item-cell {
+  padding: 10px 8px 11px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  text-align: center;
+  background: var(--surface);
+  cursor: pointer;
+}
+/* 장착 표시는 테두리로만 한다. 글자에 배경색 칩을 깔지 않는다 */
+.item-cell.equipped { border-color: var(--text-primary); border-width: 2px; padding: 9px 7px 10px; }
+.item-cell.locked { opacity: 0.5; cursor: default; }
+.item-thumb { display: block; line-height: 0; }
+.item-cell strong { font-size: 12px; }
+.item-cell small { font-size: 10px; font-weight: 400; color: var(--text-tertiary); line-height: 1.35; }
+
+/* 희귀도는 색 점 + 글자. 바탕색을 깔지 않는다 */
+.item-rarity {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+.item-rarity i { width: 6px; height: 6px; border-radius: 50%; }

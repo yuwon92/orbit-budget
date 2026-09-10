@@ -1,18 +1,23 @@
 import { useState, type ReactNode } from 'react'
+import type { ItemId } from '@orbit/wish-core/items'
+import { PATTERN_IDS } from '../planet'
 import {
   BACKGROUND_PRESETS,
-  COMPLETION_EFFECT_PRESETS,
-  DECORATION_PRESETS,
+  COMPANION_PRESETS,
+  EFFECT_PRESETS,
   PALETTE_PRESETS,
   RING_PRESETS,
 } from '../cosmetics'
+import { ITEM_LABELS } from '../lib/items'
 import { PixelPlanet, type PixelPlanetProps } from './PixelPlanet'
 import './PlanetCosmeticsPreview.css'
 
 type PreviewSelection = Pick<
   PixelPlanetProps,
-  'paletteId' | 'ringId' | 'decorationId' | 'backgroundId' | 'completionEffectId'
+  'planetColorId' | 'planetPatternId' | 'ringId' | 'backgroundId' | 'companionId' | 'effectId'
 >
+
+const nameOf = (id: string) => ITEM_LABELS[id as ItemId]?.name ?? id
 
 const SIZES = [32, 40, 64, 132] as const
 const STAGES = [
@@ -23,10 +28,9 @@ const STAGES = [
 
 interface Stage { size: number; progress: number; palette?: string; seed: number }
 
-function PreviewCard({ id, name, unlockLevel, selection, stage }: {
+function PreviewCard({ id, name, selection, stage }: {
   id: string
   name: string
-  unlockLevel?: number
   selection: PreviewSelection
   stage: Stage
 }) {
@@ -37,16 +41,16 @@ function PreviewCard({ id, name, unlockLevel, selection, stage }: {
           progress={stage.progress}
           seed={stage.seed}
           size={stage.size}
-          paletteId={selection.paletteId ?? stage.palette}
+          planetColorId={selection.planetColorId ?? stage.palette}
+          planetPatternId={selection.planetPatternId}
           ringId={selection.ringId}
-          decorationId={selection.decorationId}
           backgroundId={selection.backgroundId}
-          completionEffectId={selection.completionEffectId}
+          companionId={selection.companionId}
+          effectId={selection.effectId}
         />
       </div>
       <strong>{name}</strong>
       <code>{id}</code>
-      <small>{unlockLevel ? `LV.${unlockLevel}` : '기준'}</small>
     </article>
   )
 }
@@ -63,37 +67,73 @@ function PreviewSection({ eyebrow, title, children }: { eyebrow: string; title: 
 function PresetGallery({ stage }: { stage: Stage }) {
   return (
     <>
-      <PreviewSection eyebrow="PALETTE" title="행성 팔레트">
+      <PreviewSection eyebrow="COLOR" title="행성 색">
         {PALETTE_PRESETS.map((preset) => (
-          <PreviewCard key={preset.id} {...preset} stage={stage} selection={{ paletteId: preset.id }} />
+          <PreviewCard
+            key={preset.id}
+            id={preset.id}
+            name={nameOf(preset.id)}
+            stage={stage}
+            selection={{ planetColorId: preset.id }}
+          />
         ))}
       </PreviewSection>
 
-      <PreviewSection eyebrow="RING" title="링 패턴">
+      <PreviewSection eyebrow="PATTERN" title="행성 무늬">
+        {PATTERN_IDS.map((id) => (
+          <PreviewCard key={id} id={id} name={nameOf(id)} stage={stage} selection={{ planetPatternId: id }} />
+        ))}
+      </PreviewSection>
+
+      <PreviewSection eyebrow="RING" title="궤도 링">
         <PreviewCard id="—" name="프리셋 없음" stage={stage} selection={{}} />
         {RING_PRESETS.map((preset) => (
-          <PreviewCard key={preset.id} {...preset} stage={stage} selection={{ ringId: preset.id }} />
+          <PreviewCard
+            key={preset.id}
+            id={preset.id}
+            name={nameOf(preset.id)}
+            stage={stage}
+            selection={{ ringId: preset.id }}
+          />
         ))}
       </PreviewSection>
 
-      <PreviewSection eyebrow="ORBIT" title="궤도 장식">
+      <PreviewSection eyebrow="COMPANION" title="위성·동료">
         <PreviewCard id="—" name="프리셋 없음" stage={stage} selection={{}} />
-        {DECORATION_PRESETS.map((preset) => (
-          <PreviewCard key={preset.id} {...preset} stage={stage} selection={{ decorationId: preset.id }} />
+        {COMPANION_PRESETS.map((preset) => (
+          <PreviewCard
+            key={preset.id}
+            id={preset.id}
+            name={nameOf(preset.id)}
+            stage={stage}
+            selection={{ companionId: preset.id }}
+          />
         ))}
       </PreviewSection>
 
       <PreviewSection eyebrow="SYSTEM" title="성계 배경">
         <PreviewCard id="—" name="프리셋 없음" stage={stage} selection={{}} />
         {BACKGROUND_PRESETS.map((preset) => (
-          <PreviewCard key={preset.id} {...preset} stage={stage} selection={{ backgroundId: preset.id }} />
+          <PreviewCard
+            key={preset.id}
+            id={preset.id}
+            name={nameOf(preset.id)}
+            stage={stage}
+            selection={{ backgroundId: preset.id }}
+          />
         ))}
       </PreviewSection>
 
-      <PreviewSection eyebrow="COMPLETE" title="완주 효과">
+      <PreviewSection eyebrow="EFFECT" title="완주 효과">
         <PreviewCard id="—" name="프리셋 없음" stage={stage} selection={{}} />
-        {COMPLETION_EFFECT_PRESETS.map((preset) => (
-          <PreviewCard key={preset.id} {...preset} stage={stage} selection={{ completionEffectId: preset.id }} />
+        {EFFECT_PRESETS.map((preset) => (
+          <PreviewCard
+            key={preset.id}
+            id={preset.id}
+            name={nameOf(preset.id)}
+            stage={stage}
+            selection={{ effectId: preset.id }}
+          />
         ))}
       </PreviewSection>
     </>
@@ -107,7 +147,7 @@ function PresetGallery({ stage }: { stage: Stage }) {
 export function PlanetCosmeticsPreview() {
   const [size, setSize] = useState<number>(64)
   const [progress, setProgress] = useState<number>(100)
-  const [palette, setPalette] = useState<string>('solar')
+  const [palette, setPalette] = useState<string>('planet-color-solar')
   const [seed, setSeed] = useState<number>(7)
   const stage: Stage = { size, progress, palette, seed }
 
@@ -155,7 +195,7 @@ export function PlanetCosmeticsPreview() {
                 aria-pressed={palette === preset.id}
                 onClick={() => setPalette(preset.id)}
               >
-                {preset.name}
+                {nameOf(preset.id)}
               </button>
             ))}
           </div>
@@ -191,11 +231,12 @@ export function PlanetCosmeticsPreview() {
                 progress={100}
                 seed={seed}
                 size={value}
-                paletteId={palette}
-                ringId="debris"
-                decorationId="probe"
-                backgroundId="constellation"
-                completionEffectId="comet-trail"
+                planetColorId={palette}
+                planetPatternId="planet-pattern-crystal"
+                ringId="ring-debris"
+                backgroundId="background-constellation"
+                companionId="companion-probe"
+                effectId="effect-comet-trail"
               />
               <figcaption>{value}px</figcaption>
             </figure>
