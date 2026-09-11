@@ -26,6 +26,7 @@ import {
   weeksInMonth,
 } from '../packages/budget-core/src/budget.ts'
 import { buildCsv } from '../apps/orbit/src/lib/csv.ts'
+import { buildBackup, parseBackup } from '../apps/orbit/src/lib/backupFormat.ts'
 import type { Category, RecurringRule, Transaction } from '../packages/budget-core/src/types.ts'
 
 const cat = (id: string, name: string, monthlyBudget: number, isFixed: boolean): Category => ({
@@ -473,5 +474,44 @@ assert.equal(
   (spentByCategory(transactions, month).get('food') ?? 0) + wishPurchase.amount,
 )
 console.log('위시 구매 거래 자유비용 이중 차감 방지 통과')
+
+// ── 전체 백업 ─────────────────────────────────────────
+{
+  const schema = {
+    budget: { version: 3, keys: { categories: 'id', transactions: 'id', recurringRules: 'id', monthSettings: 'yearMonth' } },
+    wish: { version: 2, keys: { wishes: 'id', dustLedger: 'id', levelClaims: 'level' } },
+  }
+  const good = buildBackup(
+    { version: 3, tables: { categories: [{ id: 'c1', name: '식비' }], monthSettings: [{ yearMonth: '2026-09', reserveAmount: 0 }] } },
+    { version: 2, tables: { wishes: [{ id: 'w1' }], levelClaims: [{ level: 1 }] } },
+    { plannedIncome: 'exclude' },
+    1_700_000_000_000,
+  )
+  const reason = (value: unknown) => {
+    const result = parseBackup(typeof value === 'string' ? value : JSON.stringify(value), schema)
+    return result.ok ? null : result.reason
+  }
+
+  // 내보낸 그대로 다시 읽힌다
+  const round = parseBackup(JSON.stringify(good), schema)
+  assert.ok(round.ok)
+  if (round.ok) assert.deepEqual(round.backup, good)
+  // 옛 버전은 받는다 — 그때 없던 표는 빈 표로 복원된다
+  assert.equal(reason({ ...good, wish: { version: 1, tables: {} } }), null)
+
+  assert.equal(reason('백업 아님'), '백업 파일 아님')
+  assert.equal(reason({ ...good, app: 'other' }), '백업 파일 아님')
+  // 새 버전 앱의 백업은 지금 코드가 모르는 필드를 해석할 수 없다
+  assert.match(reason({ ...good, format: 2 }) ?? '', /새 버전/)
+  assert.match(reason({ ...good, budget: { version: 4, tables: {} } }) ?? '', /새 버전/)
+  assert.match(reason({ ...good, budget: { version: 3, tables: { accounts: [] } } }) ?? '', /모르는 표/)
+  // 기본키가 없거나 겹치는 행은 Dexie가 넣지 못해 복원 도중 멈춘다 — 쓰기 전에 거른다
+  assert.match(reason({ ...good, budget: { version: 3, tables: { categories: [{ name: 'x' }] } } }) ?? '', /손상/)
+  assert.match(reason({ ...good, budget: { version: 3, tables: { categories: [{ id: 'a' }, { id: 'a' }] } } }) ?? '', /중복/)
+  // 설정은 아는 값만 받는다
+  const odd = parseBackup(JSON.stringify({ ...good, settings: { plannedIncome: 'maybe' } }), schema)
+  assert.ok(odd.ok && odd.backup.settings.plannedIncome === undefined)
+  console.log('전체 백업 통과')
+}
 
 console.log('\n모든 검산 통과')

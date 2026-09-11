@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import {
+  ArchiveRestore,
   ArrowDownLeft,
   ArrowUpRight,
   CalendarDays,
@@ -7,6 +8,7 @@ import {
   ChevronRight,
   CircleDollarSign,
   Coins,
+  DatabaseBackup,
   Download,
   HelpCircle,
   Home,
@@ -34,6 +36,8 @@ import { monthlyWishDeposit } from './lib/wish'
 import { useCategories } from './lib/hooks'
 import type { Transaction } from './lib/types'
 import { buildCsv, downloadCsv } from './lib/csv'
+import { backupSchema, downloadBackup, restoreBackup } from './lib/backup'
+import { parseBackup } from './lib/backupFormat'
 import { materializeRecurring, syncRuleBudgets } from './lib/recurring'
 import { CategoryPlanet } from './components/CategoryPlanet'
 import { DailyBreakdown } from './components/DailyBreakdown'
@@ -588,6 +592,7 @@ function SettingsView({ dark, onTheme, openOnboarding, sub, setSub, plannedIncom
   const month = format(new Date(), 'yyyy-MM')
   const monthSettings = useLiveQuery(() => db.monthSettings.get(month), [month])
   const [reserveOpen, setReserveOpen] = useState(false)
+  const restoreInput = useRef<HTMLInputElement>(null)
   const reserve = monthSettings?.reserveAmount ?? 0
   if (sub === 'categories') return <CategorySettings back={() => setSub(null)} />
   if (sub === 'recurring') return <RecurringSettings back={() => setSub(null)} />
@@ -595,6 +600,26 @@ function SettingsView({ dark, onTheme, openOnboarding, sub, setSub, plannedIncom
     const [transactions, categories] = await Promise.all([db.transactions.toArray(), db.categories.toArray()])
     if (transactions.length === 0) { window.alert('내보낼 거래가 아직 없어요.'); return }
     downloadCsv(buildCsv(transactions, categories), `orbit-budget-${format(new Date(), 'yyyy-MM-dd')}.csv`)
+  }
+  const exportBackup = () => downloadBackup(`orbit-backup-${format(new Date(), 'yyyy-MM-dd')}.json`)
+  const restoreFromFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    // 같은 파일을 다시 골라도 onChange가 뜨게 비운다
+    event.target.value = ''
+    if (!file) return
+    const parsed = parseBackup(await file.text(), await backupSchema())
+    if (!parsed.ok) { window.alert(parsed.reason); return }
+    const { backup } = parsed
+    const counts = `거래 ${backup.budget.tables.transactions?.length ?? 0}건 · 위시 ${backup.wish.tables.wishes?.length ?? 0}개`
+    if (!window.confirm(`${format(backup.exportedAt, 'yyyy.MM.dd HH:mm')} 백업으로 전체 교체\n${counts}\n지금 예산·위시 데이터 삭제 · 되돌릴 수 없음`)) return
+    try {
+      await restoreBackup(backup)
+    } catch {
+      window.alert('복원 실패 · 기존 데이터 유지')
+      return
+    }
+    // 화면 상태와 구독을 새 데이터로 처음부터 다시 그린다
+    window.location.reload()
   }
   const settings = [
     { icon: CircleDollarSign, title: '카테고리 관리', desc: '예산과 카테고리 색상 설정', onClick: () => setSub('categories') },
@@ -606,7 +631,7 @@ function SettingsView({ dark, onTheme, openOnboarding, sub, setSub, plannedIncom
       onClick: () => setReserveOpen(true),
     },
   ]
-  return <div className="view"><div className="page-heading"><div><p className="eyebrow">PREFERENCES</p><h1>설정</h1><p>나의 예산 행성을 관리하세요.</p></div></div><section className="settings-card">{settings.map(row=>{const Icon=row.icon;return <button className="setting-row" key={row.title} onClick={row.onClick}><span><Icon size={20}/></span><div><strong>{row.title}</strong><small>{row.desc}</small></div><ChevronRight size={18}/></button>})}<button className="setting-row" onClick={onPlannedIncome}><span><Coins size={20}/></span><div><strong>자유비용에 예정 수입 포함</strong><small>{plannedIncome?'아직 안 들어온 예정 수입도 더해서 계산':'실제로 들어온 수입만으로 계산'}</small></div><i className={`toggle ${plannedIncome?'on':''}`}><b/></i></button></section><h2 className="settings-subhead">앱 설정</h2><section className="settings-card"><button className="setting-row" onClick={openOnboarding}><span><HelpCircle size={20}/></span><div><strong>시작 안내 다시 보기</strong><small>수입·예산·예비비를 순서대로 설정</small></div><ChevronRight size={18}/></button><button className="setting-row" onClick={onTheme}><span>{dark?<Moon size={20}/>:<Sun size={20}/>}</span><div><strong>화면 테마</strong><small>{dark?'다크 모드':'라이트 모드'}</small></div><i className={`toggle ${dark?'on':''}`}><b/></i></button><button className="setting-row" onClick={exportCsv}><span><Download size={20}/></span><div><strong>데이터 내보내기</strong><small>CSV 파일로 안전하게 보관</small></div><ChevronRight size={18}/></button></section><p className="version">ORBIT BUDGET · UI PROTOTYPE 0.4</p>{reserveOpen && <ReserveSheet month={month} current={reserve} close={() => setReserveOpen(false)} />}</div>
+  return <div className="view"><div className="page-heading"><div><p className="eyebrow">PREFERENCES</p><h1>설정</h1><p>나의 예산 행성을 관리하세요.</p></div></div><section className="settings-card">{settings.map(row=>{const Icon=row.icon;return <button className="setting-row" key={row.title} onClick={row.onClick}><span><Icon size={20}/></span><div><strong>{row.title}</strong><small>{row.desc}</small></div><ChevronRight size={18}/></button>})}<button className="setting-row" onClick={onPlannedIncome}><span><Coins size={20}/></span><div><strong>자유비용에 예정 수입 포함</strong><small>{plannedIncome?'아직 안 들어온 예정 수입도 더해서 계산':'실제로 들어온 수입만으로 계산'}</small></div><i className={`toggle ${plannedIncome?'on':''}`}><b/></i></button></section><h2 className="settings-subhead">앱 설정</h2><section className="settings-card"><button className="setting-row" onClick={openOnboarding}><span><HelpCircle size={20}/></span><div><strong>시작 안내 다시 보기</strong><small>수입·예산·예비비를 순서대로 설정</small></div><ChevronRight size={18}/></button><button className="setting-row" onClick={onTheme}><span>{dark?<Moon size={20}/>:<Sun size={20}/>}</span><div><strong>화면 테마</strong><small>{dark?'다크 모드':'라이트 모드'}</small></div><i className={`toggle ${dark?'on':''}`}><b/></i></button><button className="setting-row" onClick={exportCsv}><span><Download size={20}/></span><div><strong>데이터 내보내기</strong><small>거래 내역만 · 엑셀용 CSV</small></div><ChevronRight size={18}/></button><button className="setting-row" onClick={exportBackup}><span><DatabaseBackup size={20}/></span><div><strong>전체 백업</strong><small>예산·위시 전체 · JSON 파일</small></div><ChevronRight size={18}/></button><button className="setting-row" onClick={()=>restoreInput.current?.click()}><span><ArchiveRestore size={20}/></span><div><strong>백업에서 복원</strong><small>지금 데이터 전부 교체</small></div><ChevronRight size={18}/></button><input ref={restoreInput} type="file" accept="application/json,.json" hidden onChange={restoreFromFile}/></section><p className="version">ORBIT BUDGET · UI PROTOTYPE 0.4</p>{reserveOpen && <ReserveSheet month={month} current={reserve} close={() => setReserveOpen(false)} />}</div>
 }
 
 function App() {

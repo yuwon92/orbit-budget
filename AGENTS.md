@@ -26,6 +26,8 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `apps/orbit/src/App.tsx` | Orbit 화면 4개(Home/Calendar/Transactions/Settings) + 셸 |
 | `apps/orbit/src/lib/sheet.ts` | 바텀시트용 훅 — `useSheetViewport`, `useSheetFocus` |
 | `apps/orbit/src/lib/csv.ts` | CSV 문자열 생성 + 다운로드 |
+| `apps/orbit/src/lib/backupFormat.ts` | 전체 백업 파일 형식·검사(`parseBackup`). **순수 함수만** — 검산이 읽는다 |
+| `apps/orbit/src/lib/backup.ts` | 전체 백업 받기·복원. 예산·위시 두 DB를 한 파일로. 복원은 DB마다 한 트랜잭션으로 통째 교체, 한쪽이 실패하면 둘 다 원래대로 되돌린다 |
 | `apps/orbit/src/lib/hooks.ts` | `useCategories()` (sortOrder 정렬) |
 | `apps/orbit/src/index.css` | Orbit 전역 CSS 한 파일. 클래스명 기반 |
 | `apps/wish/src/App.tsx` | Wish 셸 — 탭·테마·시트·저장소 구독. 화면은 갖지 않음 |
