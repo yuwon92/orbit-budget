@@ -6,14 +6,16 @@ import type { Wish, WishEvent } from '@orbit/wish-core/types'
 import { PixelPlanet } from '../components/PixelPlanet'
 import { PixelBar } from '../components/PixelBar'
 import { pad2 } from '../lib/format'
+import type { WishSkin } from '../lib/preview'
 
-export function QuestScreen({ wishes, slotsUsed, orbitNumbers, events, today, slots, onCollect, onAddOrbit, onAddList, onEdit, onResolve, onFocus }: {
+export function QuestScreen({ wishes, slotsUsed, orbitNumbers, events, today, slots, skin, onCollect, onAddOrbit, onAddList, onEdit, onResolve, onFocus }: {
   wishes: Wish[]
   orbitNumbers: ReadonlyMap<string, number>
   events: WishEvent[]
   today: string
   slots: number
   slotsUsed: number
+  skin: WishSkin
   onCollect: (wish: Wish) => void
   onAddOrbit: () => void
   onAddList: () => void
@@ -50,7 +52,7 @@ export function QuestScreen({ wishes, slotsUsed, orbitNumbers, events, today, sl
                     </div>
                   </div>
                   <button className="quest-planet" onClick={() => onFocus(wish)} aria-label={`${wish.name} 허브에서 보기`}>
-                    <PixelPlanet progress={progress} seed={wish.seed} size={64} />
+                    <PixelPlanet progress={progress} seed={wish.seed} size={64} {...skin} />
                   </button>
                 </div>
                 <PixelBar ratio={progress / 100} segments={12} />

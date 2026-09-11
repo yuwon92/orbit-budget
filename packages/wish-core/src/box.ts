@@ -34,10 +34,38 @@ export const BOX_ODDS: Record<BoxType, Record<Rarity, number>> = {
  * 상자 가격. 스펙 §7의 목표 기간 「일반 코스믹 박스 = 미션 3~5일」을 기준 사용자
  * 하루 13.6 별가루로 곱한 값이다(41~68 → 60).
  *
+ * 상자는 미보유부터 주므로 한 장이 상점 아이템 하나로 바뀐다(상점가 기댓값 약 131).
+ * 가격으로 막으려면 §7 기간을 두 배로 늘려야 해서, 값은 두고 주간 한도로 속도를
+ * 묶었다(`BOX_WEEKLY_LIMIT`).
+ *
  * 희귀 확정·프리미엄은 값이 없다 — 레벨 이정표 전용이라 상점에 오르지 않는다.
  * 값을 두면 Lv.14·20 보상이 「사면 그만인 것」이 된다.
  */
 export const BOX_PRICE: Partial<Record<BoxType, number>> = { normal: 60 }
+
+/**
+ * 코스믹 박스 주간 구매 한도. 한도가 없으면 모아 둔 별가루를 한꺼번에 상자로 바꿔
+ * 상점 재고를 며칠 만에 비운다(60 × 21장 = 1,260, 직접 사면 5,120). 레벨 보상으로
+ * 받은 상자는 세지 않는다 — 한도는 상점 구매에만 걸린다.
+ */
+export const BOX_WEEKLY_LIMIT = 3
+
+/** 그 시각이 속한 주의 월요일 0시(기기 시간대). 한도는 월요일마다 새로 찬다 */
+export function weekStartOf(time: number): number {
+  const date = new Date(time)
+  date.setHours(0, 0, 0, 0)
+  date.setDate(date.getDate() - ((date.getDay() + 6) % 7))
+  return date.getTime()
+}
+
+/** 이번 주에 상점에서 산 상자 수. 열었든 안 열었든 산 것은 센다 */
+export const boxesBoughtThisWeek = (
+  boxes: readonly { boxId: string; acquiredAt: number }[],
+  now: number,
+): number => {
+  const start = weekStartOf(now)
+  return boxes.filter((box) => box.boxId.startsWith('shop:') && box.acquiredAt >= start).length
+}
 
 /**
  * 중복이 나왔을 때 대신 주는 별가루. §7 가격의 1/4이고 검산이 그 비율을 지킨다.

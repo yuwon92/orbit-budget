@@ -6,8 +6,9 @@ import type { Wish, WishEvent } from '@orbit/wish-core/types'
 import { PixelPlanet } from '../components/PixelPlanet'
 import { CODEX_SLOTS } from '../lib/labels'
 import { formatDate } from '../lib/format'
+import type { WishSkin } from '../lib/preview'
 
-export function CodexScreen({ wishes, events }: { wishes: Wish[]; events: WishEvent[] }) {
+export function CodexScreen({ wishes, events, skin }: { wishes: Wish[]; events: WishEvent[]; skin: WishSkin }) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const entries = useMemo(() => wishes.map((wish) => {
@@ -43,7 +44,7 @@ export function CodexScreen({ wishes, events }: { wishes: Wish[]; events: WishEv
             onClick={() => setSelectedId(item.wish.id)}
             aria-label={item.wish.name}
           >
-            <PixelPlanet progress={100} seed={item.wish.seed} size={40} />
+            <PixelPlanet progress={100} seed={item.wish.seed} size={40} {...skin} />
           </button>
         ))}
         <span className="dust d1" /><span className="dust d2" /><span className="dust d3" /><span className="dust d4" />
@@ -78,7 +79,7 @@ export function CodexScreen({ wishes, events }: { wishes: Wish[]; events: WishEv
             className={`codex-cell${entry?.wish.id === item.wish.id ? ' selected' : ''}`}
             onClick={() => setSelectedId(item.wish.id)}
           >
-            <PixelPlanet progress={100} seed={item.wish.seed} size={52} />
+            <PixelPlanet progress={100} seed={item.wish.seed} size={52} {...skin} />
             <strong>{item.wish.name}</strong>
             <span>{formatDate(item.date)}</span>
           </button>

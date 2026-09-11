@@ -14,8 +14,9 @@ import { OrbitMap } from '../components/OrbitMap'
 import { type Mission } from '../missions'
 import { STAGE_NAMES } from '../lib/labels'
 import { pad2 } from '../lib/format'
+import type { WishSkin } from '../lib/preview'
 
-export function HubScreen({ wishes, active, events, today, missions, pendingXp, slots, slotsUsed, level, onSelect, onAdd, onRun, onClaimOne, onClaimAll, onOpenQuests }: {
+export function HubScreen({ wishes, active, events, today, missions, pendingXp, slots, slotsUsed, level, skin, onSelect, onAdd, onRun, onClaimOne, onClaimAll, onOpenQuests }: {
   wishes: Wish[]
   active: Wish | null
   events: WishEvent[]
@@ -25,6 +26,7 @@ export function HubScreen({ wishes, active, events, today, missions, pendingXp, 
   slots: number
   slotsUsed: number
   level: number
+  skin: WishSkin
   onSelect: (id: string) => void
   onAdd: () => void
   onRun: (mission: Mission) => void
@@ -62,6 +64,7 @@ export function HubScreen({ wishes, active, events, today, missions, pendingXp, 
           onSelect={onSelect}
           onAdd={onAdd}
           slots={slots}
+          skin={skin}
         />
         <div className="stage-caption">
           <span className="pixel-label">{orbitLevelOf(progress)}단계 · {STAGE_NAMES[stageOf(progress)]}</span>

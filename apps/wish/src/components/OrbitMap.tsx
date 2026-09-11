@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react'
 import { OrbitRing, PixelPlanet } from './PixelPlanet'
 import { progress as progressOf } from '@orbit/wish-core/wish'
 import type { Wish } from '@orbit/wish-core/types'
+import type { WishSkin } from '../lib/preview'
 
 interface OrbitMapProps {
   wishes: Wish[]
@@ -10,10 +11,11 @@ interface OrbitMapProps {
   onSelect: (id: string) => void
   onAdd: () => void
   slots: number
+  skin: WishSkin
 }
 
 /** 허브 중앙의 행성 맵. 가운데가 지금 보는 위시, 바깥 궤도가 나머지 슬롯. */
-export function OrbitMap({ wishes, activeId, onSelect, onAdd, slots }: OrbitMapProps) {
+export function OrbitMap({ wishes, activeId, onSelect, onAdd, slots, skin }: OrbitMapProps) {
   const active = wishes.find((wish) => wish.id === activeId) ?? wishes[0]
   const others = wishes.filter((wish) => wish.id !== active?.id)
   const satellites: { key: string; node: ReactNode; onClick?: () => void; locked?: boolean }[] = [
@@ -22,7 +24,7 @@ export function OrbitMap({ wishes, activeId, onSelect, onAdd, slots }: OrbitMapP
       onClick: () => onSelect(wish.id),
       node: (
         <>
-          <PixelPlanet progress={progressOf(wish)} seed={wish.seed} size={44} />
+          <PixelPlanet progress={progressOf(wish)} seed={wish.seed} size={44} {...skin} />
           <span>{wish.name}</span>
         </>
       ),
@@ -50,7 +52,7 @@ export function OrbitMap({ wishes, activeId, onSelect, onAdd, slots }: OrbitMapP
       <span className="map-star three" />
       <div className="map-core">
         {active && <OrbitRing progress={progressOf(active)} />}
-        {active && <PixelPlanet progress={progressOf(active)} seed={active.seed} size={132} float />}
+        {active && <PixelPlanet progress={progressOf(active)} seed={active.seed} size={132} float {...skin} />}
       </div>
       <div className="map-satellites">
         {satellites.map((item, index) => (

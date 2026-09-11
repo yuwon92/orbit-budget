@@ -11,6 +11,20 @@ export const PREVIEW_SEED = 7
 
 export type EquippedItems = Partial<Record<ItemCategory, ItemId>>
 
+/**
+ * 위시 행성에 입히는 장착 칸. 행성 색·무늬만 — 링·배경·동료·효과는 나의 우주에만
+ * 그린다. 위시 행성끼리는 씨앗마다 다른 무늬 자리와 진행 단계로 구분한다.
+ */
+export interface WishSkin {
+  planetColorId?: ItemId
+  planetPatternId?: ItemId
+}
+
+export const wishSkinOf = (items: EquippedItems): WishSkin => ({
+  planetColorId: items.planetColor,
+  planetPatternId: items.planetPattern,
+})
+
 /** 장착 상태를 바탕으로 그 아이템의 칸만 갈아 끼운다 */
 export function previewProps(items: EquippedItems, itemId: ItemId, size: number) {
   const category = ITEMS[itemId].category

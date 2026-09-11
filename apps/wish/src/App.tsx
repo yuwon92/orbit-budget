@@ -64,6 +64,7 @@ import { TITLES } from './lib/labels'
 import { pad2, todayString } from './lib/format'
 import { ITEM_LABELS, RARITY_LABELS } from './lib/items'
 import { BOX_LABELS, titleOfLevel } from './lib/rewards'
+import { wishSkinOf } from './lib/preview'
 import { SAMPLE_REWARDS, readDevXp, writeDevXp } from './lib/dev'
 import {
   useBoxOpens, useBoxes, useClaims, useDustLedger, useEquipped, useLevelClaims, useOwnedItems,
@@ -139,6 +140,8 @@ export default function App() {
   const levelClaims = useMemo(() => storedLevelClaims ?? [], [storedLevelClaims])
   const boxes = useMemo(() => storedBoxes ?? [], [storedBoxes])
   const boxOpens = useMemo(() => storedBoxOpens ?? [], [storedBoxOpens])
+  // 위시 행성에 입히는 장착 색·무늬. 궤도·퀘스트·도감·완주 연출이 함께 쓴다
+  const skin = useMemo(() => wishSkinOf(equippedMap(equipped)), [equipped])
 
   const [activeId, setActiveId] = useState<string | null>(null)
 
@@ -324,7 +327,7 @@ export default function App() {
   const handleBuyBox = useCallback((type: BoxType) => {
     void buyBox(type).then((outcome) => {
       if (outcome === 'ok') return setToast(`${BOX_LABELS[type]} 1장 획득`)
-      setToast(outcome === 'poor' ? '별가루 부족' : '판매하지 않는 상자')
+      setToast(outcome === 'poor' ? '별가루 부족' : outcome === 'limit' ? '이번 주 구매 한도 도달' : '판매하지 않는 상자')
     })
   }, [])
 
@@ -548,6 +551,7 @@ export default function App() {
             slots={slots}
             slotsUsed={slotsUsed}
             level={level.level}
+            skin={skin}
             onSelect={setActiveId}
             onAdd={() => setAdding('orbit')}
             onRun={runMission}
@@ -564,6 +568,7 @@ export default function App() {
             events={events}
             today={today}
             slots={slots}
+            skin={skin}
             onCollect={(wish) => setCollecting(wish)}
             onAddOrbit={() => setAdding('orbit')}
             onAddList={() => setAdding('list')}
@@ -572,7 +577,7 @@ export default function App() {
             onFocus={(wish) => { setActiveId(wish.id); goScreen('hub') }}
           />
         )}
-        {screen === 'codex' && <CodexScreen wishes={doneWishes} events={events} />}
+        {screen === 'codex' && <CodexScreen wishes={doneWishes} events={events} skin={skin} />}
         {screen === 'observatory' && (
           <ObservatoryScreen
             level={level}
@@ -703,7 +708,7 @@ export default function App() {
           onCancel={(targetWishId) => cancelOpenWish(resolving, targetWishId)}
         />
       )}
-      {rewards[0] && <RewardOverlay reward={rewards[0]} onClose={() => setRewards((current) => current.slice(1))} />}
+      {rewards[0] && <RewardOverlay reward={rewards[0]} skin={skin} onClose={() => setRewards((current) => current.slice(1))} />}
       {toast && <div className="wl-toast"><span aria-hidden="true">⭐</span>{toast}</div>}
     </div>
   )

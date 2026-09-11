@@ -155,8 +155,8 @@ export function ObservatoryScreen({
 
       <section className="panel">
         <div className="panel-head"><div><span className="pixel-label">MY UNIVERSE</span><h2>나의 우주</h2></div></div>
-        <div className="observer-card">
-          <div className="observer-planet">
+        <div className="obs-card">
+          <div className="obs-planet">
             <UniversePreview
               equipped={equipped}
               progress={Math.min(99, level.level * 14)}
@@ -166,13 +166,13 @@ export function ObservatoryScreen({
               float
             />
           </div>
-          <div className="observer-xp">
+          <div className="obs-xp">
             <PixelBar ratio={level.ratio} segments={16} />
-            <p className="observer-xp-numbers">
+            <p className="obs-xp-numbers">
               <strong>{level.into.toLocaleString('ko-KR')}</strong>
               <span>/ {level.max ? '—' : level.need.toLocaleString('ko-KR')} XP</span>
             </p>
-            <p className="observer-xp-sub">
+            <p className="obs-xp-sub">
               누적 {totalXp.toLocaleString('ko-KR')} · 다음 레벨까지 {level.max ? 0 : level.need - level.into}
               {pendingXp > 0 && ` · 미수령 ${pendingXp}`}
             </p>

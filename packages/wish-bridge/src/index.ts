@@ -6,9 +6,11 @@ import { claimIdOf, type MissionUnit } from '@orbit/wish-core/xp'
 import { missionDustGrants, stardustBalance, type DustRow } from '@orbit/wish-core/dust'
 import { canBuy, purchaseRows, type BuyRefusal } from '@orbit/wish-core/shop'
 import {
+  BOX_WEEKLY_LIMIT,
   boxOpenId,
   boxPriceOf,
   boxPurchaseRow,
+  boxesBoughtThisWeek,
   duplicateDustRow,
   pityCount,
   rollBox,
@@ -423,12 +425,14 @@ export async function buyItem(itemId: string): Promise<BuyOutcome> {
   })
 }
 
-export type BuyBoxOutcome = 'ok' | 'notForSale' | 'poor'
+export type BuyBoxOutcome = 'ok' | 'notForSale' | 'poor' | 'limit'
 
 /**
  * 상자 구매. 검증 → 별가루 차감 줄 → 상자 지급이 한 트랜잭션이다(§7 구매 규칙).
  * 아이템 구매와 달리 **같은 종류를 여러 장 살 수 있다** — 상자는 소모품이다.
  * 그래서 재구매를 막는 「이미 보유」 검사가 없고, 이름표는 상자 id로 갈린다.
+ * 대신 주간 한도(`BOX_WEEKLY_LIMIT`)를 여기서 다시 센다 — 화면이 본 횟수는
+ * 다른 탭의 구매를 모른다.
  *
  * 상자 id 순번은 이미 산 상자 수에서 뽑고 `add`로 넣는다. 순번이 겹치면 조용히
  * 덮어쓰는 대신 트랜잭션이 통째로 되돌아가 별가루도 함께 살아난다.
@@ -438,9 +442,11 @@ export async function buyBox(type: BoxType): Promise<BuyBoxOutcome> {
   if (price === undefined || price <= 0) return 'notForSale'
   return wishDb.transaction('rw', wishDb.dustLedger, wishDb.boxes, async () => {
     // 화면이 들고 있던 잔액을 믿지 않는다. 상점 구매와 같은 이유다
+    const boxes = await wishDb.boxes.toArray()
+    if (boxesBoughtThisWeek(boxes, Date.now()) >= BOX_WEEKLY_LIMIT) return 'limit'
     const balance = stardustBalance(await wishDb.dustLedger.toArray())
     if (balance < price) return 'poor'
-    const bought = (await wishDb.boxes.toArray()).filter((row) => row.boxId.startsWith('shop:'))
+    const bought = boxes.filter((row) => row.boxId.startsWith('shop:'))
     const boxId = `shop:${type}:${bought.length + 1}`
     const row = boxPurchaseRow(boxId, type, Date.now())
     await addDustRows([row])

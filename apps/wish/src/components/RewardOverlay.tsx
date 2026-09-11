@@ -3,7 +3,7 @@ import type { ItemId, Rarity } from '@orbit/wish-core/items'
 import { PixelPlanet } from './PixelPlanet'
 import { pad2 } from '../lib/format'
 import { RARITY_LABELS } from '../lib/items'
-import { previewProps, type EquippedItems } from '../lib/preview'
+import { previewProps, type EquippedItems, type WishSkin } from '../lib/preview'
 
 export type Reward =
   | { kind: 'levelup'; from: number; to: number; title: string; unlock: string | null }
@@ -30,7 +30,7 @@ export type Reward =
  * 1픽셀짜리 마침표가 3×3 블록이 되고 글자 사이에 뜬 점처럼 보인다. 11px
  * `.pixel-label`에서는 문장부호로 읽히므로 그쪽은 `LV.` 그대로 둔다.
  */
-export function RewardOverlay({ reward, onClose }: { reward: Reward; onClose: () => void }) {
+export function RewardOverlay({ reward, skin, onClose }: { reward: Reward; skin: WishSkin; onClose: () => void }) {
   const close = useRef(onClose)
   close.current = onClose
 
@@ -88,7 +88,7 @@ export function RewardOverlay({ reward, onClose }: { reward: Reward; onClose: ()
         </div>
       ) : (
         <div className="reward-body">
-          <PixelPlanet progress={100} seed={reward.seed} size={132} float />
+          <PixelPlanet progress={100} seed={reward.seed} size={132} float {...skin} />
           <p className="reward-title">WISH COMPLETED</p>
           <p className="reward-name">{reward.name}</p>
           <p className="reward-sub">소원이 이루어졌다 · {reward.date.replaceAll('-', '.')}</p>

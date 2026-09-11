@@ -61,12 +61,15 @@ import { canBuy, priceOf, purchaseRows, shopItems } from '../packages/wish-core/
 import {
   BOX_ODDS,
   BOX_PRICE,
+  BOX_WEEKLY_LIMIT,
   DUPLICATE_DUST,
   PITY_LIMIT,
   boxOpenId,
   boxPool,
   boxPurchaseRow,
   boxRarities,
+  boxesBoughtThisWeek,
+  weekStartOf,
   duplicateDustId,
   duplicateDustRow,
   pityCount,
@@ -789,7 +792,64 @@ const claim = (date: string, missionId: string): Claim => ({
   assert.equal(buyRow.amount, BOX_PRICE.normal)
   assert.equal(buyRow.id, 'purchase:box:shop:normal:2')
   assert.notEqual(buyRow.id, boxPurchaseRow('shop:normal:3', 'normal', 0).id)
+
+  // 주간 한도는 월요일 0시에 새로 찬다. 2026-09-14가 월요일
+  const at = (y: number, m: number, d: number, h = 12) => new Date(y, m - 1, d, h).getTime()
+  assert.equal(weekStartOf(at(2026, 9, 16)), at(2026, 9, 14, 0))
+  assert.equal(weekStartOf(at(2026, 9, 14, 0)), at(2026, 9, 14, 0))
+  // 일요일은 앞 주에 속한다
+  assert.equal(weekStartOf(at(2026, 9, 13)), at(2026, 9, 7, 0))
+  // 지난주 구매와 레벨 보상 상자는 세지 않는다
+  const bought = [
+    { boxId: 'shop:normal:1', acquiredAt: at(2026, 9, 13) },
+    { boxId: 'shop:normal:2', acquiredAt: at(2026, 9, 14, 0) },
+    { boxId: 'shop:normal:3', acquiredAt: at(2026, 9, 15) },
+    { boxId: 'level:16:normal:1', acquiredAt: at(2026, 9, 15) },
+  ]
+  assert.equal(boxesBoughtThisWeek(bought, at(2026, 9, 16)), 2)
+  assert.equal(boxesBoughtThisWeek(bought, at(2026, 9, 21)), 0)
   console.log('코스믹 박스 통과')
+}
+
+// ── 밸런스 ────────────────────────────────────────────
+// 사용 패턴 하나가 하루에 버는 XP·별가루. 레벨 곡선과 상점 가격이 같은 기준 사용자를
+// 봐야 한다 — 둘이 다른 사람을 가정하면 조용히 어긋난다
+{
+  interface Profile { carryoverPerWeek: number }
+  const perDay = (table: { share: number; carryover: number; streak7: number }, profile: Profile) =>
+    table.share + (table.carryover * profile.carryoverPerWeek) / 7 + table.streak7 / 7
+  // 기준 사용자: 하루 몫 매일 + 넘기기 주 2회 + 연속
+  const BASE: Profile = { carryoverPerWeek: 2 }
+  const dustPerDay = (profile: Profile) => perDay(DUST, profile)
+  const xpPerDay = (profile: Profile) => perDay(XP, profile)
+
+  assert.ok(Math.abs(dustPerDay(BASE) - 13.57) < 0.01)
+  assert.ok(Math.abs(xpPerDay(BASE) - 22.86) < 0.01)
+  // 하루·일주일·한 달
+  assert.equal(Math.round(dustPerDay(BASE) * 7), 95)
+  assert.equal(Math.round(dustPerDay(BASE) * 30), 407)
+
+  // §7 목표 획득 기간. 가격 ÷ 기준 사용자 하루 별가루
+  const within = (price: number, [min, max]: [number, number], label: string) => {
+    const days = price / dustPerDay(BASE)
+    assert.ok(days >= min && days <= max, `${label} ${days.toFixed(1)}일`)
+  }
+  within(PRICES.common, [4, 7], 'Common')
+  within(PRICES.rare, [14, 21], 'Rare')
+  within(PRICES.epic, [21, 35], 'Epic')
+  within(BOX_PRICE.normal ?? 0, [3, 5], '코스믹 박스')
+
+  // 코스믹 박스는 가격이 아니라 주간 한도로 속도를 묶는다. 미보유 우선이라 상자 한 장이
+  // 상점 아이템 하나로 바뀐다 — 한도가 없으면 모아 둔 별가루로 상점 재고를 며칠 만에 비운다
+  const weeksToClear = Math.ceil(boxPool('normal').length / BOX_WEEKLY_LIMIT)
+  assert.ok(weeksToClear >= 7, `상자로 상점 재고를 비우는 데 ${weeksToClear}주`)
+
+  // Lv.20 도달 기간(개월). 완주 보너스를 빼고 잰 값이라 실제로는 더 빠르다
+  const months = (profile: Profile) => LEVEL_STEPS[19] / xpPerDay(profile) / 30.4
+  assert.ok(Math.abs(months(BASE) - 24) < 0.5, `기준 ${months(BASE).toFixed(1)}개월`)
+  assert.ok(Math.abs(months({ carryoverPerWeek: 7 }) - 12.5) < 0.5)
+  assert.ok(Math.abs(months({ carryoverPerWeek: 0 }) - 39) < 0.5)
+  console.log('밸런스 통과')
 }
 
 console.log('\n모든 Wish 검산 통과')

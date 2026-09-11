@@ -3,10 +3,12 @@ import { ChevronLeft } from 'lucide-react'
 import { money } from '@orbit/budget-core/format'
 import {
   BOX_ODDS,
+  BOX_WEEKLY_LIMIT,
   PITY_LIMIT,
   boxPool,
   boxPriceOf,
   boxRarities,
+  boxesBoughtThisWeek,
   pityCount,
 } from '@orbit/wish-core/box'
 import { CATEGORIES, ITEMS, equippedMap, type ItemCategory, type ItemId, type Rarity } from '@orbit/wish-core/items'
@@ -55,6 +57,9 @@ export function ShopScreen({
   const unopened = boxes.filter((box) => box.openedAt === null)
   const boxPrice = boxPriceOf('normal') ?? 0
   const boxPoor = stardust < boxPrice
+  // 한도는 상점에서 산 것만 센다. 판정은 buyBox가 트랜잭션 안에서 다시 한다
+  const boughtThisWeek = boxesBoughtThisWeek(boxes, Date.now())
+  const boxCapped = boughtThisWeek >= BOX_WEEKLY_LIMIT
   // 파는 코스믹 박스는 보유가 없어도 늘 카드를 세운다. 나머지는 가진 것만
   const boxCards = BOX_ORDER.filter(
     (type) => type === 'normal' || unopened.some((box) => box.type === type),
@@ -113,16 +118,22 @@ export function ShopScreen({
                   {type === 'normal' && (
                     <button
                       className={`${mine.length ? 'secondary-button' : 'primary-button'} full`}
-                      disabled={boxPoor}
+                      disabled={boxPoor || boxCapped}
                       onClick={() => onBuyBox('normal')}
                     >
-                      {boxPoor ? `별가루 ${money(boxPrice - stardust)} 부족` : `별가루 ${money(boxPrice)}개로 구매`}
+                      {boxCapped
+                        ? '이번 주 구매 완료'
+                        : boxPoor
+                          ? `별가루 ${money(boxPrice - stardust)} 부족`
+                          : `별가루 ${money(boxPrice)}개로 구매`}
                     </button>
                   )}
                 </div>
                 <p className="box-buy-note">
                   {type === 'normal'
-                    ? `구매 후 잔액 ${money(Math.max(0, stardust - boxPrice))}`
+                    ? `이번 주 ${boughtThisWeek}/${BOX_WEEKLY_LIMIT} · ${boxCapped
+                      ? '월요일 초기화'
+                      : `구매 후 잔액 ${money(Math.max(0, stardust - boxPrice))}`}`
                     : '레벨 보상 전용 · 판매하지 않음'}
                 </p>
               </article>

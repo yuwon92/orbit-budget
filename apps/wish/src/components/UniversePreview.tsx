@@ -7,7 +7,7 @@ import { OrbitRing, PixelPlanet } from './PixelPlanet'
  * 그린다. 관측소 홈·꾸미기·상점 미리보기가 같은 것을 쓴다 — 상점에서 본 모습과
  * 장착한 뒤 모습이 다르면 안 된다(스펙 §6).
  *
- * 허브·퀘스트·도감의 위시 행성은 그 위시 고유의 모습이라 여기를 거치지 않는다.
+ * 허브·퀘스트·도감의 위시 행성은 여기를 거치지 않고 행성 색·무늬만 받는다(`wishSkinOf`).
  */
 export function UniversePreview({ equipped, progress, seed, size = 132, ring, float = false }: {
   equipped: Equipped[]
