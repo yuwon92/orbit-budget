@@ -1363,7 +1363,8 @@ ul { padding: 0; list-style: none; }
   flex: 0 0 auto;
   width: 46px;
   height: 46px;
-  padding: 0;
+  /* Mona 이모지는 12칸 격자 중 왼쪽 11칸만 칠해 오른쪽 한 줄이 빈다. 반 칸만큼 오른쪽으로 민다 */
+  padding: 0 0 0 calc(1em / 12);
   border: 1px solid var(--border-strong);
   border-radius: 15px;
   display: grid;

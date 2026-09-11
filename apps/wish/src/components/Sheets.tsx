@@ -532,7 +532,7 @@ export function ItemSheet({ itemId, items, owned, stardust, onBuy, onEquip, onUn
             )
           ) : forSale ? (
             <button className="primary-button full" disabled={poor} onClick={() => onBuy(itemId)}>
-              <ShoppingBag size={16} /> {poor ? `별가루 ${money(-after)} 부족` : `별가루 ${money(price)} 지불`}
+              <ShoppingBag size={16} /> {poor ? `별가루 ${money(-after)} 부족` : `별가루 ${money(price)}개로 구매`}
             </button>
           ) : null}
 

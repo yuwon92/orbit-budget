@@ -98,13 +98,13 @@ export function ShopScreen({
                   <span className="box-icon" aria-hidden="true">{BOX_DETAILS[type].icon}</span>
                   <div>
                     <strong>{BOX_LABELS[type]}</strong>
-                    <span>{BOX_DETAILS[type].detail}</span>
+                    {BOX_DETAILS[type].detail && <span>{BOX_DETAILS[type].detail}</span>}
                   </div>
                   <span className="box-count">{mine.length ? `${mine.length}장 보유` : '판매 중'}</span>
                 </div>
                 <BoxOdds type={type} ownedIds={ownedIds} />
                 {type === 'normal' && (
-                  <p className="box-pity">천장 · {Math.max(1, PITY_LIMIT + 1 - pity)}회 안에 희귀 이상 확정</p>
+                  <p className="box-pity">{Math.max(1, PITY_LIMIT + 1 - pity)}회 안에 희귀 이상 확정</p>
                 )}
                 <div className="box-actions">
                   {mine.length > 0 && (
@@ -116,7 +116,7 @@ export function ShopScreen({
                       disabled={boxPoor}
                       onClick={() => onBuyBox('normal')}
                     >
-                      {boxPoor ? `별가루 ${money(boxPrice - stardust)} 부족` : `별가루 ${money(boxPrice)} 지불`}
+                      {boxPoor ? `별가루 ${money(boxPrice - stardust)} 부족` : `별가루 ${money(boxPrice)}개로 구매`}
                     </button>
                   )}
                 </div>

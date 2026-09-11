@@ -10,9 +10,9 @@ export const BOX_LABELS: Record<BoxType, string> = {
   premium: '프리미엄 박스',
 }
 
-/** 상자 한 줄 설명과 아이콘. 개봉 화면의 카드가 읽는다 */
-export const BOX_DETAILS: Record<BoxType, { icon: string; detail: string }> = {
-  normal: { icon: '📦', detail: '일반 중심 · 낮은 영웅 확률' },
+/** 상자 한 줄 설명과 아이콘. 개봉 화면의 카드가 읽는다. 코스믹 박스는 확률표가 곧 설명이라 비워 둔다 */
+export const BOX_DETAILS: Record<BoxType, { icon: string; detail?: string }> = {
+  normal: { icon: '📦' },
   rare: { icon: '🎁', detail: '희귀 이상 확정' },
   premium: { icon: '💎', detail: '영웅 중심 · 최상위 상자' },
 }
