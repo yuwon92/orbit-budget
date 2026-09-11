@@ -252,7 +252,9 @@ plannedIncome: boolean  // 자유비용에 예정 수입을 넣을지. 기본 tr
 
 테마는 `localStorage['orbit-theme']`에 저장하고, 고른 적이 없으면 `prefers-color-scheme`를 따른다. `index.html`의 인라인 스크립트가 첫 페인트 전에 같은 키를 읽어 `.dark`를 붙인다(키를 바꾸면 양쪽 다 고칠 것).
 
-`useToday()`가 1분마다 날짜를 확인해 자정을 넘기면 화면과 동기화를 다시 돌린다.
+`useToday()`가 1분마다, 그리고 화면이 다시 보일 때(`visibilitychange`) 날짜를 확인해 자정을 넘기면 화면과 동기화를 다시 돌린다. Wish도 같은 훅을 쓴다(`apps/wish/src/lib/hooks.ts`) — 켤 때 한 번만 읽으면 켜 둔 채 자정을 넘긴 앱이 어제 날짜로 저금·수령을 기록한다.
+
+**오류는 두 겹으로 받는다.** 그리기 중 오류는 `main.tsx`의 `ErrorBoundary`가 흰 화면 대신 「다시 불러오기」를 띄운다. 저장 실패처럼 받지 않은 비동기 오류는 App의 `unhandledrejection` 알림(「저장 실패 · 다시 시도」)이 받는다. 실패를 따로 다뤄야 하는 쓰기(위시 구매처럼 두 DB에 걸친 것)만 직접 `try/catch`로 감싼다.
 날짜가 바뀔 때마다 `materializeRecurring()` → `syncRuleBudgets()`, 최초 1회 `requestPersistentStorage()`.
 
 **HomeView** — 히어로(`남은 자유비용` 큰 숫자 · 오늘 사용액 · `DailyBreakdown`) → `QuickAddOrbs`(**카드 밖**) → `WishSavings`(대상 있을 때만) → 이번 달 예산 카드 그리드 → 오늘 내역.

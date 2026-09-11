@@ -1,7 +1,31 @@
+import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { wishDb } from '@orbit/wish-bridge/db'
 import type { DustRow } from '@orbit/wish-core/dust'
 import type { BoxOpen, Claim, Equipped, LevelClaim, OwnedBox, OwnedItem, Player, Wish, WishEvent } from '@orbit/wish-core/types'
+import { todayString } from './format'
+
+/**
+ * 오늘 날짜. 켤 때 한 번만 읽으면 자정을 넘겨 켜 둔 앱이 어제 날짜로 저금·수령을
+ * 기록한다 — 홈 화면 앱은 며칠씩 닫히지 않는다. 1분마다 다시 읽고, 백그라운드에서는
+ * 타이머가 멈추므로 화면이 다시 보일 때도 읽는다. Orbit의 useToday와 같은 방식.
+ */
+export function useToday(): string {
+  const [today, setToday] = useState(todayString)
+  useEffect(() => {
+    const refresh = () => setToday((current) => {
+      const next = todayString()
+      return next === current ? current : next
+    })
+    const timer = window.setInterval(refresh, 60_000)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [])
+  return today
+}
 
 // App에서 한 번만 구독해 prop으로 내린다. HUD가 모든 화면에서 같은 값을 쓰므로
 // 화면마다 따로 구독하면 같은 테이블을 네다섯 번 읽게 된다.

@@ -61,14 +61,14 @@ import { CodexScreen } from './screens/CodexScreen'
 import { ObservatoryScreen, type ObsSub } from './screens/ObservatoryScreen'
 import { buildMissions, type Mission } from './missions'
 import { TITLES } from './lib/labels'
-import { pad2, todayString } from './lib/format'
+import { pad2 } from './lib/format'
 import { ITEM_LABELS, RARITY_LABELS } from './lib/items'
 import { BOX_LABELS, titleOfLevel } from './lib/rewards'
 import { wishSkinOf } from './lib/preview'
 import { SAMPLE_REWARDS, readDevXp, writeDevXp } from './lib/dev'
 import {
   useBoxOpens, useBoxes, useClaims, useDustLedger, useEquipped, useLevelClaims, useOwnedItems,
-  usePlayer, useWishEvents, useWishes,
+  usePlayer, useToday, useWishEvents, useWishes,
 } from './lib/hooks'
 import { loadBudgetView, type BudgetView } from './lib/budget'
 
@@ -95,7 +95,7 @@ function readTheme() {
 }
 
 export default function App() {
-  const today = useMemo(todayString, [])
+  const today = useToday()
   const [screen, setScreen] = useState<Screen>('hub')
   // 관측소 하위 화면. 탭을 옮기면 반드시 비운다 — 안 그러면 다른 탭에 갔다
   // 돌아왔을 때 하위 화면이 그대로 떠 있다
@@ -181,6 +181,14 @@ export default function App() {
     const timer = window.setTimeout(() => setToast(null), 2400)
     return () => window.clearTimeout(timer)
   }, [toast])
+
+  // 저장 실패 알림. 쓰기 호출이 화면마다 흩어져 있어 받지 않은 실패를 한곳에서 잡는다 —
+  // 아무 반응이 없으면 사용자는 저장된 줄 안다
+  useEffect(() => {
+    const onFail = () => setToast('저장 실패 · 다시 시도')
+    window.addEventListener('unhandledrejection', onFail)
+    return () => window.removeEventListener('unhandledrejection', onFail)
+  }, [])
 
   useEffect(() => {
     if (xpPop === null) return
@@ -465,14 +473,21 @@ export default function App() {
     if (!canPurchase(wish, today)) return
     // 결정적인 id + Orbit의 put 조합으로 두 DB 저장 도중 재시도해도 거래가 중복되지 않는다.
     const transactionId = `wish-purchase-${wish.id}`
-    await createWishPurchaseTransaction({
-      id: transactionId,
-      wishName: wish.name,
-      amount: wish.targetAmount,
-      date: today,
-      categoryId,
-    })
-    await purchaseWish(wish.id, today, transactionId)
+    try {
+      await createWishPurchaseTransaction({
+        id: transactionId,
+        wishName: wish.name,
+        amount: wish.targetAmount,
+        date: today,
+        categoryId,
+      })
+      await purchaseWish(wish.id, today, transactionId)
+    } catch {
+      // Orbit 거래만 남고 위시 완료가 빠질 수 있다. 같은 id라 다시 눌러도 거래가
+      // 두 번 생기지 않으므로 시트를 열어 둔 채 다시 시도하게 한다
+      setToast('구매 저장 실패 · 다시 시도')
+      return
+    }
     // 완주 별가루를 여기서 한 번 더 부른다. 구독이 갱신되기를 기다리지 않아야
     // 완주 연출과 잔액이 같은 순간에 맞는다
     void grantDust(bonusDustGrants([...wishes.filter((item) => item.id !== wish.id), { ...wish, status: 'done' }], events, Date.now()))

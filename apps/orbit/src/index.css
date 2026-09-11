@@ -273,6 +273,18 @@ button.transaction-name,.history-row .row-open{border:0;background:none;padding:
   .quick-undo-toast{bottom:92px;width:calc(100% - 32px);justify-content:space-between;white-space:normal}
 }
 
+/* 저장 실패 알림. 실행 취소 알림과 같은 자리에 겹쳐 뜨므로 한 칸 위에 둔다 */
+.save-error-toast{position:fixed;z-index:95;left:50%;bottom:86px;transform:translateX(-50%);max-width:calc(100% - 32px);padding:13px 16px;border-radius:14px;background:var(--text-primary);color:var(--surface);box-shadow:var(--shadow);font-size:12px;font-weight:700;animation:toast-up .2s ease-out}
+@media(max-width:680px){
+  .save-error-toast{bottom:148px}
+}
+
+/* 그리기 오류 안내. App 바깥에서 뜨므로 셸 레이아웃에 기대지 않는다 */
+.crash-screen{min-height:100dvh;padding:24px;display:grid;place-content:center;justify-items:center;gap:10px;text-align:center;color:var(--text-primary)}
+.crash-screen strong{font-size:18px}
+.crash-screen p{margin:0;font-size:13px;opacity:.7}
+.crash-screen button{margin-top:8px;height:44px;padding:0 18px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:inherit;font:inherit;font-weight:700;cursor:pointer}
+
 /* 퀵 슬롯 제목·편집·빈 상태와 터치 접근성 */
 .quick-section{margin-top:22px}
 .quick-section-head{display:flex;align-items:center;justify-content:space-between;min-height:44px}

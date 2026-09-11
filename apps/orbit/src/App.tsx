@@ -78,11 +78,17 @@ function useToday(): string {
   const getToday = () => format(new Date(), 'yyyy-MM-dd')
   const [today, setToday] = useState(getToday)
   useEffect(() => {
-    const timer = window.setInterval(() => setToday((current) => {
+    const refresh = () => setToday((current) => {
       const next = getToday()
       return next === current ? current : next
-    }), 60_000)
-    return () => window.clearInterval(timer)
+    })
+    // 백그라운드에서는 타이머가 멈추므로 화면이 다시 보일 때도 읽는다
+    const timer = window.setInterval(refresh, 60_000)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', refresh)
+    }
   }, [])
   return today
 }
@@ -641,6 +647,19 @@ function App() {
     materializeRecurring(today).then(() => syncRuleBudgets(today.slice(0, 7)))
   }, [today])
   useEffect(() => { requestPersistentStorage() }, [])
+  // 저장 실패 알림. 거래 저장이 화면마다 흩어져 있어 받지 않은 실패를 한곳에서 잡는다 —
+  // 아무 반응이 없으면 사용자는 저장된 줄 안다
+  const [failure, setFailure] = useState<string | null>(null)
+  useEffect(() => {
+    const onFail = () => setFailure('저장 실패 · 다시 시도')
+    window.addEventListener('unhandledrejection', onFail)
+    return () => window.removeEventListener('unhandledrejection', onFail)
+  }, [])
+  useEffect(() => {
+    if (!failure) return
+    const timer = window.setTimeout(() => setFailure(null), 3000)
+    return () => window.clearTimeout(timer)
+  }, [failure])
   useEffect(() => {
     if (onboardingSeen()) return
     Promise.all([db.transactions.count(), db.monthSettings.count(), db.categories.toArray()]).then(([transactionCount, settingsCount, categories]) => {
@@ -649,7 +668,7 @@ function App() {
   }, [])
   const closeOnboarding = () => { rememberOnboarding(); setOnboardingOpen(false) }
   const content = useMemo(() => ({home:<HomeView openExpense={openExpense} openEdit={openEdit} openPreset={openPreset} goTransactions={()=>{setTxFocus(null);setActive('transactions')}} goCategoryTransactions={goCategoryTransactions} goCategories={()=>goSettings('categories')} plannedIncome={plannedIncome}/>,calendar:<CalendarView openEdit={openEdit} openExpenseForDate={openExpenseForDate}/>,transactions:<TransactionsView openExpense={openExpense} openEdit={openEdit} focus={txFocus} clearFocus={clearTxFocus}/>,settings:<SettingsView dark={dark} onTheme={()=>setDark(!dark)} openOnboarding={()=>setOnboardingOpen(true)} sub={settingsSub} setSub={setSettingsSub} plannedIncome={plannedIncome} onPlannedIncome={()=>setPlannedIncome(!plannedIncome)}/>})[active], [active,dark,settingsSub,today,txFocus,plannedIncome])
-  return <div className="app-shell"><Header dark={dark} onTheme={()=>setDark(!dark)}/><Sidebar active={active} setActive={(tab)=>{if(tab==='settings')setSettingsSub(null);if(tab==='transactions')setTxFocus(null);setActive(tab)}}/><main>{content}</main>{(active==='home'||active==='transactions')&&!onboardingOpen&&<><button className="desktop-add" onClick={openExpense}><Plus size={20}/> 추가</button><button className="fab-add" onClick={openExpense} aria-label="거래 추가"><Plus size={26}/></button></>}{!onboardingOpen&&<nav className="bottom-nav">{([{id:'home',label:'홈',icon:Home},{id:'calendar',label:'달력',icon:CalendarDays},{id:'transactions',label:'거래',icon:ListFilter},{id:'settings',label:'설정',icon:Settings}] as const).map(item=>{const Icon=item.icon;return <button key={item.id} className={active===item.id?'active':''} onClick={()=>{if(item.id==='settings')setSettingsSub(null);if(item.id==='transactions')setTxFocus(null);setActive(item.id)}}><Icon size={20}/><span>{item.label}</span></button>})}</nav>}{sheet&&<ExpenseSheet transaction={sheet.transaction} preset={sheet.preset} initialDate={sheet.initialDate} close={()=>setSheet(null)}/>} {onboardingOpen&&<Onboarding close={closeOnboarding} finish={closeOnboarding}/>}</div>
+  return <div className="app-shell"><Header dark={dark} onTheme={()=>setDark(!dark)}/><Sidebar active={active} setActive={(tab)=>{if(tab==='settings')setSettingsSub(null);if(tab==='transactions')setTxFocus(null);setActive(tab)}}/><main>{content}</main>{(active==='home'||active==='transactions')&&!onboardingOpen&&<><button className="desktop-add" onClick={openExpense}><Plus size={20}/> 추가</button><button className="fab-add" onClick={openExpense} aria-label="거래 추가"><Plus size={26}/></button></>}{!onboardingOpen&&<nav className="bottom-nav">{([{id:'home',label:'홈',icon:Home},{id:'calendar',label:'달력',icon:CalendarDays},{id:'transactions',label:'거래',icon:ListFilter},{id:'settings',label:'설정',icon:Settings}] as const).map(item=>{const Icon=item.icon;return <button key={item.id} className={active===item.id?'active':''} onClick={()=>{if(item.id==='settings')setSettingsSub(null);if(item.id==='transactions')setTxFocus(null);setActive(item.id)}}><Icon size={20}/><span>{item.label}</span></button>})}</nav>}{sheet&&<ExpenseSheet transaction={sheet.transaction} preset={sheet.preset} initialDate={sheet.initialDate} close={()=>setSheet(null)}/>} {onboardingOpen&&<Onboarding close={closeOnboarding} finish={closeOnboarding}/>}{failure&&<div className="save-error-toast" role="alert">{failure}</div>}</div>
 }
 
 export default App
