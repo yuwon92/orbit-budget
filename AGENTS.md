@@ -62,8 +62,8 @@ React 19 + TypeScript + Vite / Dexie(IndexedDB) / date-fns / lucide-react / vite
 | `packages/budget-core/src/format.ts` | 금액·요일 표시 함수 |
 | `packages/orbit-bridge/src/db.ts` | Orbit Dexie 인스턴스, 스키마·마이그레이션, 쓰기 헬퍼 |
 | `packages/orbit-bridge/src/recurring.ts` | 반복 거래 생성·동기화 |
-| `packages/orbit-bridge/src/index.ts` | Wish용 예산 스냅샷(`OrbitBudgetSnapshot`) + 자유비용 제외 위시 구매 거래 쓰기. 어제 남은 예산(`carryoverAmount`)도 여기서 계산 |
-| `packages/orbit-bridge/src/settings.ts` | 두 앱이 함께 읽는 설정(`orbit-planned-income`) |
+| `packages/orbit-bridge/src/index.ts` | Wish용 예산 스냅샷(`OrbitBudgetSnapshot`) + 자유비용 제외 위시 구매 거래 쓰기. 지난달 이월(`carriedInAmount`)과 어제 남은 예산(`carryoverAmount`)도 여기서 계산 |
+| `packages/orbit-bridge/src/settings.ts` | 두 앱이 함께 읽는 설정(`orbit-planned-income`·`orbit-carryover-start`) |
 | `scripts/verify-budget.ts` | Orbit 계산 검산 |
 | `scripts/verify-wish.ts` | Wish 계산 검산 |
 | `scripts/gen-icons.ts` | PWA 아이콘 생성 |
@@ -122,7 +122,7 @@ Wish는 게임 허브 흐름이다. 자원 HUD 상시 노출, 오늘의 미션�
 
 - **XP는 저장되지 않아 「레벨을 N으로 맞추기」를 저장으로 할 수 없다.** 설정의 개발용 XP는 계산된 `totalXp`에 가산값을 얹는 방식이고, 그래서 레벨 판정·레벨업 연출·미수령 보상이 실제 경로를 그대로 탄다
 
-Wish는 Orbit 예산을 `getOrbitSnapshot()`으로 읽고, 구매 확정 때만 `createWishPurchaseTransaction()`으로 거래를 쓴다. `connected`는 DB가 열리는지가 아니라 데이터가 있는지로 판단한다 — 저장소가 분리된 환경에서는 빈 DB가 새로 만들어질 뿐이라 존재 여부로는 알 수 없다. 위시 저금은 이번 달 순저금 합계로 자유비용에서 실제 차감한다. 스냅샷의 `carryoverAmount`는 어제 끝난 예산 기간에서 자유비용으로 넘어온 잔액 합계(`releasedLeftovers`)이며, 카테고리별 내역은 `carryoverRows`에 그대로 실어 보낸다. 남은 자유비용을 넘지 않게 자른다 — 스냅샷이 이번 달 거래만 읽으므로 매달 1일은 기준일이 지난달이라 0이고 `carryoverDate`도 null이다.
+Wish는 Orbit 예산을 `getOrbitSnapshot()`으로 읽고, 구매 확정 때만 `createWishPurchaseTransaction()`으로 거래를 쓴다. `connected`는 DB가 열리는지가 아니라 데이터가 있는지로 판단한다 — 저장소가 분리된 환경에서는 빈 DB가 새로 만들어질 뿐이라 존재 여부로는 알 수 없다. 위시 저금은 이번 달 순저금 합계로 자유비용에서 실제 차감한다. 스냅샷의 `carryoverAmount`는 어제 끝난 예산 기간에서 자유비용으로 넘어온 잔액 합계(`releasedLeftovers`)이며, 카테고리별 내역은 `carryoverRows`에 그대로 실어 보낸다. 남은 자유비용을 넘지 않게 자른다 — 매달 1일은 기준일이 지난달이라 0이고 `carryoverDate`도 null이다. 그와 별개로 `carriedInAmount`는 지난달들에서 넘어온 월 이월액이며 `freeAmount`에 이미 더해져 있다 — 스냅샷의 이월(`carriedInAmount`)은 `monthSettings`에 굳어 있는 값을 그대로 읽는다 — 거래는 이번 달 것만 읽는다. Wish도 열릴 때 `rollCarryover`를 부른다(Orbit을 안 열어도 달이 바뀌면 굴러가야 한다).
 
 **Wish 데이터는 `orbital-wish`(Dexie)에 저장된다.** 위시·이벤트·수령 기록·Player 네 스토어. 화면은 `packages/wish-bridge`를 통해서만 쓰고, Wish 앱 읽기는 `apps/wish/src/lib/hooks.ts`의 `useLiveQuery` 네 개가 전부다. Orbit 홈은 `listWishes()`·`listWishEvents()`를 live query로 읽어 기간이 있는 active 위시만 표시한다.
 
@@ -187,6 +187,7 @@ Dexie `'orbital-budget'`. 스토어: `categories`(id) / `transactions`(id, **dat
 - `db.version(2).stores({})`는 빈 선언이지만 **지우면 기존 DB가 안 열림**
 - `db.version(3)`은 구 팔레트 색 → v2 팔레트 색 1회 치환. 팔레트 밖 사용자 지정 색은 보존
 - `db.on('populate')`로 기본 카테고리 4개 시드(예산 0)
+- **`monthSettings` 한 줄에 예비비와 이월액(`carriedIn`)이 함께 있다.** 예비비만 고치면서 `put`으로 줄을 통째로 갈면 이월이 조용히 0이 된다 — `setReserveAmount`를 쓰거나 기존 줄을 펼쳐 넣을 것
 - 퀵 슬롯 쓰기는 `setQuickSlot`·`moveQuickSlot`이 담당. 둘 다 트랜잭션 안에서 `quickOrder`를 0..n-1로 **다시 매김**(번호 없는 슬롯이 섞이면 새 슬롯이 맨 앞으로 튄다)
 - `db.ts` → `budget.ts` 단방향 import. 반대 방향(계산이 DB를 읽는 것) 금지
 
@@ -197,7 +198,7 @@ Dexie `'orbital-budget'`. 스토어: `categories`(id) / `transactions`(id, **dat
 **자유비용 모델** — 히어로 큰 숫자는 `monthlyFreeAmount` 하나다.
 
 ```
-남은 자유비용 = 총수입 - Σ(카테고리 월 예산) - 예비비 + 조정
+남은 자유비용 = 총수입 + 지난달 이월 - Σ(카테고리 월 예산) - 예비비 + 조정
 ```
 
 조정(`adjustment`)에 들어가는 것:
@@ -207,7 +208,22 @@ Dexie `'orbital-budget'`. 스토어: `categories`(id) / `transactions`(id, **dat
 - **이미 끝난** 일/주 기간의 미사용액 → 자유비용으로 환급. 진행 중·미래 기간의 잔액은 카테고리에 남겨둠
 - 어떤 예산 기간에도 안 걸치는 날의 지출(요일 지정 카테고리의 비지정 요일 등) → 전액 차감
 
-`monthlyFreeAmount(txs, categories, today, reserve, includePlannedIncome = true, wishSavedAmount = 0)` — `includePlannedIncome`이 false면 `isPlanned` 수입을 빼고 센다(설정 첫 카드의 `자유비용에 예정 수입 포함` 토글). **수입에만 걸린다.** 예정 지출은 어차피 나갈 돈이라 늘 차감한다. `wishSavedAmount`는 이번 달 순저금으로 예비비처럼 한 번 차감한다.
+`monthlyFreeAmount(txs, categories, today, reserve, includePlannedIncome = true, wishSavedAmount = 0)` — `includePlannedIncome`이 false면 `isPlanned` 수입을 빼고 센다(설정 첫 카드의 `자유비용에 예정 수입 포함` 토글). **수입에만 걸린다.** 예정 지출은 어차피 나갈 돈이라 늘 차감한다. `wishSavedAmount`는 이번 달 순저금으로 예비비처럼 한 번 차감한다. `carriedIn`은 지난달들에서 넘어온 잔액으로 수입과 같은 자리에서 더한다.
+
+**월 이월** — 달이 바뀌면 안 쓴 돈 전부가 다음 달 자유비용으로 넘어간다.
+
+- `monthClosingBalance(txs, month, includePlannedIncome, wishSavedAmount, carriedIn)` — 그 달 마감 잔액. **진행 중 계산과 기준이 다르다.** 달이 끝나면 카테고리 예산도 예비비도 붙잡을 이유가 없어 전부 풀고 실제로 나간 돈만 뺀다 — 같은 달 `monthlyFreeAmount`보다 「안 쓴 카테고리 예산 + 안 쓴 예비비」만큼 크다
+- **이월액은 계산이 아니라 저장값이다.** `monthSettings[yearMonth].carriedIn`에 그 달이 받은 이월을 굳혀 둔다(인덱스 아닌 필드라 마이그레이션 불필요). 화면과 스냅샷은 이 값을 그대로 읽고 **과거를 훑지 않는다**
+- `rollCarryoverForward(txs, fromMonth, toMonth, baseCarriedIn, wishSavedByMonth, includePlannedIncome)` — 굴리는 계산 자체. **순수 함수라 검산이 닿는다.** `monthsBetween`·`nextMonth`도 여기 있다
+- `rollCarryover(today, wishSavedOf, includePlannedIncome)`(`orbit-bridge/carryover.ts`) — 위 순수 함수에 재료를 대고 결과를 저장하는 껍데기. 굳어 있는 가장 최근 달에서 출발하므로 **보통 지난달 한 달치 거래만 읽는다.** 앱을 몇 달 안 열었으면 그 사이만 메운다. 위시 저금 조회 함수는 주입받는다 — 이 패키지가 Wish DB를 직접 읽으면 경계가 순환한다
+- **이월 0으로 `monthSettings` 줄을 새로 만들지 않는다.** Wish가 그 줄의 존재를 「Orbit을 쓴 흔적」으로 읽어서(`connected`), 빈 DB에 줄이 생기면 저장소가 분리된 환경에서 연결됐다고 잘못 말하고 캐시 복구가 죽는다. 시작 달도 줄을 만들지 않는다
+- **이번 달 값은 부를 때마다 다시 계산해 덮어쓴다.** 그래야 10월 2일에 9월 30일 지출을 뒤늦게 넣어도 반영된다. 반대로 **지난달 이전을 고치면 반영되지 않는다** — 그 달들의 이월은 이미 굳었다. 읽는 양을 지난달 한 달로 묶은 대가이고, 의도한 선택이다
+- **예정 거래를 확정한 뒤에 굴린다**(`materializeRecurring` → `syncRuleBudgets` → `rollCarryover`). 확정 전 금액으로 지난달을 마감하면 안 된다
+- **이월 시작 달**(`orbit-carryover-start`, localStorage)은 앱을 처음 열 때 그 달로 굳는다(`ensureCarryoverStart`). 시작 달은 이월 0으로 박고 그 달 마감분부터 다음 달로 넘긴다 — 기능을 켜기 전의 엉성한 기록(수입만 넣고 지출은 빠뜨린 달 등)이 지금 자유비용에 소급되는 것을 막는다. 저장이 막힌 환경에서는 늘 이번 달이 되어 이월이 0이다 — 숫자가 갑자기 뛰는 쪽보다 안전하다
+- 위시 저금은 `monthlyWishDeposit`을 그대로 주입한다(`wishSavedOf`). 계산이 Wish DB를 읽지 않는다는 규칙은 그대로다
+- 위시에 묶인 돈은 넘어가지 않고, 위시 구매 거래(`excludedFromFreeAmount`)는 저금 때 이미 빠져 마감에서 다시 빼지 않는다
+- **화면에 이월 줄은 두지 않는다.** 히어로 숫자 하나에 들어간다 — 사용자가 본 「남은 자유비용」과 다른 숫자를 만들지 않는다
+- **Wish의 `carryoverAmount`와 다른 개념이다.** 그쪽은 어제 끝난 일/주 예산 기간에서 풀린 잔액(위시 미션 금액), 이쪽은 달이 바뀔 때 넘어온 돈(스냅샷의 `carriedInAmount`)
 
 **기간 배분**(내부 `categoryBudgetPeriods`) — 횟수·교통 카테고리의 월 예산을 실제 달력 주/요일 기간에 앞에서부터 채운다. 달을 걸치는 주는 월 경계에서 자르고, 배분 총합은 월 예산을 넘지 않는다.
 

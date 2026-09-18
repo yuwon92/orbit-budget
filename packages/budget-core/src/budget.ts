@@ -107,6 +107,11 @@ export function monthlyFreeAmount(
    * 취소로 회수한 금액이 더 크면 음수가 되어 이번 달 자유비용에 더해진다.
    */
   wishSavedAmount = 0,
+  /**
+   * 지난달에서 넘어온 잔액(`carriedInto`). 수입과 같은 자리에서 한 번 더해진다.
+   * 마이너스면 그만큼 이번 달 자유비용이 줄어든다.
+   */
+  carriedIn = 0,
 ): number {
   const month = today.slice(0, 7)
   const totalBudget = categories.reduce((sum, category) => sum + Math.max(category.monthlyBudget, 0), 0)
@@ -150,7 +155,92 @@ export function monthlyFreeAmount(
       .reduce((sum, transaction) => sum + transaction.amount, 0)
   }
 
-  return totalIncome(transactions, month, includePlannedIncome) - totalBudget - reserveAmount - wishSavedAmount + adjustment
+  return totalIncome(transactions, month, includePlannedIncome) - totalBudget - reserveAmount - wishSavedAmount + adjustment + carriedIn
+}
+
+/**
+ * 그 달의 마감 잔액 — 다음 달로 넘어가는 「안 쓴 돈 전부」.
+ *
+ * 진행 중인 달의 `monthlyFreeAmount`와 기준이 다르다. 달이 끝나면 카테고리 예산도
+ * 예비비도 더 붙잡아 둘 이유가 없으므로 전부 풀고 실제로 나간 돈만 뺀다. 그래서 이 값은
+ * 같은 달 자유비용보다 「안 쓴 카테고리 예산 + 안 쓴 예비비」만큼 크다.
+ *
+ * 위시 저금은 아직 위시에 묶여 있는 돈이라 뺀다. 위시 구매 거래는 저금할 때 이미
+ * 빠졌으므로(`excludedFromFreeAmount`) 지출에서 제외해 두 번 빠지지 않게 한다.
+ *
+ * **받은 이월(`carriedIn`)을 그대로 얹어 넘긴다.** 이 한 줄 덕분에 달을 한 칸씩 굴리면
+ * 지난달 한 달치만 읽어도 그 앞에서 남긴 돈이 계속 살아 있다.
+ */
+export function monthClosingBalance(
+  transactions: Transaction[],
+  month: string,
+  includePlannedIncome = true,
+  wishSavedAmount = 0,
+  /** 그 달이 지난달에서 받은 이월액 */
+  carriedIn = 0,
+): number {
+  const spent = transactions
+    .filter((t) => inMonth(t, month) && t.type === 'expense' && !t.excludedFromFreeAmount)
+    .reduce((sum, t) => sum + t.amount, 0)
+  return carriedIn + totalIncome(transactions, month, includePlannedIncome) - spent - wishSavedAmount
+}
+
+/** 다음 달. 'yyyy-MM'에서 해를 넘긴다 */
+export function nextMonth(month: string): string {
+  const [year, monthNumber] = month.split('-').map(Number)
+  return monthNumber === 12
+    ? `${year + 1}-01`
+    : `${year}-${String(monthNumber + 1).padStart(2, '0')}`
+}
+
+/** from(포함)부터 to(제외)까지의 달 목록. 거꾸로거나 같으면 빈 배열 */
+export function monthsBetween(from: string, to: string): string[] {
+  const months: string[] = []
+  for (let cursor = from; cursor < to; cursor = nextMonth(cursor)) months.push(cursor)
+  return months
+}
+
+/** 달마다 굳혀 둘 이월액 한 줄 */
+export interface CarryoverStep {
+  /** 이 이월액을 받는 달 */
+  month: string
+  carriedIn: number
+}
+
+/**
+ * 이월 원장을 기준 달부터 이번 달까지 한 칸씩 굴린다.
+ *
+ * 앞 달 마감 잔액이 다음 달 이월이 되고, 그 이월이 다시 다음 달 마감에 얹힌다.
+ * 그래서 **굳어 있는 달에서 출발하면 그 뒤 한두 달치 거래만 있으면 된다** —
+ * 보통은 지난달 한 칸이고, 앱을 몇 달 안 열었을 때만 그 사이를 메운다.
+ * 기록이 없는 달은 받은 금액을 그대로 흘려보낸다.
+ *
+ * 저장은 호출자가 한다. 이 파일은 DB를 모른다.
+ */
+export function rollCarryoverForward(
+  transactions: Transaction[],
+  /** 이월액이 이미 굳어 있는 기준 달 */
+  fromMonth: string,
+  /** 이번 달. 이 달 것까지 만들고 멈춘다 */
+  toMonth: string,
+  /** 기준 달이 받은 이월액 */
+  baseCarriedIn: number,
+  wishSavedByMonth: ReadonlyMap<string, number> = new Map(),
+  includePlannedIncome = true,
+): CarryoverStep[] {
+  const steps: CarryoverStep[] = []
+  let carried = baseCarriedIn
+  for (const cursor of monthsBetween(fromMonth, toMonth)) {
+    carried = monthClosingBalance(
+      transactions,
+      cursor,
+      includePlannedIncome,
+      wishSavedByMonth.get(cursor) ?? 0,
+      carried,
+    )
+    steps.push({ month: nextMonth(cursor), carriedIn: carried })
+  }
+  return steps
 }
 
 /** 기간이 끝나면서 자유비용으로 풀린 잔액 한 줄 */

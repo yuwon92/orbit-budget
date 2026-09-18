@@ -33,6 +33,7 @@ import { db, requestPersistentStorage, setQuickSlot } from './lib/db'
 import { money } from './lib/format'
 import { readPlannedIncome, writePlannedIncome } from './lib/settings'
 import { monthlyWishDeposit } from './lib/wish'
+import { rollCarryover } from './lib/carryover'
 import { useCategories } from './lib/hooks'
 import type { Transaction } from './lib/types'
 import { buildCsv, downloadCsv } from './lib/csv'
@@ -178,7 +179,8 @@ function HomeView({ openExpense, openEdit, openPreset, goTransactions, goCategor
   const todayTx = loaded
     ? txs.filter(t => t.date === today).sort((a, b) => a.createdAt - b.createdAt)
     : undefined
-  const freeRemaining = monthlyFreeAmount(txs, categories, today, settings?.reserveAmount ?? 0, plannedIncome, wishSaved ?? 0)
+  // 이월은 rollCarryover가 달이 바뀔 때 굳혀 둔 값이다. 여기서 과거를 다시 세지 않는다.
+  const freeRemaining = monthlyFreeAmount(txs, categories, today, settings?.reserveAmount ?? 0, plannedIncome, wishSaved ?? 0, settings?.carriedIn ?? 0)
   // 카테고리 이름이 아니라 각 카테고리에 저장된 일/주 주기 설정을 순회한다.
   const rows = buildBreakdown(categories, txs, today)
   const over = freeRemaining < 0
@@ -668,9 +670,13 @@ function App() {
   const openEdit = (t: Transaction) => setSheet({ transaction: t })
   const openPreset = (preset: QuickPreset) => setSheet({ preset })
   // 날짜가 바뀌면 지난 예정 거래를 확정하고, 새 달의 반복 거래·계산식 예산을 맞춘다.
+  // 예정 거래를 확정한 뒤에 이월을 굴린다 — 확정 전 금액으로 지난달을 마감하면 안 된다.
+  // 예정 수입 설정이 바뀌면 지난달 마감 기준도 달라지므로 그때도 다시 굴린다.
   useEffect(() => {
-    materializeRecurring(today).then(() => syncRuleBudgets(today.slice(0, 7)))
-  }, [today])
+    materializeRecurring(today)
+      .then(() => syncRuleBudgets(today.slice(0, 7)))
+      .then(() => rollCarryover(today, monthlyWishDeposit))
+  }, [today, plannedIncome])
   useEffect(() => { requestPersistentStorage() }, [])
   // 저장 실패 알림. 거래 저장이 화면마다 흩어져 있어 받지 않은 실패를 한곳에서 잡는다 —
   // 아무 반응이 없으면 사용자는 저장된 줄 안다

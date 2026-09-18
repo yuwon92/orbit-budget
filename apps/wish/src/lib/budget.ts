@@ -3,7 +3,7 @@
 // 홈 화면에 설치된 두 앱이 저장소를 나눠 갖는 환경(iOS)에서는 이 읽기가
 // 빈 DB를 만나게 된다. 그때는 이 파일의 구현만 서버 조회로 바꾸면 되고
 // 화면 코드는 건드리지 않는다.
-import { getOrbitSnapshot, type OrbitBudgetSnapshot } from '@orbit/bridge'
+import { getOrbitSnapshot, rollCarryover, type OrbitBudgetSnapshot } from '@orbit/bridge'
 import { monthlyWishDeposit } from '@orbit/wish-bridge'
 
 const CACHE_KEY = 'wish-budget-snapshot'
@@ -39,6 +39,8 @@ export async function loadBudgetView(today: string): Promise<BudgetView> {
     // 이번 달 위시 저금액을 Orbit 계산에 넣어 준다. 계산은 Orbit이 하고
     // 우리는 재료만 넘긴다 — 여기서 직접 빼면 두 앱의 숫자가 갈라진다.
     const saved = await monthlyWishDeposit(today.slice(0, 7))
+    // Orbit을 안 열고 Wish만 열어도 달이 바뀌면 이월이 굴러가야 한다
+    await rollCarryover(today, monthlyWishDeposit)
     const snapshot = await getOrbitSnapshot(today, undefined, saved)
     if (snapshot.connected) {
       writeCache(snapshot)

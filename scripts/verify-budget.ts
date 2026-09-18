@@ -8,9 +8,12 @@ import {
   categoryProgress,
   countExpenses,
   inQuickSlot,
+  monthClosingBalance,
   monthlyAmountForRule,
   monthlyOccurrences,
   monthlyFreeAmount,
+  monthsBetween,
+  rollCarryoverForward,
   occurrenceDate,
   occurrenceDates,
   quickAddAmount,
@@ -339,7 +342,7 @@ const spent80 = tx('2026-09-01', 80_000, 'expense', 'editable', '')
 assert.equal(monthlyFreeAmount([income200, spent80], [homeCat('editable', 100_000, { kind: 'manual' })], '2026-09-01', 0), 100_000)
 assert.equal(monthlyFreeAmount([income200, spent80], [homeCat('editable', 50_000, { kind: 'manual' })], '2026-09-01', 0), 120_000)
 
-// 9월에 풀린 잔액은 10월 자유비용으로 이월하지 않는다.
+// 달 안에서 풀린 잔액은 달을 넘지 않는다. 다음 달로 넘어가는 돈은 `carriedInto`로만 들어온다.
 const octoberIncome = tx('2026-10-01', 100_000, 'income', null, '')
 assert.equal(monthlyFreeAmount([dailyIncome, spent15, octoberIncome], [dailyFood], '2026-10-01', 0), 60_000)
 
@@ -474,6 +477,99 @@ assert.equal(
   (spentByCategory(transactions, month).get('food') ?? 0) + wishPurchase.amount,
 )
 console.log('위시 구매 거래 자유비용 이중 차감 방지 통과')
+
+// --- 달 마감 잔액과 다음 달 이월 ---
+{
+  const carryCats = [homeCat('c-food', 200_000, { kind: 'manual' })]
+  const aug = [
+    tx('2026-08-01', 500_000, 'income', null, ''),
+    tx('2026-08-10', 120_000, 'expense', 'c-food', ''), // 예산 안에서 사용
+    tx('2026-08-20', 80_000, 'expense', null, ''), // 예산 밖
+  ]
+  // 마감은 카테고리 예산을 붙잡지 않는다 — 500,000에서 실제로 나간 200,000만 뺀다
+  assert.equal(monthClosingBalance(aug, '2026-08'), 300_000)
+  // 진행 중 자유비용은 예산 200,000을 확보한 뒤 예산 밖 80,000을 뺀 값
+  assert.equal(monthlyFreeAmount(aug, carryCats, '2026-08-31', 0), 220_000)
+  // 둘의 차이가 곧 안 쓴 카테고리 예산(200,000 − 120,000)이다
+  assert.equal(monthClosingBalance(aug, '2026-08') - monthlyFreeAmount(aug, carryCats, '2026-08-31', 0), 80_000)
+  // 예비비를 떼어 둔 달도 마감에서는 함께 풀린다 (안 쓴 예비비도 넘어간다)
+  assert.equal(monthlyFreeAmount(aug, carryCats, '2026-08-31', 50_000), 170_000)
+  assert.equal(monthClosingBalance(aug, '2026-08'), 300_000)
+
+  // 9월은 8월 마감액을 이월로 받는다
+  const sep = [...aug, tx('2026-09-01', 100_000, 'income', null, '')]
+  const carried = monthClosingBalance(aug, '2026-08')
+  assert.equal(carried, 300_000)
+  assert.equal(
+    monthlyFreeAmount(sep, carryCats, '2026-09-05', 0, true, 0, carried),
+    monthlyFreeAmount(sep, carryCats, '2026-09-05', 0) + 300_000,
+  )
+
+  // 초과 지출한 달은 마이너스로 넘어간다
+  const overspent = [
+    tx('2026-08-01', 100_000, 'income', null, ''),
+    tx('2026-08-15', 150_000, 'expense', null, ''),
+  ]
+  assert.equal(monthClosingBalance(overspent, '2026-08'), -50_000)
+
+  // 한 칸씩 굴린다. 받은 이월을 그대로 얹어 넘기므로 지난달 한 달치만 읽으면 된다 —
+  // 7월에 남긴 100,000이 8월 기록에 없어도 9월까지 살아 있다
+  const july = [tx('2026-07-01', 100_000, 'income', null, '')]
+  const chain = [...july, tx('2026-08-10', 30_000, 'expense', null, '')]
+  const julyClosing = monthClosingBalance(chain, '2026-07')
+  assert.equal(julyClosing, 100_000)
+  assert.equal(monthClosingBalance(chain, '2026-08', true, 0, julyClosing), 70_000)
+  // 기록이 없는 달은 받은 금액을 그대로 흘려보낸다
+  assert.equal(monthClosingBalance([], '2026-08', true, 0, 70_000), 70_000)
+  // 시작 달은 이월을 받지 않는다
+  assert.equal(monthClosingBalance(july, '2026-07', true, 0, 0), 100_000)
+
+  // 위시에 묶인 돈은 넘어가지 않는다. 구매 거래는 저금 때 이미 빠져 두 번 빠지지 않는다
+  assert.equal(monthClosingBalance(aug, '2026-08', true, 50_000), 250_000)
+  const augWithPurchase = [
+    ...aug,
+    { ...tx('2026-08-25', 50_000, 'expense', null, 'Wish · 헤드폰'), excludedFromFreeAmount: true },
+  ]
+  assert.equal(monthClosingBalance(augWithPurchase, '2026-08', true, 50_000), 250_000)
+
+  // 예정 수입 제외 설정은 마감에도 같은 기준으로 걸린다
+  const plannedAug = [...aug, { ...tx('2026-08-28', 90_000, 'income', null, ''), isPlanned: true }]
+  assert.equal(monthClosingBalance(plannedAug, '2026-08'), 390_000)
+  assert.equal(monthClosingBalance(plannedAug, '2026-08', false), 300_000)
+
+  // 인자를 생략하면 예전과 같다. 이월이 없는 사용자의 숫자가 변하지 않아야 한다
+  assert.equal(monthlyFreeAmount(transactions, categories, today, 0, true, 0, 0), 556_490)
+  console.log('달 마감 잔액과 다음 달 이월 (안 쓴 예산·예비비 포함, 마이너스·빈 달 이어 붙이기) 통과')
+
+  // --- 이월 원장 굴리기 (rollCarryover가 DB에 굳히는 값) ---
+  assert.deepEqual(monthsBetween('2026-11', '2027-02'), ['2026-11', '2026-12', '2027-01']) // 해를 넘는다
+  assert.deepEqual(monthsBetween('2026-09', '2026-09'), [])
+  assert.deepEqual(monthsBetween('2026-10', '2026-09'), []) // 거꾸로면 빈 배열 (무한 루프 금지)
+
+  // 7월 +100,000 → 8월 −30,000 → 9월은 기록 없음. 앱을 몇 달 안 열었을 때의 메우기
+  const rollLedger = [...july, tx('2026-08-10', 30_000, 'expense', null, '')]
+  assert.deepEqual(
+    rollCarryoverForward(rollLedger, '2026-07', '2026-10', 0),
+    [
+      { month: '2026-08', carriedIn: 100_000 },
+      { month: '2026-09', carriedIn: 70_000 },
+      { month: '2026-10', carriedIn: 70_000 }, // 기록 없는 달은 그대로 흘러간다
+    ],
+  )
+  // 평소 경로: 굳어 있는 지난달에서 한 칸만 굴려도 같은 값이 나온다
+  assert.deepEqual(
+    rollCarryoverForward(rollLedger, '2026-09', '2026-10', 70_000),
+    [{ month: '2026-10', carriedIn: 70_000 }],
+  )
+  // 위시에 묶인 돈은 그 달 마감에서 빠진다
+  assert.deepEqual(
+    rollCarryoverForward(rollLedger, '2026-08', '2026-09', 100_000, new Map([['2026-08', 20_000]])),
+    [{ month: '2026-09', carriedIn: 50_000 }],
+  )
+  // 굴릴 것이 없으면 빈 목록 — 시작 달이나 같은 달을 두 번 열었을 때
+  assert.deepEqual(rollCarryoverForward(rollLedger, '2026-10', '2026-10', 70_000), [])
+  console.log('이월 원장 굴리기 (해 넘김, 빈 달 메우기, 한 칸 굴리기, 위시 차감) 통과')
+}
 
 // ── 전체 백업 ─────────────────────────────────────────
 {

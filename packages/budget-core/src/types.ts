@@ -59,4 +59,9 @@ export interface RecurringRule {
 export interface MonthSettings {
   yearMonth: string // "2026-09"
   reserveAmount: number // 예비비. 자유 예산에서 미리 떼어둘 금액
+  /**
+   * 그 달이 지난달에서 받은 이월액. 달이 바뀔 때 한 번 계산해 굳힌다.
+   * 이 값이 있어서 화면은 지난달 한 달치만 읽으면 된다 — 없으면 첫 달까지 거슬러 올라가야 한다.
+   */
+  carriedIn?: number
 }

@@ -94,6 +94,17 @@ export async function moveQuickSlot(categories: Category[], categoryId: string, 
 }
 
 /**
+ * 그 달 예비비를 고쳐 쓴다. **`put`으로 줄을 통째로 갈면 안 된다** —
+ * 같은 줄에 이월액(`carriedIn`)이 함께 들어 있어서 예비비를 저장할 때마다 날아간다.
+ */
+export async function setReserveAmount(month: string, reserveAmount: number) {
+  await db.transaction('rw', db.monthSettings, async () => {
+    const existing = await db.monthSettings.get(month)
+    await db.monthSettings.put({ ...existing, yearMonth: month, reserveAmount })
+  })
+}
+
+/**
  * 브라우저가 저장소를 임의로 비우지 않도록 요청한다.
  * 승인 여부는 브라우저가 결정하며(설치 여부, 사용 빈도 등), 거부돼도 앱 동작에는 영향이 없다.
  */

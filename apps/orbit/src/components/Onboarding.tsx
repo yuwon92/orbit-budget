@@ -106,7 +106,9 @@ export function Onboarding({ close, finish }: { close: () => void; finish: () =>
           monthlyBudget: Number(budgets[categoryId]) || 0,
           budgetRule: { kind: 'manual' },
         })))
-        await db.monthSettings.put({ yearMonth: month, reserveAmount })
+        // 같은 줄의 이월액을 보존한다. put은 줄을 통째로 간다
+        const settings = await db.monthSettings.get(month)
+        await db.monthSettings.put({ ...settings, yearMonth: month, reserveAmount })
       })
       finish()
     } finally {

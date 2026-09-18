@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
-import { db } from '../lib/db'
+import { setReserveAmount } from '../lib/db'
 import { money } from '../lib/format'
 import { useSheetFocus, useSheetViewport } from '../lib/sheet'
 
@@ -19,7 +19,8 @@ export function ReserveSheet({ month, current, close }: { month: string; current
   const save = async () => {
     if (saving) return
     setSaving(true)
-    await db.monthSettings.put({ yearMonth: month, reserveAmount: value })
+    // 같은 줄에 이월액이 함께 있다. put으로 줄을 갈면 이월이 날아간다
+    await setReserveAmount(month, value)
     close()
   }
 

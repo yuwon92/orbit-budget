@@ -2,7 +2,7 @@ import { monthlyFreeAmount, releasedLeftovers } from '@orbit/budget-core/budget'
 import type { ReleasedLeftover } from '@orbit/budget-core/budget'
 import type { Category, Transaction } from '@orbit/budget-core/types'
 import { db } from './db'
-import { readPlannedIncome } from './settings'
+import { readCarryoverStart, readPlannedIncome } from './settings'
 
 /** 하루 전 날짜. 달·해 경계를 넘어간다 */
 function previousDate(date: string): string {
@@ -25,6 +25,12 @@ export interface OrbitBudgetSnapshot {
   reserveAmount: number
   /** 이번 달 위시 저금 합계. 위 freeAmount에서 이미 빠져 있다 */
   wishSavedAmount: number
+  /**
+   * 지난달에서 넘어온 잔액. 위 freeAmount에 이미 더해져 있다.
+   * 아래 `carryoverAmount`와 다른 값이다 — 이쪽은 달이 바뀔 때 넘어온 돈이고,
+   * 저쪽은 어제 끝난 일/주 예산 기간에서 풀린 돈이다.
+   */
+  carriedInAmount: number
   /**
    * 어제 끝난 예산 기간에서 남아 자유비용으로 넘어온 금액 합계.
    * Wish의 '남은 예산 저금하기' 미션 금액이다. 남은 자유비용을 넘지 않게 자르고,
@@ -58,9 +64,11 @@ export interface SnapshotProbe {
   /** 이번 달 예비비 설정이 있는지 */
   hasMonthSettings: boolean
   includePlannedIncome: boolean
+  /** 이월을 어느 달부터 셌는지. 이월액이 이상해 보일 때 먼저 볼 값 */
+  carryoverStart: string
 }
 
-export const SNAPSHOT_VERSION = 3
+export const SNAPSHOT_VERSION = 4
 
 /**
  * Orbit 예산을 읽어 요약을 만든다.
@@ -86,7 +94,10 @@ export async function getOrbitSnapshot(
   ])
   const reserveAmount = settings?.reserveAmount ?? 0
   const budgetedCategories = categories.filter((category) => category.monthlyBudget > 0).length
-  const freeAmount = monthlyFreeAmount(transactions, categories, today, reserveAmount, includePlannedIncome, wishSavedAmount)
+  // 이월은 `rollCarryover`가 달이 바뀔 때 굳혀 둔 값을 그대로 읽는다. 과거를 훑지 않는다.
+  const carriedInAmount = settings?.carriedIn ?? 0
+  const carryoverStart = readCarryoverStart() ?? yearMonth
+  const freeAmount = monthlyFreeAmount(transactions, categories, today, reserveAmount, includePlannedIncome, wishSavedAmount, carriedInAmount)
 
   // 어제 기간이 끝나면서 자유비용으로 넘어온 잔액.
   // 이번 달 거래만 읽어 두므로 1일에는 기준일이 지난달이라 계산하지 않는다.
@@ -108,6 +119,7 @@ export async function getOrbitSnapshot(
     freeAmount,
     reserveAmount,
     wishSavedAmount,
+    carriedInAmount,
     carryoverAmount,
     carryoverRows,
     carryoverDate,
@@ -122,6 +134,7 @@ export async function getOrbitSnapshot(
       budgetedCategories,
       hasMonthSettings: settings !== undefined,
       includePlannedIncome,
+      carryoverStart,
     },
   }
 }
@@ -155,3 +168,4 @@ export async function createWishPurchaseTransaction(input: WishPurchaseInput): P
 }
 
 export { readPlannedIncome, writePlannedIncome, PLANNED_INCOME_KEY } from './settings'
+export { rollCarryover } from './carryover'
