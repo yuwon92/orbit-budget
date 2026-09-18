@@ -37,7 +37,15 @@ function describeRule(rule: BudgetRule | undefined, ruleCount: number): string |
   }
 }
 
-function CategoryForm({ category, close }: { category: Category | null; close: () => void }) {
+/**
+ * 카테고리 추가·수정 시트. 설정 화면과 지출 입력 시트가 같은 것을 쓴다.
+ * onSaved는 저장된 카테고리 id를 받는다 — 지출 입력에서 새로 만든 카테고리를 바로 고르게.
+ */
+export function CategoryForm({ category, close, onSaved }: {
+  category: Category | null
+  close: () => void
+  onSaved?: (categoryId: string) => void
+}) {
   const month = format(new Date(), 'yyyy-MM')
   const rules = useLiveQuery(() => db.recurringRules.toArray(), []) ?? []
   const saved = category?.budgetRule
@@ -111,13 +119,16 @@ function CategoryForm({ category, close }: { category: Category | null; close: (
   const save = async () => {
     if (!canSave) return
     const data = { name: name.trim(), monthlyBudget, color, isFixed, budgetRule: rule }
+    let id = category?.id
     if (category) {
       await db.categories.update(category.id, data)
     } else {
       const existing = await db.categories.toArray()
       const sortOrder = existing.reduce((max, c) => Math.max(max, c.sortOrder), -1) + 1
-      await db.categories.add({ id: crypto.randomUUID(), sortOrder, ...data })
+      id = crypto.randomUUID()
+      await db.categories.add({ id, sortOrder, ...data })
     }
+    if (id) onSaved?.(id)
     close()
   }
 

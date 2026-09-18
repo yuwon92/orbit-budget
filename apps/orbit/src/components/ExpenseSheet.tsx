@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CalendarDays, X } from 'lucide-react'
+import { CalendarDays, Pencil, Plus, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { reserveSpentAmount } from '../lib/budget'
@@ -7,9 +7,10 @@ import { db } from '../lib/db'
 import { money } from '../lib/format'
 import { useCategories } from '../lib/hooks'
 import { useSheetFocus, useSheetViewport } from '../lib/sheet'
-import type { Transaction } from '../lib/types'
+import type { Category, Transaction } from '../lib/types'
 import type { QuickPreset } from './QuickAddOrbs'
 import { CategoryPlanet } from './CategoryPlanet'
+import { CategoryForm } from './CategorySettings'
 
 /**
  * transaction이 있으면 수정, 없으면 새 거래 추가.
@@ -26,7 +27,11 @@ export function ExpenseSheet({
   initialDate?: string
   close: () => void
 }) {
-  const categories = useCategories() ?? []
+  const categoryList = useCategories()
+  const categories = categoryList ?? []
+  // 카테고리 편집 모드와, 위에 띄울 추가·수정 시트
+  const [editMode, setEditMode] = useState(false)
+  const [formFor, setFormFor] = useState<Category | 'new' | null>(null)
   const editing = transaction ?? null
   const [type, setType] = useState<'expense' | 'income'>(editing?.type ?? 'expense')
   const [amount, setAmount] = useState(
@@ -61,7 +66,8 @@ export function ExpenseSheet({
   const usingReserve = type === 'expense' && fromReserve
 
   // 고르지 않으면 그대로 미분류로 저장한다. 첫 카테고리를 임의로 채우지 않는다.
-  const selected = selectedId
+  // 편집 중 고른 카테고리를 지웠으면 선택도 풀린다 — 없는 카테고리로 저장하지 않게
+  const selected = categoryList && selectedId && !categoryList.some((c) => c.id === selectedId) ? null : selectedId
   const formatted = amount ? money(Number(amount)) : '0'
   const canSave = Number(amount) > 0
 
@@ -95,7 +101,7 @@ export function ExpenseSheet({
     close()
   }
 
-  return (
+  return (<>
     <div className="sheet-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
       <section className="expense-sheet">
         <div className="sheet-top">
@@ -125,6 +131,28 @@ export function ExpenseSheet({
             <strong>원</strong>
           </div>
         </label>
+        {type === 'expense' && !usingReserve && <>
+          <div className="field-label category-label">
+            <span>카테고리 <em className="field-optional">고르지 않으면 미분류</em></span>
+            <button className="text-button" onClick={() => setEditMode(!editMode)}>{editMode ? '완료' : '편집'}</button>
+          </div>
+          <div className={`category-pills${editMode ? ' editing' : ''}`}>
+            {categories.map((c) => (
+              // 평소엔 선택, 한 번 더 누르면 선택이 풀린다(미분류로 되돌릴 방법이 이것뿐이다).
+              // 편집 모드에서는 누르면 수정 시트가 열린다.
+              <button
+                key={c.id}
+                className={selected === c.id ? 'selected' : ''}
+                aria-pressed={editMode ? undefined : selected === c.id}
+                onClick={() => editMode ? setFormFor(c) : setSelectedId(selected === c.id ? null : c.id)}
+              >
+                <CategoryPlanet color={c.color} />{c.name}
+                {editMode && <Pencil size={12} className="pill-edit" aria-label="수정" />}
+              </button>
+            ))}
+            <button className="add-pill" onClick={() => setFormFor('new')}><Plus size={15} />추가</button>
+          </div>
+        </>}
         {type === 'expense' && <button className="fixed-toggle reserve-toggle" onClick={() => setFromReserve(!fromReserve)} aria-pressed={fromReserve} disabled={reserveLocked}>
           <div>
             <strong>예비비에서 사용</strong>
@@ -134,22 +162,6 @@ export function ExpenseSheet({
           </div>
           <i className={`toggle ${fromReserve ? 'on' : ''}`}><b /></i>
         </button>}
-        {type === 'expense' && !usingReserve && <>
-          <div className="field-label">카테고리 <em className="field-optional">고르지 않으면 미분류</em></div>
-          <div className="category-pills">
-            {categories.map((c) => (
-              // 한 번 더 누르면 선택이 풀린다(미분류로 되돌릴 방법이 이것뿐이다).
-              <button
-                key={c.id}
-                className={selected === c.id ? 'selected' : ''}
-                aria-pressed={selected === c.id}
-                onClick={() => setSelectedId(selected === c.id ? null : c.id)}
-              >
-                <CategoryPlanet color={c.color} />{c.name}
-              </button>
-            ))}
-          </div>
-        </>}
         <div className="simple-fields">
           <label className="date-field">
             <CalendarDays size={18} />
@@ -169,5 +181,12 @@ export function ExpenseSheet({
         {editing && <button className="delete-button" onClick={remove}>내역 삭제</button>}
       </section>
     </div>
-  )
+    {/* 지출 시트 바깥에 띄운다. 배경의 backdrop-filter가 안쪽 fixed 요소의 기준을 바꿔서 안에 두면 시트가 엉뚱한 곳에 뜬다 */}
+    {formFor && <CategoryForm
+      category={formFor === 'new' ? null : formFor}
+      close={() => setFormFor(null)}
+      // 새로 만든 카테고리는 바로 고른다
+      onSaved={(id) => formFor === 'new' && setSelectedId(id)}
+    />}
+  </>)
 }

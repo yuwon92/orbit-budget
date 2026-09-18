@@ -4,6 +4,9 @@ const MOBILE_SHEET = '(max-width: 680px)'
 
 const isMobileSheet = () => window.matchMedia(MOBILE_SHEET).matches
 
+/** 지금 열린 시트 수. 시트 위에 시트를 띄울 때(지출 입력 → 카테고리 수정) 안쪽이 닫혀도 바깥 값을 지우지 않게 */
+let openSheets = 0
+
 /**
  * 바텀시트가 열려 있는 동안 배경 스크롤을 막고, 보이는 영역(visualViewport) 크기를
  * CSS 변수로 넘긴다. iOS는 키보드가 올라와도 fixed 요소 기준이 되는 레이아웃 뷰포트가
@@ -18,6 +21,7 @@ export function useSheetViewport() {
       root.style.setProperty('--sheet-vh', `${Math.round(vv.height)}px`)
       root.style.setProperty('--sheet-top', `${Math.round(vv.offsetTop)}px`)
     }
+    openSheets += 1
     apply()
     vv?.addEventListener('resize', apply)
     vv?.addEventListener('scroll', apply)
@@ -37,6 +41,9 @@ export function useSheetViewport() {
         document.body.style.overflow = prevBody
         root.style.overflow = prevRoot
       }
+      openSheets -= 1
+      // 아래에 아직 시트가 있으면 그 시트가 계속 이 값을 쓴다
+      if (openSheets > 0) return
       root.style.removeProperty('--sheet-vh')
       root.style.removeProperty('--sheet-top')
     }

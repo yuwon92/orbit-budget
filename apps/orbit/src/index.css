@@ -632,3 +632,9 @@ button.transaction-name,.history-row .row-open{border:0;background:none;padding:
 .reserve-toggle{width:100%;margin-top:22px}
 .reserve-toggle small{font-variant-numeric:tabular-nums}
 .reserve-toggle:disabled{opacity:.45;cursor:default}
+
+/* 지출 시트 · 카테고리 편집. 제목 줄 오른쪽 편집/완료, 목록 끝 추가 칸 */
+.category-label{display:flex;align-items:center;justify-content:space-between}
+.category-label .text-button{font-size:11px;padding:0}
+.category-pills .add-pill{border-style:dashed;color:var(--text-secondary);gap:4px}
+.category-pills .pill-edit{color:var(--text-tertiary);flex:0 0 auto}
