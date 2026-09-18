@@ -138,7 +138,7 @@ Wish는 Orbit 예산을 `getOrbitSnapshot()`으로 읽고, 구매 확정 때만 
 
 | 파일 | 역할 |
 |---|---|
-| `ExpenseSheet.tsx` | 거래 추가/수정 바텀시트. `transaction`=수정, `preset`=카테고리·금액 프리필, `initialDate`=날짜 지정 |
+| `ExpenseSheet.tsx` | 거래 추가/수정 바텀시트. `transaction`=수정, `preset`=카테고리·금액 프리필, `initialDate`=날짜 지정. `예비비에서 사용` 토글 — 고른 날짜가 속한 달의 예비비 기준, 0인 달은 잠김(숨기지 않음), 켜면 카테고리 없이 저장 |
 | `CategorySettings.tsx` (381줄) | 카테고리 목록 + 폼(예산 계산 도구 UI 포함) |
 | `RecurringSettings.tsx` | 반복 거래 목록 + 폼 |
 | `ReserveSheet.tsx` | 월 예비비 입력 |
@@ -153,11 +153,11 @@ Wish는 Orbit 예산을 `getOrbitSnapshot()`으로 읽고, 구매 확정 때만 
 Category        id, name, monthlyBudget, color, isFixed, sortOrder,
                 budgetRule?, hiddenOnHome?, quickSlot?, quickOrder?
 Transaction     id, date('yyyy-MM-dd'), amount(항상 양수), type, categoryId|null,
-                memo, isPlanned, createdAt, recurringRuleId?, excludedFromFreeAmount?
+                memo, isPlanned, createdAt, recurringRuleId?, excludedFromFreeAmount?, fromReserve?
 RecurringRule   id, name, amount, type, categoryId, interval?('monthly'|'weekly'),
                 dayOfMonth, weekdays?(0=일…6=토, 여러 개),
                 startDate, endDate|null, lastGeneratedMonth|null
-MonthSettings   yearMonth('yyyy-MM'), reserveAmount
+MonthSettings   yearMonth('yyyy-MM'), reserveAmount, carriedIn?
 ```
 
 ```ts
@@ -174,6 +174,7 @@ BudgetRule = { kind:'manual' }
 - `interval`이 없으면 월 단위(예전 규칙). 주 단위는 `weekdays`(여러 요일 가능)를 쓰고 `dayOfMonth`는 안 씀(주기를 되돌릴 때를 위해 값은 남겨둠)
 - `isPlanned`는 저장 시 `date > 오늘`로 자동 결정. `materializeRecurring`이 앱을 열 때 오늘 이하 날짜를 전부 `false`로 확정
 - `excludedFromFreeAmount`는 위시 구매 거래 전용. 거래·카테고리 통계에는 포함하지만 `monthlyFreeAmount`에서는 완전히 제외
+- `fromReserve`는 예비비에서 꺼내 쓴 지출. 화면은 카테고리 없이 저장한다(카드 진행률에 안 잡히게). 계산은 카테고리가 붙어 있어도 카테고리 예산·예산 밖 차감에서 빼고 예비비 안에서 따로 정산한다. 남은 예비비는 저장하지 않고 `reserveSpentAmount`로 매번 센다 — 거래를 고치거나 지우면 예비비가 저절로 돌아온다
 - `hiddenOnHome`은 히어로 예산 행 **표시만** 숨김. 계산에는 그대로 들어감
 - `isFixed`는 현재 **라벨 전용**(목록의 `고정비` 칩). 계산에서 안 씀
 - `quickOrder`는 퀵 슬롯 줄에서의 순서. 없으면 `sortOrder` 순으로 뒤에 붙음
@@ -198,7 +199,7 @@ Dexie `'orbital-budget'`. 스토어: `categories`(id) / `transactions`(id, **dat
 **자유비용 모델** — 히어로 큰 숫자는 `monthlyFreeAmount` 하나다.
 
 ```
-남은 자유비용 = 총수입 + 지난달 이월 - Σ(카테고리 월 예산) - 예비비 + 조정
+남은 자유비용 = 총수입 + 지난달 이월 - Σ(카테고리 월 예산) - 예비비 - max(0, 예비비 사용액 - 예비비) + 조정
 ```
 
 조정(`adjustment`)에 들어가는 것:
@@ -208,7 +209,7 @@ Dexie `'orbital-budget'`. 스토어: `categories`(id) / `transactions`(id, **dat
 - **이미 끝난** 일/주 기간의 미사용액 → 자유비용으로 환급. 진행 중·미래 기간의 잔액은 카테고리에 남겨둠
 - 어떤 예산 기간에도 안 걸치는 날의 지출(요일 지정 카테고리의 비지정 요일 등) → 전액 차감
 
-`monthlyFreeAmount(txs, categories, today, reserve, includePlannedIncome = true, wishSavedAmount = 0)` — `includePlannedIncome`이 false면 `isPlanned` 수입을 빼고 센다(설정 첫 카드의 `자유비용에 예정 수입 포함` 토글). **수입에만 걸린다.** 예정 지출은 어차피 나갈 돈이라 늘 차감한다. `wishSavedAmount`는 이번 달 순저금으로 예비비처럼 한 번 차감한다. `carriedIn`은 지난달들에서 넘어온 잔액으로 수입과 같은 자리에서 더한다.
+`monthlyFreeAmount(txs, categories, today, reserve, includePlannedIncome = true, wishSavedAmount = 0, carriedIn = 0)` — `includePlannedIncome`이 false면 `isPlanned` 수입을 빼고 센다(설정 첫 카드의 `자유비용에 예정 수입 포함` 토글). **수입에만 걸린다.** 예정 지출은 어차피 나갈 돈이라 늘 차감한다. `wishSavedAmount`는 이번 달 순저금으로 예비비처럼 한 번 차감한다. `carriedIn`은 지난달들에서 넘어온 잔액으로 수입과 같은 자리에서 더한다.
 
 **월 이월** — 달이 바뀌면 안 쓴 돈 전부가 다음 달 자유비용으로 넘어간다.
 

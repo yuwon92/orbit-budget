@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { CalendarDays, X } from 'lucide-react'
 import { format } from 'date-fns'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { reserveSpentAmount } from '../lib/budget'
 import { db } from '../lib/db'
 import { money } from '../lib/format'
 import { useCategories } from '../lib/hooks'
@@ -35,9 +37,28 @@ export function ExpenseSheet({
   )
   const [date, setDate] = useState(() => editing?.date ?? initialDate ?? format(new Date(), 'yyyy-MM-dd'))
   const [memo, setMemo] = useState(editing?.memo ?? '')
+  const [fromReserve, setFromReserve] = useState(editing?.fromReserve ?? false)
   const [saving, setSaving] = useState(false)
   const amountRef = useSheetFocus<HTMLInputElement>()
   useSheetViewport()
+
+  // 예비비는 달마다 따로 있다. 고른 날짜가 속한 달의 예비비를 본다.
+  const month = date.slice(0, 7)
+  const reserveInfo = useLiveQuery(async () => {
+    const [settings, monthTx] = await Promise.all([
+      db.monthSettings.get(month),
+      db.transactions.where('date').startsWith(month).toArray(),
+    ])
+    // 수정 중인 거래는 빼고 센다 — 이 거래를 넣기 전 남은 예비비를 보여준다
+    const others = editing ? monthTx.filter((t) => t.id !== editing.id) : monthTx
+    const reserve = settings?.reserveAmount ?? 0
+    return { reserve, remaining: reserve - reserveSpentAmount(others, month) }
+  }, [month, editing?.id])
+  // 예비비가 없는 달에도 토글은 보인다 — 숨기면 기능이 없는 줄 안다. 대신 켤 수 없게 막고,
+  // 이미 예비비로 기록된 거래는 끌 수 있게 남긴다.
+  const hasReserve = (reserveInfo?.reserve ?? 0) > 0
+  const reserveLocked = !hasReserve && !fromReserve
+  const usingReserve = type === 'expense' && fromReserve
 
   // 고르지 않으면 그대로 미분류로 저장한다. 첫 카테고리를 임의로 채우지 않는다.
   const selected = selectedId
@@ -51,7 +72,9 @@ export function ExpenseSheet({
       date,
       amount: Number(amount),
       type,
-      categoryId: type === 'expense' ? selected : null,
+      // 예비비 지출은 카테고리 없이 기록한다. 카테고리 카드 진행률에 잡히지 않게.
+      categoryId: type === 'expense' && !usingReserve ? selected : null,
+      fromReserve: usingReserve,
       memo: memo.trim(),
       // 미래 날짜면 예정 거래로 둔다.
       isPlanned: date > format(new Date(), 'yyyy-MM-dd'),
@@ -102,7 +125,16 @@ export function ExpenseSheet({
             <strong>원</strong>
           </div>
         </label>
-        {type === 'expense' && <>
+        {type === 'expense' && <button className="fixed-toggle reserve-toggle" onClick={() => setFromReserve(!fromReserve)} aria-pressed={fromReserve} disabled={reserveLocked}>
+          <div>
+            <strong>예비비에서 사용</strong>
+            <small>{hasReserve
+              ? `남은 예비비 ${money(reserveInfo?.remaining ?? 0)} / ${money(reserveInfo?.reserve ?? 0)}원`
+              : '이번 달 예비비 없음'}</small>
+          </div>
+          <i className={`toggle ${fromReserve ? 'on' : ''}`}><b /></i>
+        </button>}
+        {type === 'expense' && !usingReserve && <>
           <div className="field-label">카테고리 <em className="field-optional">고르지 않으면 미분류</em></div>
           <div className="category-pills">
             {categories.map((c) => (

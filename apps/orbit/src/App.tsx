@@ -28,7 +28,7 @@ import {
 import { useLiveQuery } from 'dexie-react-hooks'
 import { addDays, addMonths, endOfMonth, format, getDaysInMonth, parseISO } from 'date-fns'
 import { ko } from 'date-fns/locale'
-import { buildBreakdown, inQuickSlot, monthlyFreeAmount, spentByCategory, spentOnDate } from './lib/budget'
+import { buildBreakdown, inQuickSlot, monthlyFreeAmount, reserveSpentAmount, spentByCategory, spentOnDate } from './lib/budget'
 import { db, requestPersistentStorage, setQuickSlot } from './lib/db'
 import { money } from './lib/format'
 import { readPlannedIncome, writePlannedIncome } from './lib/settings'
@@ -266,7 +266,7 @@ function HomeView({ openExpense, openEdit, openPreset, goTransactions, goCategor
               <span className="transaction-time">{format(t.createdAt, 'HH:mm')}</span>
               <CategoryPlanet color={cat?.color ?? '#9aa3b4'}/>
               {/* 메모가 없으면 제목이 곧 카테고리라 아래 줄을 또 쓰지 않는다 */}
-              <button className="transaction-name" onClick={() => openEdit(t)}><strong>{t.memo || cat?.name || (income ? '수입' : '지출')}</strong>{t.memo && <span>{income ? '수입' : cat?.name ?? '미분류'}</span>}</button>
+              <button className="transaction-name" onClick={() => openEdit(t)}><strong>{t.memo || cat?.name || (income ? '수입' : t.fromReserve ? '예비비' : '지출')}</strong>{t.memo && <span>{income ? '수입' : t.fromReserve ? '예비비' : cat?.name ?? '미분류'}</span>}</button>
               <strong className={`transaction-amount ${income ? 'income-text' : ''}`}>{income ? '+' : '-'}{money(t.amount)}원</strong>
             </div>
           })}
@@ -405,7 +405,7 @@ function CalendarView({ openEdit, openExpenseForDate }: { openEdit: (t: Transact
                 return <div className="transaction-row" key={t.id}>
                   <span className={`transaction-time ${t.isPlanned ? 'planned-label' : ''}`}>{t.isPlanned ? '예정' : format(t.createdAt, 'HH:mm')}</span>
                   <CategoryPlanet color={income ? '#83dad8' : cat?.color ?? '#9aa3b4'}/>
-                  <button className="transaction-name" onClick={() => editFromDetail(t)}><strong>{t.memo || cat?.name || (income ? '수입' : '지출')}</strong>{t.memo && <span>{income ? '수입' : cat?.name ?? '미분류'}</span>}</button>
+                  <button className="transaction-name" onClick={() => editFromDetail(t)}><strong>{t.memo || cat?.name || (income ? '수입' : t.fromReserve ? '예비비' : '지출')}</strong>{t.memo && <span>{income ? '수입' : t.fromReserve ? '예비비' : cat?.name ?? '미분류'}</span>}</button>
                   <strong className={`transaction-amount ${income ? 'income-text' : ''}`}>{income ? '+' : '-'}{money(t.amount)}원</strong>
                 </div>
               })}
@@ -470,7 +470,7 @@ function TransactionsView({ openExpense, openEdit, focus, clearFocus }: { openEx
       if (typeFilter !== 'all' && t.type !== typeFilter) return false
       if (catFilter.length > 0 && !catFilter.includes(t.categoryId ?? 'none')) return false
       if (!q) return true
-      const name = t.categoryId ? catMap.get(t.categoryId)?.name ?? '' : '미분류'
+      const name = t.fromReserve ? '예비비' : t.categoryId ? catMap.get(t.categoryId)?.name ?? '' : '미분류'
       return t.memo.toLowerCase().includes(q) || name.toLowerCase().includes(q)
     })
   }, [all, query, typeFilter, catFilter, catMap, tab, range])
@@ -578,8 +578,8 @@ function TransactionsView({ openExpense, openEdit, focus, clearFocus }: { openEx
           return <div className="history-row" key={t.id}>
             <span className={`money-direction ${income ? 'income' : 'expense'}`}>{income ? <ArrowDownLeft size={18}/> : <ArrowUpRight size={18}/>}</span>
             <button className="row-open" onClick={() => openEdit(t)}>
-              <strong>{t.memo || cat?.name || (income ? '수입' : '지출')}{t.isPlanned && <em className="planned-chip">예정</em>}</strong>
-              <span>{format(t.createdAt, 'HH:mm')} · {income ? '수입' : cat?.name ?? '미분류'}</span>
+              <strong>{t.memo || cat?.name || (income ? '수입' : t.fromReserve ? '예비비' : '지출')}{t.isPlanned && <em className="planned-chip">예정</em>}</strong>
+              <span>{format(t.createdAt, 'HH:mm')} · {income ? '수입' : t.fromReserve ? '예비비' : cat?.name ?? '미분류'}</span>
             </button>
             <strong className={income ? 'income-text' : ''}>{income ? '+' : '-'}{money(t.amount)}원</strong>
             <button className="row-delete" onClick={() => remove(t)} aria-label="삭제"><Trash2 size={16}/></button>
@@ -593,9 +593,15 @@ function TransactionsView({ openExpense, openEdit, focus, clearFocus }: { openEx
 function SettingsView({ dark, onTheme, openOnboarding, sub, setSub, plannedIncome, onPlannedIncome }: { dark: boolean; onTheme: () => void; openOnboarding: () => void; sub: SettingsSub; setSub: (sub: SettingsSub) => void; plannedIncome: boolean; onPlannedIncome: () => void }) {
   const month = format(new Date(), 'yyyy-MM')
   const monthSettings = useLiveQuery(() => db.monthSettings.get(month), [month])
+  // 예비비에서 꺼내 쓴 금액. 저장하지 않고 이번 달 거래에서 센다
+  const reserveSpent = useLiveQuery(
+    async () => reserveSpentAmount(await db.transactions.where('date').startsWith(month).toArray(), month),
+    [month],
+  ) ?? 0
   const [reserveOpen, setReserveOpen] = useState(false)
   const restoreInput = useRef<HTMLInputElement>(null)
   const reserve = monthSettings?.reserveAmount ?? 0
+  const reserveLeft = reserve - reserveSpent
   if (sub === 'categories') return <CategorySettings back={() => setSub(null)} />
   if (sub === 'recurring') return <RecurringSettings back={() => setSub(null)} />
   const exportCsv = async () => {
@@ -629,7 +635,11 @@ function SettingsView({ dark, onTheme, openOnboarding, sub, setSub, plannedIncom
     {
       icon: WalletCards,
       title: '예비비 설정',
-      desc: reserve > 0 ? `이번 달 예비비 ${money(reserve)}원` : '이번 달 예비비 없음',
+      desc: reserveSpent === 0
+        ? reserve > 0 ? `이번 달 예비비 ${money(reserve)}원` : '이번 달 예비비 없음'
+        : reserveLeft >= 0
+          ? `남은 예비비 ${money(reserveLeft)} / ${money(reserve)}원`
+          : `예비비 ${money(reserve)}원 · ${money(-reserveLeft)}원 초과`,
       onClick: () => setReserveOpen(true),
     },
   ]

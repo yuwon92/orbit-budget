@@ -117,10 +117,13 @@ export function monthlyFreeAmount(
   const totalBudget = categories.reduce((sum, category) => sum + Math.max(category.monthlyBudget, 0), 0)
   // 위시 구매는 저금할 때 이미 자유비용에서 빠졌다. 거래와 카테고리 통계에는 남기지만
   // 이 계산에서는 완전히 제외해 미분류 지출·기간 초과로 두 번 차감되지 않게 한다.
+  // 예비비 지출은 예비비 안에서 따로 정산한다(아래 반환식). 카테고리가 붙어 있어도
+  // 카테고리 예산·예산 밖 차감에는 넣지 않는다 — 넣으면 두 번 빠진다.
   const expenses = transactions.filter(
     (transaction) => inMonth(transaction, month)
       && transaction.type === 'expense'
-      && !transaction.excludedFromFreeAmount,
+      && !transaction.excludedFromFreeAmount
+      && !transaction.fromReserve,
   )
   const categoriesById = new Map(categories.map((category) => [category.id, category]))
   let adjustment = 0
@@ -155,7 +158,21 @@ export function monthlyFreeAmount(
       .reduce((sum, transaction) => sum + transaction.amount, 0)
   }
 
-  return totalIncome(transactions, month, includePlannedIncome) - totalBudget - reserveAmount - wishSavedAmount + adjustment + carriedIn
+  // 예비비는 이미 통째로 빠져 있다. 그 안에서 쓴 돈은 더 빼지 않고, 넘긴 만큼만 뺀다.
+  const reserveOverflow = Math.max(reserveSpentAmount(transactions, month) - Math.max(reserveAmount, 0), 0)
+  return totalIncome(transactions, month, includePlannedIncome) - totalBudget - reserveAmount - wishSavedAmount + adjustment + carriedIn - reserveOverflow
+}
+
+/**
+ * 그 달 예비비에서 꺼내 쓴 금액. 실제·예정 모두 센다 (예정 지출도 나갈 돈이다).
+ * 남은 예비비 = 예비비 − 이 값. 음수면 넘긴 만큼이 자유비용에서 빠진 상태다.
+ *
+ * 따로 저장하지 않고 매번 거래에서 센다 — 예비비 지출을 고치거나 지우면 예비비가 저절로 돌아온다.
+ */
+export function reserveSpentAmount(transactions: Transaction[], month: string): number {
+  return transactions
+    .filter((t) => inMonth(t, month) && t.type === 'expense' && t.fromReserve && !t.excludedFromFreeAmount)
+    .reduce((sum, t) => sum + t.amount, 0)
 }
 
 /**

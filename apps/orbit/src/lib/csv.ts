@@ -3,7 +3,7 @@ import type { Category, Transaction } from './types'
 // 콤마, 따옴표, 줄바꿈이 든 값은 CSV 규칙대로 따옴표로 감싼다.
 const escapeCsv = (value: string) => (/[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value)
 
-/** 자유비용 제외 여부까지 내보내야 위시 구매를 다시 가져올 때 이중 차감되지 않는다. */
+/** 자유비용 제외·예비비 여부까지 내보내야 다시 가져올 때 자유비용이 달라지지 않는다. */
 export function buildCsv(transactions: Transaction[], categories: Category[]): string {
   const nameById = new Map(categories.map((c) => [c.id, c.name]))
   const rows = [...transactions]
@@ -17,9 +17,10 @@ export function buildCsv(transactions: Transaction[], categories: Category[]): s
         escapeCsv(t.memo),
         String(t.isPlanned),
         String(t.excludedFromFreeAmount ?? false),
+        String(t.fromReserve ?? false),
       ].join(','),
     )
-  return ['date,type,category,amount,memo,is_planned,excluded_from_free_amount', ...rows].join('\n')
+  return ['date,type,category,amount,memo,is_planned,excluded_from_free_amount,from_reserve', ...rows].join('\n')
 }
 
 /** BOM을 붙여 엑셀에서 한글이 깨지지 않게 다운로드한다. */

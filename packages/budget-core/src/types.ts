@@ -39,6 +39,11 @@ export interface Transaction {
   recurringRuleId?: string // 반복 규칙이 자동 생성한 거래면 그 규칙의 id
   /** 위시 저금으로 이미 자유비용에서 빠진 구매. 거래·카테고리 통계에는 보이되 자유비용에서는 다시 빼지 않는다 */
   excludedFromFreeAmount?: boolean
+  /**
+   * 예비비에서 꺼내 쓴 지출. 카테고리 없이 기록한다.
+   * 예비비 안에서는 자유비용을 건드리지 않고, 예비비를 넘긴 만큼만 자유비용에서 빠진다
+   */
+  fromReserve?: boolean
 }
 
 export interface RecurringRule {

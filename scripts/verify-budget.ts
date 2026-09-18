@@ -21,6 +21,7 @@ import {
   recurringSumForCategory,
   releasedLeftoverTotal,
   releasedLeftovers,
+  reserveSpentAmount,
   spentByCategory,
   spentOnDate,
   totalIncome,
@@ -393,10 +394,11 @@ const csv = buildCsv(
   categories,
 )
 const csvLines = csv.split('\n')
-assert.equal(csvLines[0], 'date,type,category,amount,memo,is_planned,excluded_from_free_amount')
-assert.equal(csvLines[1], '2026-09-01,expense,,5000,"콤마,와 ""따옴표""",false,false') // 날짜순 정렬 + 이스케이프
-assert.equal(csvLines[2], '2026-09-13,expense,식비,12000,점심,false,false')
-console.log('CSV 생성 (컬럼 순서, 정렬, 이스케이프) 통과')
+assert.equal(csvLines[0], 'date,type,category,amount,memo,is_planned,excluded_from_free_amount,from_reserve')
+assert.equal(csvLines[1], '2026-09-01,expense,,5000,"콤마,와 ""따옴표""",false,false,false') // 날짜순 정렬 + 이스케이프
+assert.equal(csvLines[2], '2026-09-13,expense,식비,12000,점심,false,false,false')
+assert.equal(buildCsv([{ ...tx('2026-09-14', 3000, 'expense', null, ''), fromReserve: true }], categories).split('\n')[1], '2026-09-14,expense,,3000,,false,false,true')
+console.log('CSV 생성 (컬럼 순서, 정렬, 이스케이프, 예비비) 통과')
 
 // --- 끝난 기간이 자유비용에 돌려주는 잔액 (위시 '남은 예산 저금하기'가 가져가는 값) ---
 // 2026-09: 1일이 화요일 → 주 기간은 1~6, 7~13, 14~20, 21~27, 28~30.
@@ -569,6 +571,40 @@ console.log('위시 구매 거래 자유비용 이중 차감 방지 통과')
   // 굴릴 것이 없으면 빈 목록 — 시작 달이나 같은 달을 두 번 열었을 때
   assert.deepEqual(rollCarryoverForward(rollLedger, '2026-10', '2026-10', 70_000), [])
   console.log('이월 원장 굴리기 (해 넘김, 빈 달 메우기, 한 칸 굴리기, 위시 차감) 통과')
+}
+
+// --- 예비비에서 꺼내 쓴 지출 ---
+{
+  const income = tx('2026-09-01', 100_000, 'income', null, '')
+  const fromReserve = (amount: number, extra: Partial<Transaction> = {}): Transaction =>
+    ({ ...tx('2026-09-10', amount, 'expense', null, '예비비'), fromReserve: true, ...extra })
+
+  // 예비비 30,000을 떼어 둔 달. 쓰기 전 자유비용은 70,000
+  assert.equal(monthlyFreeAmount([income], [], '2026-09-15', 30_000), 70_000)
+  // 예비비 안에서 쓰면 자유비용은 그대로, 예비비만 줄어든다
+  assert.equal(monthlyFreeAmount([income, fromReserve(20_000)], [], '2026-09-15', 30_000), 70_000)
+  assert.equal(reserveSpentAmount([income, fromReserve(20_000)], '2026-09'), 20_000)
+  // 예비비를 넘기면 넘긴 20,000만 자유비용에서 빠진다
+  assert.equal(monthlyFreeAmount([income, fromReserve(50_000)], [], '2026-09-15', 30_000), 50_000)
+  // 같은 돈을 예비비 표시 없이 쓰면 자유비용에서 전액 빠진다 — 표시의 차이
+  assert.equal(monthlyFreeAmount([income, tx('2026-09-10', 20_000, 'expense', null, '')], [], '2026-09-15', 30_000), 50_000)
+  // 예비비가 0인 달은 전액이 초과라 표시 없는 지출과 같다
+  assert.equal(monthlyFreeAmount([income, fromReserve(10_000)], [], '2026-09-15', 0), 90_000)
+  // 예정 지출도 즉시 예비비를 쓴다
+  assert.equal(reserveSpentAmount([income, fromReserve(10_000, { isPlanned: true, date: '2026-09-25' })], '2026-09'), 10_000)
+  // 다른 달 예비비 지출은 이번 달에 안 들어온다
+  assert.equal(reserveSpentAmount([fromReserve(10_000, { date: '2026-10-01' })], '2026-09'), 0)
+
+  // 카테고리가 붙어 있어도 카테고리 예산·초과 계산에 넣지 않는다 (두 번 빠지면 안 된다)
+  const manualCat = homeCat('r-etc', 10_000, { kind: 'manual' })
+  assert.equal(
+    monthlyFreeAmount([income, fromReserve(20_000, { categoryId: 'r-etc' })], [manualCat], '2026-09-15', 30_000),
+    60_000, // 100,000 − 카테고리 10,000 − 예비비 30,000. 예비비 지출 20,000은 예비비 안
+  )
+
+  // 이월과 맞물린다: 마감은 실제로 나간 돈만 빼므로 안 쓴 예비비 10,000이 자유비용 70,000과 함께 넘어간다
+  assert.equal(monthClosingBalance([income, fromReserve(20_000)], '2026-09'), 80_000)
+  console.log('예비비 지출 (예비비 안·초과·예정·카테고리 무시·이월 정합) 통과')
 }
 
 // ── 전체 백업 ─────────────────────────────────────────
