@@ -440,7 +440,6 @@ function presetRange(id: RangeId): { from: string; to: string } {
 function TransactionsView({ openExpense, openEdit, focus, clearFocus }: { openExpense: () => void; openEdit: (t: Transaction) => void; focus: TxFocus | null; clearFocus: () => void }) {
   const categories = useCategories() ?? []
   const catMap = useMemo(() => new Map(categories.map(c => [c.id, c])), [categories])
-  const all = useLiveQuery(() => db.transactions.orderBy('date').reverse().toArray(), [])
   const [query, setQuery] = useState('')
   // 홈 카드에서 넘어왔으면 어떤 조건이 걸렸는지 보이도록 필터 패널을 펼친 채로 연다.
   const [filterOpen, setFilterOpen] = useState(Boolean(focus))
@@ -452,6 +451,25 @@ function TransactionsView({ openExpense, openEdit, focus, clearFocus }: { openEx
   const [range, setRange] = useState(() => (focus ? { from: focus.from, to: focus.to } : presetRange('week')))
   // 한 번 반영하고 비운다. 다음에 탭으로 다시 들어올 때 옛 필터가 되살아나면 안 된다.
   useEffect(() => { if (focus) clearFocus() }, [focus, clearFocus])
+  const today = format(new Date(), 'yyyy-MM-dd')
+  // 예정 거래는 날짜가 오늘 이후인 거래다 — 입력할 때 그렇게 정해지고, 날짜가 지나면 확정된다.
+  // 그래서 예정 탭은 오늘부터만 읽는다 (boolean은 IndexedDB 색인에 못 건다).
+  const plannedTx = () => db.transactions.where('date').aboveOrEqual(today).filter(t => t.isPlanned)
+  // 조회 기간만 날짜 색인으로 읽는다. 기록이 쌓여도 한 번에 읽는 양은 기간만큼이다.
+  // '전체'만 경계가 없어 모두 읽는다.
+  const rows = useLiveQuery(() => {
+    if (tab === 'planned') return plannedTx().reverse().toArray()
+    const { from, to } = range
+    if (from && to && from > to) return []
+    const byDate = from && to ? db.transactions.where('date').between(from, to, true, true)
+      : from ? db.transactions.where('date').aboveOrEqual(from)
+      : to ? db.transactions.where('date').belowOrEqual(to)
+      : db.transactions.orderBy('date')
+    return byDate.reverse().toArray()
+  }, [tab, range.from, range.to, today])
+  const plannedCount = useLiveQuery(() => plannedTx().count(), [today]) ?? 0
+  // 빈 화면 문구를 「거래가 아예 없음」과 「조건에 맞는 거래 없음」으로 나누는 데만 쓴다
+  const totalCount = useLiveQuery(() => db.transactions.count(), [])
   const defaultRange = presetRange('week')
   const rangeChanged = range.from !== defaultRange.from || range.to !== defaultRange.to
   const activePreset = RANGE_PRESETS.find(p => {
@@ -463,24 +481,18 @@ function TransactionsView({ openExpense, openEdit, focus, clearFocus }: { openEx
   const reset = () => { setQuery(''); setTypeFilter('all'); setCatFilter([]); setRange(presetRange('week')) }
   const toggleCat = (id: string) =>
     setCatFilter((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
-  const plannedCount = (all ?? []).filter(t => t.isPlanned).length
 
+  // 탭과 조회 기간은 읽을 때 이미 걸렀다. 여기서는 종류·카테고리·검색어만 본다.
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return (all ?? []).filter(t => {
-      if (tab === 'planned') {
-        if (!t.isPlanned) return false
-      } else {
-        if (range.from && t.date < range.from) return false
-        if (range.to && t.date > range.to) return false
-      }
+    return (rows ?? []).filter(t => {
       if (typeFilter !== 'all' && t.type !== typeFilter) return false
       if (catFilter.length > 0 && !catFilter.includes(t.categoryId ?? 'none')) return false
       if (!q) return true
       const name = t.fromReserve ? '예비비' : t.categoryId ? catMap.get(t.categoryId)?.name ?? '' : '미분류'
       return t.memo.toLowerCase().includes(q) || name.toLowerCase().includes(q)
     })
-  }, [all, query, typeFilter, catFilter, catMap, tab, range])
+  }, [rows, query, typeFilter, catFilter, catMap])
 
   const groups = useMemo(() => {
     const map = new Map<string, Transaction[]>()
@@ -555,13 +567,13 @@ function TransactionsView({ openExpense, openEdit, focus, clearFocus }: { openEx
       {filtering && <button className="text-button filter-reset" onClick={reset}>필터 초기화</button>}
     </section>}
     <section className="history-card">
-      {all && all.length === 0 && <div className="empty-state">
+      {totalCount === 0 && <div className="empty-state">
         <span className="empty-planet" aria-hidden="true" />
         <strong>아직 거래가 없어요</strong>
         <p>첫 지출이나 수입을 기록해보세요.</p>
         <button className="outline-button" onClick={openExpense}><Plus size={16}/> 거래 추가</button>
       </div>}
-      {all && all.length > 0 && groups.length === 0 && (tab === 'planned' && !filtering
+      {rows && totalCount !== undefined && totalCount > 0 && groups.length === 0 &&(tab === 'planned' && !filtering
         ? <div className="empty-state">
             <span className="empty-planet" aria-hidden="true" />
             <strong>예정된 거래가 없어요</strong>
