@@ -44,6 +44,8 @@ import { CategoryPlanet } from './components/CategoryPlanet'
 import { DailyBreakdown } from './components/DailyBreakdown'
 import { CategorySettings } from './components/CategorySettings'
 import { ExpenseSheet } from './components/ExpenseSheet'
+import { MonthAnalysis } from './components/MonthAnalysis'
+import { MonthSummaryCard } from './components/MonthSummaryCard'
 import { QuickAddOrbs, type QuickPreset } from './components/QuickAddOrbs'
 import { RecurringSettings } from './components/RecurringSettings'
 import { ReserveSheet } from './components/ReserveSheet'
@@ -279,6 +281,8 @@ function CalendarView({ openEdit, openExpenseForDate }: { openEdit: (t: Transact
   const [month, setMonth] = useState(today.slice(0, 7))
   const [selected, setSelected] = useState<string | null>(today)
   const [detailOpen, setDetailOpen] = useState(false)
+  // 요약 카드를 누르면 달력 대신 월 분석 화면을 띄운다
+  const [analysisOpen, setAnalysisOpen] = useState(false)
   const categories = useCategories() ?? []
   const catMap = useMemo(() => new Map(categories.map(c => [c.id, c])), [categories])
   const monthTx = useLiveQuery(() => db.transactions.where('date').startsWith(month).toArray(), [month])
@@ -333,6 +337,8 @@ function CalendarView({ openEdit, openExpenseForDate }: { openEdit: (t: Transact
     openExpenseForDate(selected)
   }
 
+  if (analysisOpen) return <MonthAnalysis initialMonth={month} today={today} back={() => setAnalysisOpen(false)}/>
+
   return <div className="view">
     <div className="page-heading">
       <div><p className="eyebrow">MONTHLY ORBIT</p><h1>달력</h1></div>
@@ -386,7 +392,7 @@ function CalendarView({ openEdit, openExpenseForDate }: { openEdit: (t: Transact
       </div>
       <div className="calendar-legend"><span><i className="spent"/> 지출</span><span><i className="income"/> 수입</span><span><i className="planned"/> 예정 거래</span></div>
     </section>
-    {selected && <div className={`calendar-detail-layer ${detailOpen ? 'open' : ''}`} onClick={(e) => e.target === e.currentTarget && setDetailOpen(false)}>
+    {selected &&<div className={`calendar-detail-layer ${detailOpen ? 'open' : ''}`} onClick={(e) => e.target === e.currentTarget && setDetailOpen(false)}>
       <section className="selected-day" role="region" aria-labelledby="selected-day-title">
         <div className="sheet-handle calendar-sheet-handle" aria-hidden="true" />
         <div className="selected-head">
@@ -413,6 +419,7 @@ function CalendarView({ openEdit, openExpenseForDate }: { openEdit: (t: Transact
         <button className="selected-day-add" onClick={addFromDetail}><Plus size={17}/> 이 날짜에 추가</button>
       </section>
     </div>}
+    {monthTx && <MonthSummaryCard month={month} today={today} transactions={monthTx} categories={categories} onOpen={() => { setDetailOpen(false); setAnalysisOpen(true) }}/>}
   </div>
 }
 

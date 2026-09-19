@@ -25,7 +25,7 @@ export function totalIncome(transactions: Transaction[], month: string, includeP
     .reduce((sum, t) => sum + t.amount, 0)
 }
 
-interface BudgetPeriod {
+export interface BudgetPeriod {
   scope: 'week' | 'day'
   from: string
   to: string
@@ -38,7 +38,7 @@ const dateInMonth = (month: string, day: number) => `${month}-${String(day).padS
  * 횟수·교통 카테고리의 월 예산을 실제 일/달력 주 기간에 배분한다.
  * 달을 걸치는 주는 월 경계에서 자르고, 앞 기간부터 채워 월 예산 총액을 절대 넘지 않는다.
  */
-function categoryBudgetPeriods(category: Category, month: string): BudgetPeriod[] {
+export function categoryBudgetPeriods(category: Category, month: string): BudgetPeriod[] {
   const rule = category.budgetRule
   if (!rule || (rule.kind !== 'perUse' && rule.kind !== 'commute')) return []
 

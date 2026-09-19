@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "exports": {
+    "./analysis": "./src/analysis.ts",
     "./budget": "./src/budget.ts",
     "./format": "./src/format.ts",
     "./types": "./src/types.ts"

@@ -29,6 +29,16 @@ import {
   weekdayCountInMonth,
   weeksInMonth,
 } from '../packages/budget-core/src/budget.ts'
+import {
+  categorySpending,
+  elapsedDays,
+  fixedVsVariable,
+  monthSummary,
+  spendingChange,
+  topExpenses,
+  topMemos,
+  usageCompliance,
+} from '../packages/budget-core/src/analysis.ts'
 import { buildCsv } from '../apps/orbit/src/lib/csv.ts'
 import { buildBackup, parseBackup } from '../apps/orbit/src/lib/backupFormat.ts'
 import type { Category, RecurringRule, Transaction } from '../packages/budget-core/src/types.ts'
@@ -644,6 +654,84 @@ console.log('위시 구매 거래 자유비용 이중 차감 방지 통과')
   const odd = parseBackup(JSON.stringify({ ...good, settings: { plannedIncome: 'maybe' } }), schema)
   assert.ok(odd.ok && odd.backup.settings.plannedIncome === undefined)
   console.log('전체 백업 통과')
+}
+
+// ── 월 분석 ─────────────────────────────────────────
+{
+  const aCats: Category[] = [
+    // 9월 카페 예산은 계산식에서: 5,000 × round(2 × 30/7) = 45,000
+    { ...cat('cafe', '카페', 45_000, false), budgetRule: { kind: 'perUse', unitAmount: 5_000, freq: { mode: 'perWeek', timesPerWeek: 2 } } },
+    { ...cat('subs', '구독', 30_000, true), budgetRule: { kind: 'manual' } },
+    cat('food', '식비', 0, false),
+  ]
+  const at = (date: string, amount: number, categoryId: string | null, memo = '', extra: Partial<Transaction> = {}): Transaction =>
+    ({ ...tx(date, amount, 'expense', categoryId, memo), ...extra })
+  const sept: Transaction[] = [
+    tx('2026-09-01', 1_000_000, 'income', null, '월급'),
+    { ...tx('2026-09-25', 200_000, 'income', null, '용돈'), isPlanned: true },
+    at('2026-09-01', 4_000, 'cafe', '스타벅스'), // 9/1~9/6 주: 몫 10,000
+    at('2026-09-03', 5_000, 'cafe', '스타벅스'),
+    at('2026-09-08', 15_000, 'cafe', '스타벅스'), // 9/7~9/13 주: 몫 10,000 → 5,000 초과
+    at('2026-09-02', 9_900, 'subs', '넷플릭스', { recurringRuleId: 'r1' }),
+    at('2026-09-05', 30_000, 'food', '마트'),
+    at('2026-09-06', 12_000, 'gone', '지운 카테고리'), // 없는 카테고리 → 미분류
+    at('2026-09-07', 8_000, 'food', '', { fromReserve: true }), // 예비비
+    at('2026-09-09', 50_000, 'food', '위시 구매', { excludedFromFreeAmount: true }),
+    at('2026-09-20', 7_000, 'food', '마트', { isPlanned: true }), // 예정은 지출에서 제외
+  ]
+  const aToday = '2026-09-13'
+
+  assert.equal(elapsedDays('2026-08', aToday), 31)
+  assert.equal(elapsedDays('2026-09', aToday), 13)
+  assert.equal(elapsedDays('2026-10', aToday), 0)
+
+  const summary = monthSummary(sept, '2026-09', aToday)
+  assert.equal(summary.spent, 4_000 + 5_000 + 15_000 + 9_900 + 30_000 + 12_000 + 8_000 + 50_000)
+  assert.equal(summary.income, 1_000_000)
+  assert.equal(summary.plannedIncome, 200_000)
+  assert.equal(summary.plannedSpent, 7_000)
+  // 지출 있는 날: 1·2·3·5·6·7·8·9 → 13일 중 5일 무지출
+  assert.equal(summary.noSpendDays, 5)
+
+  const rows = categorySpending(sept, aCats, '2026-09')
+  const byKey = new Map(rows.map((row) => [row.key, row]))
+  assert.equal(byKey.get('food')?.spent, 80_000) // 위시 구매 포함, 예비비·예정 제외
+  assert.equal(byKey.get('reserve')?.spent, 8_000)
+  assert.equal(byKey.get('none')?.spent, 12_000)
+  assert.equal(byKey.get('cafe')?.budget, 45_000)
+  assert.equal(byKey.get('cafe')?.budgetIsCurrent, false)
+  assert.equal(byKey.get('subs')?.budgetIsCurrent, true)
+  assert.equal(byKey.get('food')?.budget, null)
+  assert.equal(rows[0].key, 'food') // 많이 쓴 순서
+  // 2월은 28일 → 카페 계산식 예산이 5,000 × round(8) = 40,000
+  assert.equal(categorySpending([at('2026-02-03', 1_000, 'cafe')], aCats, '2026-02')[0].budget, 40_000)
+
+  const change = spendingChange(rows, categorySpending([at('2026-08-10', 20_000, 'food')], aCats, '2026-08'))
+  assert.equal(change.get('food'), 60_000)
+  assert.equal(change.get('cafe'), 24_000)
+
+  // 오늘 9/13은 둘째 주 진행 중 → 끝난 주는 9/1~9/6 하나
+  const compliance = usageCompliance(aCats, sept, '2026-09', aToday)
+  assert.equal(compliance.length, 1)
+  const { periods, kept, over, leftover, overAmount } = compliance[0]
+  assert.deepEqual({ periods, kept, over, leftover, overAmount }, { periods: 1, kept: 1, over: 0, leftover: 1_000, overAmount: 0 })
+  // 다음 주로 넘어가면 둘째 주가 초과로 잡힌다
+  const later = usageCompliance(aCats, sept, '2026-09', '2026-09-14')[0]
+  assert.equal(later.over, 1)
+  assert.equal(later.overAmount, 5_000)
+  // 미사용액은 자유비용 환급(releasedLeftovers)과 같은 값
+  assert.equal(later.leftover, releasedLeftoverTotal(aCats, sept, '2026-09-06'))
+  // 예산 0인 계산식 카테고리는 지킬 한도가 없어 빠진다
+  assert.equal(usageCompliance([{ ...aCats[0], monthlyBudget: 0 }], sept, '2026-09', '2026-09-14').length, 0)
+
+  assert.deepEqual(topExpenses(sept, '2026-09', 2).map((t) => t.amount), [50_000, 30_000])
+  // 마트는 실제 1건 + 예정 1건이라 「자주」에 못 든다
+  assert.deepEqual(topMemos(sept, '2026-09'), [{ memo: '스타벅스', count: 3, total: 24_000 }])
+
+  const split = fixedVsVariable(sept, aCats, '2026-09')
+  assert.equal(split.fixed, 9_900)
+  assert.equal(split.fixed + split.variable, summary.spent)
+  console.log('월 분석 통과')
 }
 
 console.log('\n모든 검산 통과')
