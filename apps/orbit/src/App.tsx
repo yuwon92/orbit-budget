@@ -244,7 +244,9 @@ function HomeView({ openExpense, openEdit, openPreset, goTransactions, goCategor
             : <><strong>{money(used)}원</strong> <span>사용</span></>}</p></div>
           {hasBudget
             ? <>
-                <div className="progress-meta"><span>{progress}% 사용</span><span>{money(category.monthlyBudget - used)}원 남음</span></div>
+                <div className="progress-meta"><span>{progress}% 사용</span>{used > category.monthlyBudget
+                  ? <span className="over">{money(used - category.monthlyBudget)}원 초과</span>
+                  : <span>{money(category.monthlyBudget - used)}원 남음</span>}</div>
                 <div className="category-progress"><i style={{ width: `${Math.min(progress, 100)}%`, background: barColor }} /></div>
               </>
             : <p className="no-budget-note">예산 미설정</p>}
