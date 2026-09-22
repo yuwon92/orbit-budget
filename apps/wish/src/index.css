@@ -1236,31 +1236,6 @@ ul { padding: 0; list-style: none; }
   cursor: pointer;
 }
 
-.plain-wish-list {
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  overflow: hidden;
-  background: var(--surface);
-}
-.plain-wish-list li + li { border-top: 1px solid var(--border); }
-.plain-wish-list button {
-  width: 100%;
-  min-height: 70px;
-  padding: 13px 16px;
-  border: 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  text-align: left;
-  background: none;
-  cursor: pointer;
-}
-.plain-wish-list button > span { min-width: 0; flex: 1; display: grid; gap: 5px; }
-.plain-wish-list strong { overflow-wrap: anywhere; font-size: 14px; }
-.plain-wish-list small { font-size: 11px; font-weight: 400; color: var(--text-tertiary); }
-.plain-wish-list b { flex: 0 0 auto; font-size: 13px; font-variant-numeric: tabular-nums; }
-.plain-wish-list svg { flex: 0 0 auto; color: var(--text-tertiary); }
-
 .empty-wish-list {
   width: 100%;
   min-height: 70px;
@@ -1703,3 +1678,19 @@ ul { padding: 0; list-style: none; }
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
 }
+
+/* ── 기간 없는 위시 저금통 ─────────────────────────── */
+
+/* 궤도 카드(.quest-card)의 숫자·버튼 줄을 그대로 빌려 쓰고, 행성 그림만 뺀 한 칸.
+   목표에 닿으면 궤도 카드와 같은 노란 테두리로 알린다. */
+.piggy-list { display: grid; gap: 10px; }
+.piggy-row {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+}
+.piggy-row.state-ready { border-color: var(--star-yellow); }
+.piggy-head { margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.piggy-head strong { min-width: 0; overflow-wrap: anywhere; font-size: 15px; }
+.piggy-row .quest-actions { margin-top: 12px; }

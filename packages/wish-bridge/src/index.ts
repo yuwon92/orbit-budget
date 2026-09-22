@@ -121,8 +121,8 @@ export async function updateWish(wishId: string, input: UpdateWishInput) {
   })
 }
 
-/** 저금. 목표를 채우면 그 자리에서 ready로 넘어간다 */
-export async function deposit(wishId: string, amount: number, date: string, source: 'manual' | 'carryover' = 'manual') {
+/** 저금. 목표를 채우면 그 자리에서 ready로 넘어간다. 기간 없는 위시 저금통은 `piggy` */
+export async function deposit(wishId: string, amount: number, date: string, source: 'manual' | 'carryover' | 'piggy' = 'manual') {
   if (amount <= 0) return
   await wishDb.transaction('rw', wishDb.wishes, wishDb.wishEvents, async () => {
     const wish = await wishDb.wishes.get(wishId)

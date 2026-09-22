@@ -1,4 +1,4 @@
-import { ChevronRight, Plus, WalletCards } from 'lucide-react'
+import { Plus, WalletCards } from 'lucide-react'
 import { money } from '@orbit/budget-core/format'
 import { dailyShare, dayStatus, progress as progressOf, remainingDays } from '@orbit/wish-core/wish'
 import { XP } from '@orbit/wish-core/xp'
@@ -7,8 +7,9 @@ import { PixelPlanet } from '../components/PixelPlanet'
 import { PixelBar } from '../components/PixelBar'
 import { pad2 } from '../lib/format'
 import type { WishSkin } from '../lib/preview'
+import type { PiggyMode } from '../components/Sheets'
 
-export function QuestScreen({ wishes, slotsUsed, orbitNumbers, events, today, slots, skin, onCollect, onAddOrbit, onAddList, onEdit, onResolve, onFocus }: {
+export function QuestScreen({ wishes, slotsUsed, orbitNumbers, events, today, slots, skin, onCollect, onStash, onAddOrbit, onAddList, onEdit, onResolve, onFocus }: {
   wishes: Wish[]
   orbitNumbers: ReadonlyMap<string, number>
   events: WishEvent[]
@@ -17,6 +18,8 @@ export function QuestScreen({ wishes, slotsUsed, orbitNumbers, events, today, sl
   slotsUsed: number
   skin: WishSkin
   onCollect: (wish: Wish) => void
+  /** 기간 없는 위시 저금통 넣기·꺼내기 */
+  onStash: (wish: Wish, mode: PiggyMode) => void
   onAddOrbit: () => void
   onAddList: () => void
   onEdit: (wish: Wish) => void
@@ -119,16 +122,37 @@ export function QuestScreen({ wishes, slotsUsed, orbitNumbers, events, today, sl
         </header>
 
         {listWishes.length ? (
-          <ul className="plain-wish-list">
-            {listWishes.map((wish) => (
-              <li key={wish.id}>
-                <button onClick={() => onEdit(wish)}>
-                  <span><strong>{wish.name}</strong><small>목표 금액</small></span>
-                  <b>{money(wish.targetAmount)}원</b>
-                  <ChevronRight size={17} />
-                </button>
-              </li>
-            ))}
+          <ul className="piggy-list">
+            {listWishes.map((wish) => {
+              const progress = progressOf(wish)
+              return (
+                <li key={wish.id} className={`piggy-row state-${wish.status}`}>
+                  <div className="piggy-head">
+                    <strong>{wish.name}</strong>
+                    <button className="quest-edit" onClick={() => onEdit(wish)} aria-label={`${wish.name} 수정하기`}><span aria-hidden="true">✎</span></button>
+                  </div>
+                  <PixelBar ratio={progress / 100} segments={12} />
+                  <p className="quest-numbers">
+                    <strong>{money(wish.savedAmount)}</strong>
+                    <span>/ {money(wish.targetAmount)}원</span>
+                    <em>{progress}%</em>
+                  </p>
+                  <div className="quest-actions">
+                    {wish.status === 'active' ? (
+                      <>
+                        <button className="primary-button" onClick={() => onStash(wish, 'in')}>넣기</button>
+                        {wish.savedAmount > 0 && <button className="secondary-button" onClick={() => onStash(wish, 'out')}>꺼내기</button>}
+                      </>
+                    ) : (
+                      <>
+                        <button className="primary-button" onClick={() => onResolve(wish)}><WalletCards size={17} /> 다음 선택하기</button>
+                        <button className="secondary-button" onClick={() => onStash(wish, 'out')}>꺼내기</button>
+                      </>
+                    )}
+                  </div>
+                </li>
+              )
+            })}
           </ul>
         ) : (
           <button className="empty-wish-list" onClick={onAddList}>

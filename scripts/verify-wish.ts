@@ -33,6 +33,7 @@ import {
   pendingUnits,
   slotCount,
   streak,
+  streakBlockEnds,
   sumXp,
   totalXp,
 } from '../packages/wish-core/src/xp.ts'
@@ -208,6 +209,24 @@ const claim = (date: string, missionId: string): Claim => ({
   assert.equal(lifetimeDeposit(transfer), 0)
   assert.equal(dayStatus(wish({ id: 'w2', savedAmount: 30_000 }), transfer, '2026-09-20'), 'none')
   assert.equal(missionUnits([wish({ id: 'w2', savedAmount: 30_000 })], transfer).length, 0)
+
+  // 기간 없는 위시 저금통(piggy). 실제 돈이라 월 저금·평생 누적에는 들어가지만
+  // 하루 몫 미션·저금한 날·연속 기록에는 안 잡힌다
+  const piggyDays = Array.from({ length: 8 }, (_, index) =>
+    deposit(`2026-09-${String(index + 1).padStart(2, '0')}`, 1_000, { wishId: 'p1', source: 'piggy' }))
+  const piggyWish = wish({ id: 'p1', targetDate: null, savedAmount: 8_000 })
+  assert.equal(monthlyDeposit(piggyDays, '2026-09'), 8_000)
+  assert.equal(lifetimeDeposit(piggyDays), 8_000)
+  assert.equal(keptDays(piggyDays, 'p1'), 0)
+  assert.equal(missionUnits([piggyWish], piggyDays).length, 0)
+  assert.deepEqual(streak(piggyDays, '2026-09-08'), { current: 0, best: 0 })
+  assert.equal(streakBlockEnds(piggyDays).length, 0)
+  assert.equal(bonusXp([piggyWish], piggyDays), XP.firstWish)
+  assert.equal(observerStats([piggyWish], piggyDays, '2026-09-08').keptDays, 0)
+  assert.equal(observerStats([piggyWish], piggyDays, '2026-09-08').lifetimeDeposit, 8_000)
+  // 나중에 궤도에 올려도 지난 저금통 납입에서 XP가 소급해 생기지 않는다
+  const scheduled = { ...piggyWish, targetDate: '2026-10-31' }
+  assert.equal(missionUnits([scheduled], piggyDays).length, 0)
 
   // 08-28, 09-02 두 날. 같은 날 두 번 넣은 것은 하루로 센다
   assert.equal(keptDays(events, 'w1'), 2)

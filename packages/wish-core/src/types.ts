@@ -34,8 +34,11 @@ export interface WishEvent {
   amount?: number
   date: string
   createdAt: number
-  /** deposit 전용. 남은 예산 넘기기(30 XP)와 평범한 저금을 가른다 */
-  source?: 'manual' | 'carryover' | 'transfer'
+  /**
+   * deposit 전용. 남은 예산 넘기기(30 XP)와 평범한 저금을 가른다.
+   * `piggy`는 기간 없는 위시 저금통 — 어떤 미션·연속에도 안 들어간다
+   */
+  source?: 'manual' | 'carryover' | 'transfer' | 'piggy'
   /** purchase 전용. Orbit 거래와의 연결 */
   transactionId?: string
   /** cancel 전용. 모은 돈을 옮긴 대상 위시 */

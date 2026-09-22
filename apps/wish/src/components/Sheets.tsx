@@ -104,6 +104,94 @@ export function CollectSheet({ wishName, dailyShare, availableAmount, onClose, o
   )
 }
 
+export type PiggyMode = 'in' | 'out'
+
+/**
+ * 기간 없는 위시 저금통. 넣기·꺼내기가 같은 시트다.
+ *
+ * 하루 몫이 없어 XP 줄도 「쉬어가기」도 없다 — 저금통 납입은 어떤 미션에도 안 잡힌다
+ * (`source: 'piggy'`). 넣기는 남은 자유비용과 남은 자리 중 작은 쪽까지, 꺼내기는
+ * 모은 금액까지다. 꺼낸 돈은 이번 달 자유비용으로 돌아간다.
+ */
+export function PiggySheet({ wish, mode, availableAmount, onClose, onSubmit }: {
+  wish: Wish
+  mode: PiggyMode
+  availableAmount: number
+  onClose: () => void
+  onSubmit: (amount: number) => Promise<void>
+}) {
+  useSheetViewport()
+  const room = Math.max(0, wish.targetAmount - wish.savedAmount)
+  const max = mode === 'in' ? Math.max(0, Math.min(availableAmount, room)) : wish.savedAmount
+  const [amount, setAmount] = useState(() => Math.min(max, 10_000))
+  const [saving, setSaving] = useState(false)
+  const step = 1_000
+  const clamp = (value: number) => Math.max(0, Math.min(max, value))
+  const label = mode === 'out' ? `${money(amount)}원 꺼내기`
+    : room <= 0 ? '남은 자리 없음'
+    : max <= 0 ? '남은 자유비용 없음'
+    : `${money(amount)}원 넣기`
+
+  const submit = async () => {
+    if (saving || amount <= 0 || amount > max) return
+    setSaving(true)
+    try { await onSubmit(amount) } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="sheet-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <section className="wl-sheet" role="dialog" aria-modal="true" aria-labelledby="piggy-title">
+        <div className="sheet-handle" />
+        <header className="sheet-header">
+          <div>
+            <span className="pixel-label">{mode === 'in' ? 'WISH LIST · SAVE' : 'WISH LIST · TAKE OUT'}</span>
+            <h2 id="piggy-title">{wish.name}</h2>
+          </div>
+          <button className="icon-button" onClick={onClose} aria-label="닫기"><X size={20} /></button>
+        </header>
+
+        <div className="amount-stepper">
+          <button onClick={() => setAmount(clamp(amount - step))} aria-label="천 원 줄이기"><Minus size={19} /></button>
+          <div className="amount-input-wrap">
+            <input
+              className="amount-input"
+              inputMode="numeric"
+              aria-label={mode === 'in' ? '넣을 금액' : '꺼낼 금액'}
+              value={money(amount)}
+              onFocus={(event) => event.currentTarget.select()}
+              onChange={(event) => {
+                const digits = event.target.value.replace(/[^0-9]/g, '')
+                setAmount(digits ? clamp(Number(digits)) : 0)
+              }}
+            />
+            <span>원</span>
+          </div>
+          <button onClick={() => setAmount(clamp(amount + step))} aria-label="천 원 늘리기"><Plus size={19} /></button>
+        </div>
+
+        <input
+          className="amount-range"
+          type="range"
+          min="0"
+          max={Math.max(max, 1)}
+          step="1000"
+          value={amount}
+          disabled={max <= 0}
+          onChange={(event) => setAmount(clamp(Number(event.target.value)))}
+        />
+        <div className="amount-meta">
+          <span>모은 금액 {money(wish.savedAmount)} / {money(wish.targetAmount)}원</span>
+          <span>{mode === 'in' ? `남은 자유비용 ${money(availableAmount)}원` : '자유비용으로 회수'}</span>
+        </div>
+
+        <button className="primary-button full" disabled={saving || amount <= 0 || amount > max} onClick={submit}>
+          {label}
+        </button>
+      </section>
+    </div>
+  )
+}
+
 /**
  * 어제 남은 예산을 어느 궤도에 넣을지 고르는 시트.
  *
@@ -178,7 +266,7 @@ export function CarryoverSheet({ amount, rows, wishes, onClose, onDeposit }: {
         </section>
 
         <button className="primary-button full" disabled={!chosen || saving} onClick={submit}>
-          {chosen ? `${money(chosen.accepted)}원 저금하기` : '궤도 선택'}
+          {chosen ? `${money(chosen.accepted)}원 저금하기` : '위시 선택'}
         </button>
 
         <p className="mission-gain">
@@ -241,7 +329,8 @@ export function ResolveWishSheet({ wish, today, categories, transferTargets, onC
               {!unlocked && <small className="resolve-lock">등록일로부터 3일 동안 구매가 잠긴다 · {unlockDate} 해제</small>}
             </section>
 
-            {wish.status === 'ready' && (
+            {/* 기다리기는 하루마다 XP 미션이 붙는다. 기간 없는 위시는 보상 없는 저금통이라 뺀다 */}
+            {wish.status === 'ready' && wish.targetDate && (
               <button className="resolve-choice" disabled={saving} onClick={() => run(onWait)}>
                 <Clock3 size={19} /><span><strong>더 기다리기</strong><small>저금은 멈추고, 기다린 하루마다 미션을 이어간다.</small></span>
               </button>

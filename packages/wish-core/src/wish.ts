@@ -105,11 +105,23 @@ export function dayStatus(wish: Wish, events: WishEvent[], today: string): DaySt
   return share > 0 && net < share ? 'partial' : 'full'
 }
 
+/**
+ * 저금 습관으로 치는 납입. 저금한 날 수·연속 기록이 같은 조건을 본다.
+ * 다른 위시에서 옮긴 돈(`transfer`)은 새 행동이 아니고, 기간 없는 위시 저금통(`piggy`)은
+ * 보상 없이 돈만 쌓는 곳이다. `targetDate`로 가르지 않는 이유 — XP는 파생값이라
+ * 나중에 궤도에 올리는 순간 지난 저금통 납입이 소급해 보상을 받는다.
+ */
+export function countsAsHabit(event: WishEvent) {
+  return event.type === 'deposit'
+    && event.source !== 'transfer' && event.source !== 'piggy'
+    && (event.amount ?? 0) > 0
+}
+
 /** 저금한 날 수. 하루에 여러 번 넣어도 하루로 센다 */
 export function keptDays(events: WishEvent[], wishId: string) {
   const dates = new Set<string>()
   for (const event of eventsOf(events, wishId)) {
-    if (event.type === 'deposit' && event.source !== 'transfer' && (event.amount ?? 0) > 0) dates.add(event.date)
+    if (countsAsHabit(event)) dates.add(event.date)
   }
   return dates.size
 }

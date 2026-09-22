@@ -49,12 +49,13 @@ import {
   skipDay,
   unequipItem,
   updateWish,
+  withdraw,
 } from '@orbit/wish-bridge'
 import { createWishPurchaseTransaction } from '@orbit/bridge'
 import { PixelPlanet } from './components/PixelPlanet'
 import { PixelBar } from './components/PixelBar'
 import { RewardOverlay, type Reward } from './components/RewardOverlay'
-import { CarryoverSheet, CollectSheet, ResolveWishSheet, WishSheet } from './components/Sheets'
+import { CarryoverSheet, CollectSheet, PiggySheet, ResolveWishSheet, WishSheet, type PiggyMode } from './components/Sheets'
 import { HubScreen } from './screens/HubScreen'
 import { QuestScreen } from './screens/QuestScreen'
 import { CodexScreen } from './screens/CodexScreen'
@@ -155,6 +156,8 @@ export default function App() {
   const carryoverRows = useMemo(() => budget?.snapshot?.carryoverRows ?? [], [budget])
   const [collecting, setCollecting] = useState<Wish | null>(null)
   const [carrying, setCarrying] = useState(false)
+  // 기간 없는 위시 저금통 시트. 넣기·꺼내기가 같은 시트다
+  const [piggy, setPiggy] = useState<{ wish: Wish; mode: PiggyMode } | null>(null)
   const [adding, setAdding] = useState<'orbit' | 'list' | null>(null)
   const [editing, setEditing] = useState<Wish | null>(null)
   const [resolving, setResolving] = useState<Wish | null>(null)
@@ -454,6 +457,20 @@ export default function App() {
     setToast(`남은 예산 ${money(amount)}원을 ${target ? target.name : '궤도'}에 저금`)
   }
 
+  /**
+   * 기간 없는 위시 저금통. 넣기는 `piggy` 출처로 남겨 어떤 미션·연속에도 안 잡히게 하고,
+   * 꺼내기는 회수라 이번 달 자유비용으로 돌아간다. 둘 다 Orbit 숫자가 바뀌어 다시 읽는다
+   */
+  async function stash(amount: number) {
+    if (!piggy) return
+    const { wish, mode } = piggy
+    setPiggy(null)
+    if (mode === 'in') await deposit(wish.id, amount, today, 'piggy')
+    else await withdraw(wish.id, amount, today)
+    refreshBudget()
+    setToast(mode === 'in' ? `저금통에 ${money(amount)}원` : `${money(amount)}원 자유비용으로 회수`)
+  }
+
   /** 미션 하나 수령 */
   async function claimOne(mission: Mission) {
     const unit = pending.find((item) => item.date === mission.date && item.missionId === mission.id)
@@ -585,6 +602,7 @@ export default function App() {
             slots={slots}
             skin={skin}
             onCollect={(wish) => setCollecting(wish)}
+            onStash={(wish, mode) => setPiggy({ wish, mode })}
             onAddOrbit={() => setAdding('orbit')}
             onAddList={() => setAdding('list')}
             onEdit={(wish) => setEditing(wish)}
@@ -646,11 +664,20 @@ export default function App() {
           onSkip={skipToday}
         />
       )}
+      {piggy && (
+        <PiggySheet
+          wish={piggy.wish}
+          mode={piggy.mode}
+          availableAmount={freeAmount}
+          onClose={() => setPiggy(null)}
+          onSubmit={stash}
+        />
+      )}
       {carrying && (
         <CarryoverSheet
           amount={carryover}
           rows={carryoverRows}
-          wishes={orbitWishes}
+          wishes={openWishes}
           onClose={() => setCarrying(false)}
           onDeposit={carryOver}
         />
