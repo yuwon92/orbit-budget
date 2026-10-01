@@ -313,7 +313,7 @@ export function CategoryForm({ category, close, onSaved }: {
           <button className="fixed-toggle" onClick={() => setIsFixed(!isFixed)}>
             <div>
               <strong>고정비</strong>
-              <small>매달 나가는 지출이에요. 자유 예산 계산에서 미리 빼둬요.</small>
+              <small>소비 분석에서 고정비로 집계</small>
             </div>
             <i className={`toggle ${isFixed ? 'on' : ''}`}><b /></i>
           </button>

@@ -19,7 +19,7 @@ export interface Category {
   name: string // "식비", "교통비", "카페"
   monthlyBudget: number // 월 예산. 0이면 예산 미설정
   color: string // 화면 표시용 hex
-  isFixed: boolean // 고정비 여부. true면 자유 예산에서 제외
+  isFixed: boolean // 고정비 표시. 소비 분석의 고정비 집계에만 쓴다. 자유비용 계산과는 무관
   sortOrder: number // 목록 표시 순서
   budgetRule?: BudgetRule // 예산 계산 방법. 없으면 직접 입력으로 본다
   hiddenOnHome?: boolean // 홈 히어로의 예산 행만 감춤. 계산에는 계속 포함된다
