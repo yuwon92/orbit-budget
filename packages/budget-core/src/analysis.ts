@@ -1,4 +1,4 @@
-import { getDaysInMonth } from 'date-fns'
+import { format, getDaysInMonth, subMonths } from 'date-fns'
 import { budgetFromRule, categoryBudgetPeriods, recurringSumForCategory } from './budget.ts'
 import type { Category, RecurringRule, Transaction } from './types'
 
@@ -215,6 +215,35 @@ export function topMemos(transactions: Transaction[], month: string, limit = 5):
     .filter((row) => row.count >= 2)
     .sort((a, b) => b.count - a.count || b.total - a.total)
     .slice(0, limit)
+}
+
+/**
+ * 지출 입력의 메모 추천. 고른 카테고리에서 최근 두 달 동안 많이 쓴 메모 순, 횟수가 같으면 최근에 쓴 순.
+ * 반복 거래가 만든 지출은 뺀다 — 규칙 이름이 매달 쌓여 추천을 차지한다.
+ * 수정 중인 거래(excludeId)는 자기 메모를 자기에게 추천하지 않게 뺀다.
+ */
+export function memoSuggestions(
+  transactions: Transaction[],
+  categoryId: string,
+  today: string,
+  { limit = 3, excludeId }: { limit?: number; excludeId?: string } = {},
+): string[] {
+  const from = format(subMonths(new Date(`${today}T00:00:00`), 2), 'yyyy-MM-dd')
+  const byMemo = new Map<string, { count: number; last: string }>()
+  for (const t of transactions) {
+    if (t.type !== 'expense' || t.categoryId !== categoryId || t.isPlanned || t.recurringRuleId) continue
+    if (t.id === excludeId || t.date < from || t.date > today) continue
+    const memo = t.memo.trim()
+    if (!memo) continue
+    const row = byMemo.get(memo) ?? { count: 0, last: '' }
+    row.count++
+    if (t.date > row.last) row.last = t.date
+    byMemo.set(memo, row)
+  }
+  return [...byMemo.entries()]
+    .sort(([, a], [, b]) => b.count - a.count || b.last.localeCompare(a.last))
+    .slice(0, limit)
+    .map(([memo]) => memo)
 }
 
 /** 고정비는 고정비로 표시한 카테고리의 지출이거나 반복 거래가 만든 지출. 나머지는 변동비 */

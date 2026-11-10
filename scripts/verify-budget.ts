@@ -33,6 +33,7 @@ import {
   categorySpending,
   elapsedDays,
   fixedVsVariable,
+  memoSuggestions,
   monthSummary,
   spendingChange,
   topExpenses,
@@ -732,6 +733,37 @@ console.log('위시 구매 거래 자유비용 이중 차감 방지 통과')
   assert.equal(split.fixed, 9_900)
   assert.equal(split.fixed + split.variable, summary.spent)
   console.log('월 분석 통과')
+}
+
+{
+  // 지출 메모 추천 — 고른 카테고리 · 최근 두 달 · 횟수순, 같으면 최근순 · 3개
+  const m = (date: string, memo: string, extra: Partial<Transaction> = {}): Transaction =>
+    ({ ...tx(date, 4_500, 'expense', 'cafe', memo), ...extra })
+  const rows = [
+    m('2026-11-01', '라떼'),
+    m('2026-11-08', '라떼'),
+    m('2026-10-02', ' 아메리카노 '), // 앞뒤 공백은 같은 메모
+    m('2026-11-09', '아메리카노'),
+    m('2026-11-05', '스콘'), // 1회 — 휘낭시에보다 최근
+    m('2026-10-20', '휘낭시에'),
+    m('2026-11-07', '녹차'),
+    m('2026-09-09', '녹차'), // 두 달 밖(09-10부터)
+    m('2026-09-10', '쿠키'), // 경계 당일은 포함, 1회 중 가장 오래돼 맨 뒤
+    m('2026-11-03', '빙수', { type: 'income' }),
+    m('2026-11-03', '빙수', { categoryId: 'food' }),
+    m('2026-11-03', '빙수', { isPlanned: true }),
+    m('2026-11-03', '빙수', { recurringRuleId: 'r1' }),
+    m('2026-11-20', '빙수'), // 오늘 이후
+    m('2026-11-04', '   '),
+  ]
+  // 아메리카노·라떼 2회(아메리카노가 최근) → 1회 중 가장 최근인 녹차
+  assert.deepEqual(memoSuggestions(rows, 'cafe', '2026-11-10'), ['아메리카노', '라떼', '녹차'])
+  assert.deepEqual(memoSuggestions(rows, 'cafe', '2026-11-10', { limit: 10 }), ['아메리카노', '라떼', '녹차', '스콘', '휘낭시에', '쿠키'])
+  // 수정 중인 거래는 세지 않는다 — 아메리카노가 1회로 내려간다
+  const editing = rows.find((t) => t.date === '2026-11-09')!
+  assert.deepEqual(memoSuggestions(rows, 'cafe', '2026-11-10', { excludeId: editing.id }), ['라떼', '녹차', '스콘'])
+  assert.deepEqual(memoSuggestions(rows, 'subs', '2026-11-10'), [])
+  console.log('메모 추천 통과')
 }
 
 console.log('\n모든 검산 통과')

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { CalendarDays, Pencil, Plus, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { memoSuggestions } from '../lib/analysis'
 import { reserveSpentAmount } from '../lib/budget'
 import { db } from '../lib/db'
 import { money } from '../lib/format'
@@ -44,6 +45,7 @@ export function ExpenseSheet({
   const [memo, setMemo] = useState(editing?.memo ?? '')
   const [fromReserve, setFromReserve] = useState(editing?.fromReserve ?? false)
   const [saving, setSaving] = useState(false)
+  const [memoFocused, setMemoFocused] = useState(false)
   const amountRef = useSheetFocus<HTMLInputElement>()
   useSheetViewport()
 
@@ -69,6 +71,18 @@ export function ExpenseSheet({
   // 편집 중 고른 카테고리를 지웠으면 선택도 풀린다 — 없는 카테고리로 저장하지 않게
   const selected = categoryList && selectedId && !categoryList.some((c) => c.id === selectedId) ? null : selectedId
   const formatted = amount ? money(Number(amount)) : '0'
+
+  // 메모 추천 — 카테고리를 고른 뒤에만. 입력 중이면 그 글자를 포함하는 것만 남긴다
+  const categoryTx = useLiveQuery(
+    () => selected ? db.transactions.where('categoryId').equals(selected).toArray() : [],
+    [selected],
+  )
+  const typedMemo = memo.trim()
+  const suggestions = selected && categoryTx
+    ? memoSuggestions(categoryTx, selected, format(new Date(), 'yyyy-MM-dd'), { excludeId: editing?.id })
+      .filter((m) => m !== typedMemo && m.includes(typedMemo))
+    : []
+  const showSuggestions = type === 'expense' && !usingReserve && memoFocused && suggestions.length > 0
   const canSave = Number(amount) > 0
 
   const save = async () => {
@@ -168,8 +182,20 @@ export function ExpenseSheet({
             <input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
           </label>
           <label>
-            <input placeholder="메모 추가 (선택)" value={memo} onChange={(e) => setMemo(e.target.value)} />
+            <input
+              placeholder="메모 추가 (선택)"
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              onFocus={() => setMemoFocused(true)}
+              onBlur={() => setMemoFocused(false)}
+            />
           </label>
+          {showSuggestions && <div className="memo-suggestions">
+            {suggestions.map((m) => (
+              // 누르는 순간 메모칸이 포커스를 잃어 줄이 사라지지 않게 mousedown 기본 동작을 막는다
+              <button key={m} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setMemo(m)}>{m}</button>
+            ))}
+          </div>}
         </div>
         {editing?.recurringRuleId && <p className="field-note sheet-note">
           반복 거래에서 자동으로 만들어진 내역이에요. 여기서 고친 값은 이 달에만 적용되고,

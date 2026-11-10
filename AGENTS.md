@@ -140,7 +140,7 @@ Wish는 Orbit 예산을 `getOrbitSnapshot()`으로 읽고, 구매 확정 때만 
 
 | 파일 | 역할 |
 |---|---|
-| `ExpenseSheet.tsx` | 거래 추가/수정 바텀시트. `transaction`=수정, `preset`=카테고리·금액 프리필, `initialDate`=날짜 지정. `예비비에서 사용` 토글 — 고른 날짜가 속한 달의 예비비 기준, 0인 달은 잠김(숨기지 않음), 켜면 카테고리 없이 저장 |
+| `ExpenseSheet.tsx` | 거래 추가/수정 바텀시트. `transaction`=수정, `preset`=카테고리·금액 프리필, `initialDate`=날짜 지정. `예비비에서 사용` 토글 — 고른 날짜가 속한 달의 예비비 기준, 0인 달은 잠김(숨기지 않음), 켜면 카테고리 없이 저장. 메모 추천 — 카테고리를 고른 뒤 메모칸 포커스 시, 그 카테고리의 최근 두 달 메모 3개(`memoSuggestions`, 횟수순·같으면 최근순, 반복 거래·수정 중인 거래 제외) |
 | `CategorySettings.tsx` (381줄) | 카테고리 목록 + 폼(예산 계산 도구 UI 포함) |
 | `RecurringSettings.tsx` | 반복 거래 목록 + 폼 |
 | `ReserveSheet.tsx` | 월 예비비 입력 |
