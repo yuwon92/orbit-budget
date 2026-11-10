@@ -60,17 +60,17 @@ export function monthSummary(transactions: Transaction[], month: string, today: 
   }
 }
 
-/** 카테고리 줄의 id. 카테고리 외에 예비비 지출과 미분류(지운 카테고리 포함)가 따로 한 줄씩이다 */
-export type BreakdownKey = string | 'reserve' | 'none'
+/** 카테고리 줄의 id. 카테고리 외에 예비비 지출·위시 구매·미분류(지운 카테고리 포함)가 따로 한 줄씩이다 */
+export type BreakdownKey = string | 'reserve' | 'wish' | 'none'
 
 export interface CategorySpending {
   key: BreakdownKey
-  /** 실제 카테고리면 그 카테고리. 예비비·미분류는 null */
+  /** 실제 카테고리면 그 카테고리. 예비비·위시 구매·미분류는 null */
   category: Category | null
   spent: number
   /** 그 달 전체 지출에서 차지하는 비율(%). 반올림이라 합이 100이 아닐 수 있다 */
   share: number
-  /** 그 달 예산. 예산 미설정이거나 예비비·미분류면 null */
+  /** 그 달 예산. 예산 미설정이거나 예비비·위시 구매·미분류면 null */
   budget: number | null
   /**
    * 직접 입력 예산이라 그 달 값이 아니라 지금 값인지.
@@ -92,6 +92,8 @@ function budgetForMonth(category: Category, month: string, rules: RecurringRule[
 /**
  * 카테고리별 실제 지출. 쓴 돈이 있는 줄만, 많이 쓴 순서로 준다.
  * 예비비에서 쓴 지출은 카테고리와 무관하게 예비비 줄로, 없는 카테고리는 미분류로 모은다.
+ * 위시 구매도 카테고리와 무관하게 위시 구매 줄로 — 저금으로 모은 돈이라 카테고리 「예산 대비」에 넣으면
+ * 큰 금액 하나로 초과처럼 보인다(홈 카드의 spentByCategory와 같은 기준).
  */
 export function categorySpending(
   transactions: Transaction[],
@@ -106,6 +108,7 @@ export function categorySpending(
   for (const t of expenses) {
     const key: BreakdownKey = t.fromReserve
       ? 'reserve'
+      : t.excludedFromFreeAmount ? 'wish'
       : t.categoryId && categoriesById.has(t.categoryId) ? t.categoryId : 'none'
     spentByKey.set(key, (spentByKey.get(key) ?? 0) + t.amount)
   }
@@ -256,7 +259,8 @@ export function fixedVsVariable(
   let fixed = 0
   let variable = 0
   for (const t of actualExpenses(transactions, month)) {
-    if (t.recurringRuleId || (t.categoryId && fixedIds.has(t.categoryId))) fixed += t.amount
+    // 위시 구매는 통계 카테고리가 고정비여도 한 번 사는 물건이라 변동비
+    if (!t.excludedFromFreeAmount && (t.recurringRuleId || (t.categoryId && fixedIds.has(t.categoryId)))) fixed += t.amount
     else variable += t.amount
   }
   return { fixed, variable }

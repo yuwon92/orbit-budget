@@ -175,7 +175,7 @@ BudgetRule = { kind:'manual' }
 
 - `interval`이 없으면 월 단위(예전 규칙). 주 단위는 `weekdays`(여러 요일 가능)를 쓰고 `dayOfMonth`는 안 씀(주기를 되돌릴 때를 위해 값은 남겨둠)
 - `isPlanned`는 저장 시 `date > 오늘`로 자동 결정. `materializeRecurring`이 앱을 열 때 오늘 이하 날짜를 전부 `false`로 확정
-- `excludedFromFreeAmount`는 위시 구매 거래 전용. 거래·카테고리 통계에는 포함하지만 `monthlyFreeAmount`에서는 완전히 제외
+- `excludedFromFreeAmount`는 위시 구매 거래 전용. 거래 목록·소비 분석 총지출에는 포함하지만(소비 분석 카테고리별은 카테고리와 무관하게 `위시 구매` 한 줄, 고정비·변동비는 변동비) `monthlyFreeAmount`·카테고리 카드 진행률(`spentByCategory`)·히어로 기간 몫(`buildBreakdown`)에서는 완전히 제외 — Wish에서 고른 통계 카테고리가 붙어 있어도 저금으로 모은 돈이라 카테고리 예산을 쓰지 않는다
 - `fromReserve`는 예비비에서 꺼내 쓴 지출. 화면은 카테고리 없이 저장한다(카드 진행률에 안 잡히게). 계산은 카테고리가 붙어 있어도 카테고리 예산·예산 밖 차감에서 빼고 예비비 안에서 따로 정산한다. 남은 예비비는 저장하지 않고 `reserveSpentAmount`로 매번 센다 — 거래를 고치거나 지우면 예비비가 저절로 돌아온다
 - `hiddenOnHome`은 히어로 예산 행 **표시만** 숨김. 계산에는 그대로 들어감
 - `isFixed`는 목록의 `고정비` 칩과 소비 분석의 고정비 집계(`fixedVsVariable`)에만 쓴다. **자유비용 계산에서 안 씀** — 표시 여부와 상관없이 모든 카테고리 월 예산이 똑같이 빠진다. 반복 거래가 만든 지출은 표시가 없어도 고정비로 집계

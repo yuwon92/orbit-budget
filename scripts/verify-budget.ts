@@ -482,12 +482,16 @@ const wishPurchase = {
   excludedFromFreeAmount: true,
 }
 assert.equal(monthlyFreeAmount([...transactions, wishPurchase], categories, today, 0, true, 40_000), 516_490)
-// 카테고리를 지정해도 자유비용 계산에서는 제외한다. spentByCategory 통계에는 포함된다.
+// 통계 카테고리를 지정해도 자유비용 계산·카테고리 예산 진행률·히어로 기간 몫에서는 제외한다.
 const categorizedWishPurchase = { ...wishPurchase, categoryId: 'food' }
 assert.equal(monthlyFreeAmount([...transactions, categorizedWishPurchase], categories, today, 0, true, 40_000), 516_490)
-assert.equal(
-  spentByCategory([...transactions, categorizedWishPurchase], month).get('food'),
-  (spentByCategory(transactions, month).get('food') ?? 0) + wishPurchase.amount,
+assert.deepEqual(
+  spentByCategory([...transactions, categorizedWishPurchase], month),
+  spentByCategory(transactions, month),
+)
+assert.deepEqual(
+  buildBreakdown(homeCats, [...weekSpend, { ...categorizedWishPurchase, date: WED }], WED),
+  buildBreakdown(homeCats, weekSpend, WED),
 )
 console.log('위시 구매 거래 자유비용 이중 차감 방지 통과')
 
@@ -696,19 +700,22 @@ console.log('위시 구매 거래 자유비용 이중 차감 방지 통과')
 
   const rows = categorySpending(sept, aCats, '2026-09')
   const byKey = new Map(rows.map((row) => [row.key, row]))
-  assert.equal(byKey.get('food')?.spent, 80_000) // 위시 구매 포함, 예비비·예정 제외
+  assert.equal(byKey.get('food')?.spent, 30_000) // 위시 구매·예비비·예정 제외
   assert.equal(byKey.get('reserve')?.spent, 8_000)
+  assert.equal(byKey.get('wish')?.spent, 50_000) // 통계 카테고리가 붙어 있어도 위시 구매 줄로
+  assert.equal(byKey.get('wish')?.budget, null)
   assert.equal(byKey.get('none')?.spent, 12_000)
   assert.equal(byKey.get('cafe')?.budget, 45_000)
   assert.equal(byKey.get('cafe')?.budgetIsCurrent, false)
   assert.equal(byKey.get('subs')?.budgetIsCurrent, true)
   assert.equal(byKey.get('food')?.budget, null)
-  assert.equal(rows[0].key, 'food') // 많이 쓴 순서
+  assert.deepEqual(rows.map((row) => row.key), ['wish', 'food', 'cafe', 'none', 'subs', 'reserve']) // 많이 쓴 순서
   // 2월은 28일 → 카페 계산식 예산이 5,000 × round(8) = 40,000
   assert.equal(categorySpending([at('2026-02-03', 1_000, 'cafe')], aCats, '2026-02')[0].budget, 40_000)
 
   const change = spendingChange(rows, categorySpending([at('2026-08-10', 20_000, 'food')], aCats, '2026-08'))
-  assert.equal(change.get('food'), 60_000)
+  assert.equal(change.get('food'), 10_000)
+  assert.equal(change.get('wish'), 50_000)
   assert.equal(change.get('cafe'), 24_000)
 
   // 오늘 9/13은 둘째 주 진행 중 → 끝난 주는 9/1~9/6 하나
@@ -732,6 +739,11 @@ console.log('위시 구매 거래 자유비용 이중 차감 방지 통과')
   const split = fixedVsVariable(sept, aCats, '2026-09')
   assert.equal(split.fixed, 9_900)
   assert.equal(split.fixed + split.variable, summary.spent)
+  // 고정비 카테고리를 붙인 위시 구매도 변동비
+  assert.deepEqual(
+    fixedVsVariable([at('2026-09-10', 40_000, 'subs', '위시', { excludedFromFreeAmount: true })], aCats, '2026-09'),
+    { fixed: 0, variable: 40_000 },
+  )
   console.log('월 분석 통과')
 }
 

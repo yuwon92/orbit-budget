@@ -10,6 +10,12 @@ import { CategoryPlanet } from './CategoryPlanet'
 /** 예비비·미분류 줄 이름과 색. 카테고리 줄은 카테고리 것을 쓴다 */
 export const RESERVE_LABEL = { name: '예비비', color: '#b7a7f8' }
 export const UNCATEGORIZED_LABEL = { name: '미분류', color: '#9aa3b4' }
+export const WISH_LABEL = { name: '위시 구매', color: '#f2c96b' }
+
+/** 소비 분석 줄의 이름·색. 카테고리가 아닌 줄(예비비·위시 구매·미분류)은 고정 라벨 */
+export function breakdownLabel(key: string | undefined, category: { name: string; color: string } | null | undefined) {
+  return category ?? (key === 'reserve' ? RESERVE_LABEL : key === 'wish' ? WISH_LABEL : UNCATEGORIZED_LABEL)
+}
 
 /**
  * 달력 밑 그 달 소비 한 장 요약. 보고 있는 달의 거래는 달력이 이미 읽어 둔 것을 받고,
@@ -28,7 +34,7 @@ export function MonthSummaryCard({ month, today, transactions, categories, onOpe
   const top = categorySpending(transactions, categories, month)[0]
   // 지난달에 기록이 하나도 없으면(첫 달 등) 비교할 기준이 없다
   const change = prevTx && prevTx.length > 0 ? summary.spent - monthSummary(prevTx, prevMonth, today).spent : null
-  const label = top?.category ?? (top?.key === 'reserve' ? RESERVE_LABEL : UNCATEGORIZED_LABEL)
+  const label = breakdownLabel(top?.key, top?.category)
 
   const body = <>
     <div className="month-summary-head">

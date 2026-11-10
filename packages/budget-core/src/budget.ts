@@ -337,11 +337,15 @@ export function spentOnDate(transactions: Transaction[], date: string): number {
     .reduce((sum, t) => sum + t.amount, 0)
 }
 
-/** 이번 달 카테고리별 지출 합계 (categoryId -> 금액) */
+/**
+ * 이번 달 카테고리별 지출 합계 (categoryId -> 금액). 홈 카테고리 카드의 예산 진행률이 읽는다.
+ * 위시 구매는 저금으로 모은 돈이라 카테고리 예산에서 나간 게 아니다 — 통계 카테고리를 붙였어도
+ * 여기 넣으면 큰 금액 하나로 카드가 「초과」가 된다. 거래 목록·소비 분석에는 그대로 남는다.
+ */
 export function spentByCategory(transactions: Transaction[], month: string): Map<string, number> {
   const map = new Map<string, number>()
   for (const t of transactions) {
-    if (inMonth(t, month) && t.type === 'expense' && t.categoryId) {
+    if (inMonth(t, month) && t.type === 'expense' && t.categoryId && !t.excludedFromFreeAmount) {
       map.set(t.categoryId, (map.get(t.categoryId) ?? 0) + t.amount)
     }
   }
@@ -594,6 +598,8 @@ export function buildBreakdown(
       .filter(
         (t) =>
           t.type === 'expense' &&
+          // 위시 구매는 카테고리 기간 예산을 쓰지 않는다(spentByCategory와 같은 기준)
+          !t.excludedFromFreeAmount &&
           t.categoryId === category.id &&
           t.date >= period.from &&
           t.date <= period.to,

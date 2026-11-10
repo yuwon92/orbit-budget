@@ -17,7 +17,7 @@ import { money } from '../lib/format'
 import { useCategories } from '../lib/hooks'
 import { monthlyWishDeposit } from '../lib/wish'
 import { CategoryPlanet } from './CategoryPlanet'
-import { RESERVE_LABEL, UNCATEGORIZED_LABEL } from './MonthSummaryCard'
+import { breakdownLabel } from './MonthSummaryCard'
 
 const shiftMonth = (month: string, delta: number) => format(addMonths(parseISO(`${month}-01`), delta), 'yyyy-MM')
 
@@ -28,7 +28,7 @@ function Change({ value, label }: { value: number; label?: string }) {
 }
 
 function rowLabel(row: CategorySpending) {
-  return row.category ?? (row.key === 'reserve' ? RESERVE_LABEL : UNCATEGORIZED_LABEL)
+  return breakdownLabel(row.key, row.category)
 }
 
 /** 달력 요약 카드에서 들어오는 월 분석 화면. 이번 달까지만 넘길 수 있다 */
@@ -155,11 +155,11 @@ export function MonthAnalysis({ initialMonth, today, back }: { initialMonth: str
           <div className="analysis-block-head"><h3>큰 지출</h3></div>
           {biggest.map((t) => {
             const cat = t.categoryId ? catMap.get(t.categoryId) : undefined
-            const category = t.fromReserve ? RESERVE_LABEL.name : cat?.name ?? UNCATEGORIZED_LABEL.name
+            const label = breakdownLabel(t.fromReserve ? 'reserve' : t.excludedFromFreeAmount ? 'wish' : 'none', cat && !t.fromReserve && !t.excludedFromFreeAmount ? cat : null)
             return <div className="analysis-list-row" key={t.id}>
               <span className="analysis-list-date">{format(parseISO(t.date), 'M/d')}</span>
-              <CategoryPlanet color={t.fromReserve ? RESERVE_LABEL.color : cat?.color ?? UNCATEGORIZED_LABEL.color}/>
-              <span className="analysis-list-name"><strong>{t.memo || category}</strong>{t.memo && <small>{category}</small>}</span>
+              <CategoryPlanet color={label.color}/>
+              <span className="analysis-list-name"><strong>{t.memo || label.name}</strong>{t.memo && <small>{label.name}</small>}</span>
               <strong>{money(t.amount)}원</strong>
             </div>
           })}
