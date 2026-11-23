@@ -342,6 +342,16 @@ assert.equal(monthlyFreeAmount([dailyIncome, spent9], [weeklyCafe], '2026-09-06'
 assert.equal(monthlyFreeAmount([dailyIncome, spent9], [weeklyCafe], '2026-09-07', 0), 56_000) // 다음 주 월요일에 1천원 이월
 assert.equal(buildBreakdown([weeklyCafe], [], '2026-09-28')[0].allowance, 5_000) // 9회=10k×4주+5k
 
+// 1일이 일요일인 달(2026-11): 하루짜리 첫 주가 한 주치를 가져가면 마지막 온전한 주가 모자란다.
+// 온전한 주 4개(2~8, 9~15, 16~22, 23~29)가 먼저 한 주치를 받고, 남는 돈만 자투리(1일·30일)로 간다.
+const novFood = homeCat('nov-food', 136_000, { kind: 'perUse', unitAmount: 8_000, freq: { mode: 'perWeek', timesPerWeek: 4 } })
+const novCafe = homeCat('nov-cafe', 20_000, { kind: 'perUse', unitAmount: 5_000, freq: { mode: 'perWeek', timesPerWeek: 1 } })
+assert.equal(buildBreakdown([novFood], [], '2026-11-24')[0].allowance, 32_000)
+assert.equal(buildBreakdown([novCafe], [], '2026-11-24')[0].allowance, 5_000)
+assert.equal(buildBreakdown([novFood], [], '2026-11-01')[0].allowance, 8_000)
+assert.equal(buildBreakdown([novCafe], [], '2026-11-01')[0].allowance, 0)
+assert.equal(buildBreakdown([novFood], [], '2026-11-30')[0].allowance, 0)
+
 const plannedOutside = { ...tx('2026-09-20', 10_000, 'expense', null, ''), isPlanned: true }
 assert.equal(monthlyFreeAmount([dailyIncome, plannedOutside], [], '2026-09-01', 0), 90_000)
 const plannedCategory = homeCat('planned', 20_000, { kind: 'manual' })

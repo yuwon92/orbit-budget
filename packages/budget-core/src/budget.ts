@@ -36,7 +36,8 @@ const dateInMonth = (month: string, day: number) => `${month}-${String(day).padS
 
 /**
  * 횟수·교통 카테고리의 월 예산을 실제 일/달력 주 기간에 배분한다.
- * 달을 걸치는 주는 월 경계에서 자르고, 앞 기간부터 채워 월 예산 총액을 절대 넘지 않는다.
+ * 달을 걸치는 주는 월 경계에서 자르고, 온전한 주에 한 주치를 먼저 준 뒤 남는 돈을
+ * 앞뒤 자투리 기간에 나눈다. 배분 총합은 월 예산을 절대 넘지 않는다.
  */
 export function categoryBudgetPeriods(category: Category, month: string): BudgetPeriod[] {
   const rule = category.budgetRule
@@ -59,16 +60,33 @@ export function categoryBudgetPeriods(category: Category, month: string): Budget
     return periods
   }
 
+  const { timesPerWeek } = rule.freq
+  const weekly = unit * timesPerWeek
+  const days: number[] = []
   for (let day = 1; day <= lastDay;) {
     const from = dateInMonth(month, day)
     // 주는 월요일에 시작해 일요일에 끝난다 (일요일이면 그 날로 끝).
     const daysUntilSunday = (7 - weekdayOf(from)) % 7
     const endDay = Math.min(day + daysUntilSunday, lastDay)
-    const allowance = Math.min(unit * rule.freq.timesPerWeek, remainingBudget)
-    periods.push({ scope: 'week', from, to: dateInMonth(month, endDay), allowance })
-    remainingBudget -= allowance
+    periods.push({ scope: 'week', from, to: dateInMonth(month, endDay), allowance: 0 })
+    days.push(endDay - day + 1)
     day = endDay + 1
   }
+
+  // 온전한 주(월~일 7일)에 먼저 한 주치를 준다. 앞에서부터 채우면 1일이 일요일인 달은
+  // 하루짜리 첫 주가 한 주치를 통째로 가져가 마지막 온전한 주가 모자란다.
+  const give = (index: number, amount: number) => {
+    const allowance = Math.min(amount, remainingBudget)
+    periods[index].allowance += allowance
+    remainingBudget -= allowance
+  }
+  periods.forEach((_, index) => { if (days[index] === 7) give(index, weekly) })
+  // 자투리 기간은 일수 비례 몫(횟수 반올림 — 월 예산과 같은 방식)을 받고,
+  // 그래도 남으면 앞에서부터 한 주치까지 채운다.
+  periods.forEach((_, index) => {
+    if (days[index] < 7) give(index, Math.min(unit * Math.round((timesPerWeek * days[index]) / 7), weekly))
+  })
+  periods.forEach((period, index) => { if (days[index] < 7) give(index, weekly - period.allowance) })
   return periods
 }
 
