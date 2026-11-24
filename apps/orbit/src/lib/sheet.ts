@@ -16,32 +16,57 @@ export function useSheetViewport() {
   useEffect(() => {
     const root = document.documentElement
     const vv = window.visualViewport
-    const apply = () => {
-      if (!vv) return
-      // 키보드가 가린 아래쪽 높이. iOS 홈 화면 앱은 키보드가 없어도 안전 영역만큼 작은 차이를
-      // 보고하므로 화면의 20% 이상 가려졌을 때만 키보드로 본다(Wish 시트와 같은 기준).
-      const occludedBottom = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop))
-      const keyboardThreshold = Math.min(160, Math.round(window.innerHeight * 0.2))
-      root.style.setProperty('--sheet-vh', `${Math.round(vv.height)}px`)
-      root.style.setProperty('--sheet-top', `${Math.round(vv.offsetTop)}px`)
-      root.style.setProperty('--sheet-bottom', `${occludedBottom >= keyboardThreshold ? occludedBottom : 0}px`)
-    }
-    // 키보드가 열려 시트가 줄어든 뒤, 커서가 있는 칸만큼만 시트 안을 스크롤한다.
-    // iOS가 직접 맞추면 메모칸처럼 아래쪽 칸에서 시트를 과하게 밀어 올린다.
-    const reveal = () => {
-      const focused = document.activeElement
-      if (!(focused instanceof HTMLElement) || !focused.closest('.expense-sheet')) return
-      if (!focused.matches('input, textarea, select')) return
-      requestAnimationFrame(() => focused.scrollIntoView({ block: 'nearest' }))
-    }
-    const onResize = () => { apply(); reveal() }
-    openSheets += 1
-    apply()
-    vv?.addEventListener('resize', onResize)
-    vv?.addEventListener('scroll', apply)
     // 배경이 스크롤되면 iOS가 키보드에 맞춰 페이지를 밀어 올려 시트 위쪽이 잘린다.
     // 데스크톱은 시트가 옆 패널이라 잠그지 않는다(스크롤바가 사라지며 화면이 튄다).
     const lock = isMobileSheet()
+
+    const apply = () => {
+      if (!vv) return
+      // iOS는 아래쪽 입력칸(메모)을 누르면 키보드 높이만큼 문서를 밀어 올린다. 문서는
+      // 스크롤하지 않는 구조라 밀린 만큼 되돌리고, 칸을 보이게 하는 일은 시트 안 스크롤이 맡는다.
+      if (lock && window.scrollY !== 0) window.scrollTo(0, 0)
+      // 키보드 판정은 보이는 높이가 줄어든 정도로만 한다. 밀린 거리(offsetTop)까지 빼고 판정하면
+      // iOS가 화면을 밀어 올린 순간 가린 높이가 기준 아래로 떨어져 시트가 키보드 뒤로 내려간다.
+      // iOS 홈 화면 앱은 키보드가 없어도 안전 영역만큼 작은 차이를 보고하므로 20% 기준을 둔다.
+      const keyboardThreshold = Math.min(160, Math.round(window.innerHeight * 0.2))
+      const keyboardOpen = window.innerHeight - vv.height >= keyboardThreshold
+      const occludedBottom = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop))
+      root.style.setProperty('--sheet-vh', `${Math.round(vv.height)}px`)
+      root.style.setProperty('--sheet-top', `${Math.round(vv.offsetTop)}px`)
+      root.style.setProperty('--sheet-bottom', `${keyboardOpen ? occludedBottom : 0}px`)
+    }
+
+    // 키보드가 자리를 잡은 뒤 커서가 있는 칸이 보이도록 시트 안만 스크롤한다.
+    // scrollIntoView는 문서까지 밀어 올릴 수 있어 쓰지 않는다. 칸에 딸린 줄(메모 추천)까지
+    // 보여야 하면 감싼 요소에 data-sheet-reveal을 단다.
+    let revealTimer = 0
+    const reveal = (delay: number) => {
+      if (!lock) return
+      window.clearTimeout(revealTimer)
+      revealTimer = window.setTimeout(() => {
+        const focused = document.activeElement
+        if (!(focused instanceof HTMLElement) || !focused.matches('input, textarea, select')) return
+        const sheet = focused.closest<HTMLElement>('.expense-sheet')
+        if (!sheet) return
+        const target = focused.closest<HTMLElement>('[data-sheet-reveal]') ?? focused
+        const box = sheet.getBoundingClientRect()
+        const header = sheet.querySelector('.sheet-top')?.getBoundingClientRect().height ?? 0
+        const field = target.getBoundingClientRect()
+        const below = field.bottom + 16 - box.bottom
+        const above = box.top + header - field.top
+        if (below > 0) sheet.scrollTop += Math.min(below, Math.max(0, -above))
+        else if (above > 0) sheet.scrollTop -= above
+      }, delay)
+    }
+    const onViewport = () => { apply(); reveal(80) }
+    // 숫자 키보드에서 메모칸으로 옮길 때는 키보드 높이가 거의 그대로라 resize가 안 올 수 있다
+    const onFocusIn = () => reveal(320)
+
+    openSheets += 1
+    apply()
+    vv?.addEventListener('resize', onViewport)
+    vv?.addEventListener('scroll', onViewport)
+    document.addEventListener('focusin', onFocusIn)
     const prevBody = document.body.style.overflow
     const prevRoot = root.style.overflow
     if (lock) {
@@ -49,8 +74,10 @@ export function useSheetViewport() {
       root.style.overflow = 'hidden'
     }
     return () => {
-      vv?.removeEventListener('resize', onResize)
-      vv?.removeEventListener('scroll', apply)
+      vv?.removeEventListener('resize', onViewport)
+      vv?.removeEventListener('scroll', onViewport)
+      document.removeEventListener('focusin', onFocusIn)
+      window.clearTimeout(revealTimer)
       if (lock) {
         document.body.style.overflow = prevBody
         root.style.overflow = prevRoot

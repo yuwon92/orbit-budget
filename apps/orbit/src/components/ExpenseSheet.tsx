@@ -176,7 +176,8 @@ export function ExpenseSheet({
           </div>
           <i className={`toggle ${fromReserve ? 'on' : ''}`}><b /></i>
         </button>}
-        <div className="simple-fields">
+        {/* 메모칸에 커서가 오면 아래 추천 줄까지 보이게 시트를 스크롤한다(useSheetViewport) */}
+        <div className="simple-fields" data-sheet-reveal>
           <label className="date-field">
             <CalendarDays size={18} />
             <input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
