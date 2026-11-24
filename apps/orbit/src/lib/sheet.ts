@@ -20,11 +20,22 @@ export function useSheetViewport() {
     // 데스크톱은 시트가 옆 패널이라 잠그지 않는다(스크롤바가 사라지며 화면이 튄다).
     const lock = isMobileSheet()
 
+    let alive = true
+    let resets = 0
     const apply = () => {
-      if (!vv) return
+      if (!vv || !alive) return
       // iOS는 아래쪽 입력칸(메모)을 누르면 키보드 높이만큼 문서를 밀어 올린다. 문서는
       // 스크롤하지 않는 구조라 밀린 만큼 되돌리고, 칸을 보이게 하는 일은 시트 안 스크롤이 맡는다.
-      if (lock && window.scrollY !== 0) window.scrollTo(0, 0)
+      // 되돌린 직후의 visualViewport 값은 아직 밀린 상태라, 그 값으로 계산하면 키보드 높이가
+      // 0에 가깝게 나와 시트가 키보드 뒤에 남는다. 되돌린 결과가 반영된 다음 프레임에 다시 잰다.
+      // iOS가 계속 다시 밀면 프레임마다 되풀이하지 않도록 세 번까지만 되돌린다.
+      if (lock && window.scrollY !== 0 && resets < 3) {
+        resets += 1
+        window.scrollTo(0, 0)
+        requestAnimationFrame(apply)
+        return
+      }
+      if (window.scrollY === 0) resets = 0
       // 키보드 판정은 보이는 높이가 줄어든 정도로만 한다. 밀린 거리(offsetTop)까지 빼고 판정하면
       // iOS가 화면을 밀어 올린 순간 가린 높이가 기준 아래로 떨어져 시트가 키보드 뒤로 내려간다.
       // iOS 홈 화면 앱은 키보드가 없어도 안전 영역만큼 작은 차이를 보고하므로 20% 기준을 둔다.
@@ -44,6 +55,8 @@ export function useSheetViewport() {
       if (!lock) return
       window.clearTimeout(revealTimer)
       revealTimer = window.setTimeout(() => {
+        // 키보드가 다 올라온 뒤 한 번 더 잰다. 마지막 신호가 키보드가 덜 올라온 값이었어도 바로잡힌다.
+        apply()
         const focused = document.activeElement
         if (!(focused instanceof HTMLElement) || !focused.matches('input, textarea, select')) return
         const sheet = focused.closest<HTMLElement>('.expense-sheet')
@@ -66,6 +79,8 @@ export function useSheetViewport() {
     apply()
     vv?.addEventListener('resize', onViewport)
     vv?.addEventListener('scroll', onViewport)
+    // iOS가 문서를 밀었다 되돌릴 때 visualViewport scroll이 안 오는 경우가 있어 문서 스크롤도 듣는다
+    window.addEventListener('scroll', onViewport)
     document.addEventListener('focusin', onFocusIn)
     const prevBody = document.body.style.overflow
     const prevRoot = root.style.overflow
@@ -74,8 +89,10 @@ export function useSheetViewport() {
       root.style.overflow = 'hidden'
     }
     return () => {
+      alive = false
       vv?.removeEventListener('resize', onViewport)
       vv?.removeEventListener('scroll', onViewport)
+      window.removeEventListener('scroll', onViewport)
       document.removeEventListener('focusin', onFocusIn)
       window.clearTimeout(revealTimer)
       if (lock) {
